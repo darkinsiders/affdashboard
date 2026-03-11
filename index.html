@@ -98,6 +98,26 @@
   .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
   .header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
+  /* SAVE INDICATOR */
+  .save-indicator {
+    font-size: 12px; font-weight: 600;
+    padding: 5px 12px; border-radius: 6px;
+    opacity: 0; transition: opacity 0.3s;
+    white-space: nowrap;
+  }
+  .save-indicator.saving {
+    opacity: 1; color: var(--muted);
+    background: var(--card2); border: 1px solid var(--border);
+  }
+  .save-indicator.saved {
+    opacity: 1; color: var(--green);
+    background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.25);
+  }
+  .save-indicator.error {
+    opacity: 1; color: var(--red);
+    background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.25);
+  }
+
   /* MAIN */
   .main { padding: 24px 32px; max-width: 1800px; margin: 0 auto; }
 
@@ -755,10 +775,13 @@
       <p>Casino Partner Dashboard</p>
     </div>
   </div>
+  <div style="display:flex;align-items:center;gap:10px">
+  <span id="saveIndicator" class="save-indicator"></span>
   <button onclick="openGuide()" style="display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer">
     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/></svg>
     How It Works
   </button>
+  </div>
 </div>
 
 <!-- Guide Modal -->
@@ -787,7 +810,7 @@
       <div>
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">② How the Redirect Works</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">1</span><span style="font-size:13px;color:var(--text);line-height:1.6">Visitor opens the smartlink URL hosted on Netlify</span></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">1</span><span style="font-size:13px;color:var(--text);line-height:1.6">Visitor opens the smartlink URL hosted on GitHub Pages</span></div>
           <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">2</span><span style="font-size:13px;color:var(--text);line-height:1.6">The page calls <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">ipapi.co</code> to detect their country code (e.g. <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">DE</code>, <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">SI</code>)</span></div>
           <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">3</span><span style="font-size:13px;color:var(--text);line-height:1.6">Their IP is hashed to a number — this maps them to a casino based on your traffic weights (e.g. 70% IVYBET / 30% ROLLETTO). The same IP always gets the same casino.</span></div>
           <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">4</span><span style="font-size:13px;color:var(--text);line-height:1.6">If their country is not covered, they go to the Fallback URL you set</span></div>
@@ -802,7 +825,7 @@
           <div style="font-size:13px;color:var(--text);line-height:1.6">1. Click the funnel tab (e.g. <strong>Dark</strong>) → scroll down to <strong>Smartlinks</strong> → <strong>Config tab</strong></div>
           <div style="font-size:13px;color:var(--text);line-height:1.6">2. Under <strong>Assigned Deals</strong> — use the <strong>+ Add deal</strong> dropdown to add a casino, or <strong>×</strong> to remove one</div>
           <div style="font-size:13px;color:var(--text);line-height:1.6">3. Use ↑ ↓ arrows to change priority order</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6">4. After changing — <strong>re-download the smartlink and re-upload to Netlify</strong></div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">4. After changing — <strong>re-download the smartlink (routes update automatically via Firebase — no re-upload needed)</strong></div>
         </div>
       </div>
 
@@ -812,7 +835,7 @@
         <div style="display:flex;flex-direction:column;gap:6px">
           <div style="font-size:13px;color:var(--text);line-height:1.6">Each assigned casino has a <strong>% weight</strong> input. Total must equal 100%.</div>
           <div style="font-size:13px;color:var(--text);line-height:1.6">Example: IVYBET 70% + ROLLETTO 30% = visitors in shared GEOs get IVYBET 70% of the time, ROLLETTO 30% of the time — and it stays consistent per IP.</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6">Click <strong>Auto-balance</strong> to split evenly. After changing weights — <strong>re-download and re-upload</strong>.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">Click <strong>Auto-balance</strong> to split evenly. Weight changes push to Firebase automatically — live smartlinks update instantly.</div>
         </div>
       </div>
 
@@ -824,13 +847,13 @@
 
       <!-- Section 6 -->
       <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">⑥ Hosting on Netlify (Getting the Live URL)</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">⑥ Hosting on GitHub Pages (Getting the Live URL)</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <div style="font-size:13px;color:var(--text);line-height:1.6">1. Download the smartlink file (e.g. <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">dark-smartlink.html</code>)</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6">2. Go to <strong>netlify.com</strong> → drag the file into the Netlify Drop area → it gives you a URL like <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">https://abc123.netlify.app</code></div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6">3. The full smartlink URL is: <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">https://abc123.netlify.app/dark-smartlink.html</code></div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">2. Go to your GitHub repo for that funnel → click the file → edit/replace it → commit</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">3. The smartlink URL is: <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">https://darkinsiders.github.io/dark-/</code></div>
           <div style="font-size:13px;color:var(--text);line-height:1.6">4. Paste this URL into the <strong>Hosted URL</strong> field in the dashboard so it stays saved</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6">5. To update: re-download the file → on Netlify go to your site → <strong>Deploys → drag new file</strong>. The URL stays the same.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">5. <strong>Routes update automatically</strong> via Firebase — you only need to re-upload if the smartlink file itself changes (rare)</div>
         </div>
       </div>
 
@@ -850,7 +873,7 @@
         <div style="display:flex;flex-direction:column;gap:5px">
           <div style="font-size:13px;color:var(--text);line-height:1.6"><strong>ipapi.co</strong> — 1,000 visitors/day free. Above that, falls back to freeipapi.com automatically. Buy Pro (~$15/mo) for 30,000/day if needed.</div>
           <div style="font-size:13px;color:var(--text);line-height:1.6"><strong>freeipapi.com</strong> — generous free tier, no hard limit documented.</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6"><strong>Netlify</strong> — 100GB bandwidth/month free ≈ 20 million redirects. No issues expected.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6"><strong>GitHub Pages</strong> — Free, unlimited bandwidth for static files. No issues expected.</div>
         </div>
       </div>
 
@@ -1099,6 +1122,32 @@ var db = firebase.firestore();
 var DOC_REF = db.collection('dashboard').doc('data');
 
 var STORAGE_KEY = 'affiliate_deals';
+
+// ── Debounce utility ───────────────────────────────────────────────────────
+function debounce(fn, ms) {
+  var timer;
+  return function() {
+    var args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function() { fn.apply(null, args); }, ms);
+  };
+}
+
+// ── Save indicator ─────────────────────────────────────────────────────────
+var saveIndicatorTimer = null;
+function showSaveIndicator(state, msg) {
+  var el = document.getElementById('saveIndicator');
+  if (!el) return;
+  clearTimeout(saveIndicatorTimer);
+  el.className = 'save-indicator ' + state;
+  el.textContent = msg;
+  if (state === 'saved') {
+    saveIndicatorTimer = setTimeout(function() {
+      el.style.opacity = '0';
+      setTimeout(function() { el.className = 'save-indicator'; }, 300);
+    }, 2000);
+  }
+}
 
 var SEED_DEALS = [
   { id: 1, name: 'IVYBET',       url: 'https://track.7ladies.com/visit/?bta=35364&nci=5370&afp1&afp10=Facebook&utm_campaign=mindep10&afp2=Dark',   geos: 'AL AT AU BE CA CH DE DK ES FI GR HU IE IT LU ME MK NO NZ PL PT RO RS SI SK',    bgaming: true, deposit: 150, revshare: 40, username: 'darkadmin',                    password: 'Desc123$',     contact: '@SarahCass1' },
@@ -1406,8 +1455,6 @@ var FUNNEL_NAMES = ['Dark', 'Slotio', 'Scanio', 'Spin', 'Shadow'];
 var FUNNEL_COLORS = {
   Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', Spin: '#f85149', Shadow: '#bc8cff'
 };
-var assignVisible = true;
-var matrixVisible = true;
 
 function saveAssignments() {
   saveToFirebase();
@@ -1516,130 +1563,6 @@ function renderConflictBadges() {
   });
 }
 
-function renderAssignments() {
-  var container = document.getElementById('funnelCols');
-  if (!container) return;
-  container.innerHTML = FUNNEL_NAMES.map(function(f) {
-    var color = FUNNEL_COLORS[f];
-    var assigned = getAssignedDeals(f);
-    var assignedIds = assignments[f] || [];
-    var unassigned = deals.filter(function(d) { return assignedIds.indexOf(d.id) === -1; });
-    var conflictCount = getConflictCount(f);
-
-    var cardsHtml = assigned.map(function(deal, idx) {
-      return '<div class="deal-card">' +
-        '<div class="deal-card-priority">' + (idx + 1) + '</div>' +
-        '<div class="deal-card-name" title="' + escHtml(deal.name) + '">' + escHtml(deal.name) + '</div>' +
-        '<div class="deal-card-controls">' +
-          '<button class="btn-move" onclick="moveAssignment(\'' + f + '\',' + idx + ',-1)"' + (idx === 0 ? ' disabled' : '') + ' title="Move up">\u2191</button>' +
-          '<button class="btn-move" onclick="moveAssignment(\'' + f + '\',' + idx + ',1)"' + (idx === assigned.length - 1 ? ' disabled' : '') + ' title="Move down">\u2193</button>' +
-          '<button class="btn-remove-deal" onclick="removeAssignment(\'' + f + '\',' + idx + ')" title="Remove">\u00d7</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-
-    var addHtml = unassigned.length > 0
-      ? '<div class="assign-add">' +
-          '<select onchange="addAssignment(\'' + f + '\',parseInt(this.value)||0);this.value=\'\'">' +
-          '<option value="">+ Add deal\u2026</option>' +
-          unassigned.map(function(d) { return '<option value="' + d.id + '">' + escHtml(d.name) + '</option>'; }).join('') +
-          '</select>' +
-        '</div>'
-      : '<div class="assign-add" style="color:var(--muted);font-size:11px;text-align:center;padding-top:4px">All deals assigned</div>';
-
-    var badgeHtml = conflictCount > 0
-      ? '<span class="conflict-badge">\u26a0 ' + conflictCount + ' conflict' + (conflictCount > 1 ? 's' : '') + '</span>'
-      : '';
-
-    return '<div class="funnel-col">' +
-      '<div class="funnel-col-header">' +
-        '<span class="funnel-col-name" style="color:' + color + '">' + f + '</span>' +
-        badgeHtml +
-      '</div>' +
-      '<div class="funnel-col-body">' +
-        (cardsHtml || '<div style="color:var(--muted);font-size:11px;text-align:center;padding:8px">No deals assigned</div>') +
-      '</div>' +
-      addHtml +
-    '</div>';
-  }).join('');
-}
-
-function renderGeoMatrix() {
-  var container = document.getElementById('matrixContent');
-  if (!container) return;
-
-  var allGeos = {};
-  FUNNEL_NAMES.forEach(function(f) {
-    getAssignedDeals(f).forEach(function(d) {
-      geoArray(d).forEach(function(g) { allGeos[g] = 1; });
-    });
-  });
-  var sortedGeos = Object.keys(allGeos).sort();
-
-  if (sortedGeos.length === 0) {
-    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted)">No GEOs covered</div>';
-    return;
-  }
-
-  var geoCounts = {};
-  FUNNEL_NAMES.forEach(function(f) {
-    geoCounts[f] = 0;
-    sortedGeos.forEach(function(geo) {
-      if (getEffectiveDeal(f, geo)) geoCounts[f]++;
-    });
-  });
-
-  var html = '<table class="geo-matrix"><thead><tr>' +
-    '<th>GEO</th>' +
-    FUNNEL_NAMES.map(function(f) {
-      var color = FUNNEL_COLORS[f];
-      return '<th style="color:' + color + '">' + f + '<br><span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">' + geoCounts[f] + ' GEOs</span></th>';
-    }).join('') +
-  '</tr></thead><tbody>';
-
-  html += sortedGeos.map(function(geo) {
-    var cellDeals = {};
-    FUNNEL_NAMES.forEach(function(f) {
-      cellDeals[f] = getEffectiveDeal(f, geo);
-    });
-
-    var dealCount = {};
-    FUNNEL_NAMES.forEach(function(f) {
-      if (cellDeals[f]) {
-        var key = String(cellDeals[f].id);
-        dealCount[key] = (dealCount[key] || 0) + 1;
-      }
-    });
-
-    var cells = FUNNEL_NAMES.map(function(f) {
-      var d = cellDeals[f];
-      if (!d) return '<td class="matrix-cell-empty">—</td>';
-      var isConflict = dealCount[String(d.id)] > 1;
-      return '<td class="' + (isConflict ? 'matrix-cell-conflict' : 'matrix-cell-ok') + '">' + escHtml(d.name) + '</td>';
-    }).join('');
-
-    return '<tr><td class="geo-code">' + escHtml(geo) + '</td>' + cells + '</tr>';
-  }).join('');
-
-  html += '</tbody></table>';
-  container.innerHTML = html;
-}
-
-function toggleAssignments() {
-  assignVisible = !assignVisible;
-  document.getElementById('assignWrap').style.display = assignVisible ? '' : 'none';
-  document.getElementById('btnToggleAssign').innerHTML = assignVisible
-    ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg> Hide'
-    : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show';
-}
-
-function toggleGeoMatrix() {
-  matrixVisible = !matrixVisible;
-  document.getElementById('matrixWrap').style.display = matrixVisible ? '' : 'none';
-  document.getElementById('btnToggleMatrix').innerHTML = matrixVisible
-    ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg> Hide'
-    : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show';
-}
 
 // ── Persistence ────────────────────────────────────────────────────────────
 function saveDeals() {
@@ -1823,7 +1746,11 @@ function renderTable() {
 
     var loginHtml = '<div class="login-cell">' +
       '<span class="login-user" title="' + escHtml(deal.username || '') + '">' + escHtml(deal.username || '&mdash;') + '</span>' +
-      (deal.password ? '<button class="btn-pass" onclick="copyPass(this,' + deal.id + ')" title="Copy password">' + ICON_LOCK + 'pw</button>' : '') +
+      (deal.password
+        ? '<button class="btn-pass" onclick="copyPass(this,' + deal.id + ')" title="Copy password">' + ICON_LOCK + 'pw</button>' +
+          '<button class="btn-pass" onclick="toggleShowPass(this,' + deal.id + ')" title="Show/hide password" style="font-size:11px">&#128065;</button>' +
+          '<span id="pw-' + deal.id + '" style="display:none;font-size:11px;font-family:monospace;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(deal.password || '') + '"></span>'
+        : '') +
     '</div>';
 
     var contactHtml = deal.contact
@@ -1905,6 +1832,29 @@ function copyPass(btn, dealId) {
   var deal = deals.find(function(d) { return d.id === dealId; });
   if (!deal || !deal.password) return;
   copyToClipboard(deal.password, btn, ICON_LOCK + 'pw');
+}
+
+function toggleShowPass(btn, dealId) {
+  var deal = deals.find(function(d) { return d.id === dealId; });
+  if (!deal || !deal.password) return;
+  var span = document.getElementById('pw-' + dealId);
+  if (!span) return;
+  var isHidden = span.style.display === 'none';
+  if (isHidden) {
+    span.textContent = deal.password;
+    span.style.display = '';
+    btn.style.color = 'var(--accent)';
+    // Auto-hide after 5 seconds
+    setTimeout(function() {
+      span.style.display = 'none';
+      span.textContent = '';
+      btn.style.color = '';
+    }, 5000);
+  } else {
+    span.style.display = 'none';
+    span.textContent = '';
+    btn.style.color = '';
+  }
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────
@@ -2089,7 +2039,7 @@ function saveSmartlinkFallbacks() {
 }
 
 function saveDealWeights() {
-  saveToFirebase();
+  debouncedSaveToFirebase();
 }
 
 function getWeight(funnel, dealId) {
@@ -2226,6 +2176,16 @@ function copySmartlinkUrl(funnel, btn) {
 }
 
 function downloadSmartlink(funnel) {
+  var assigned = getAssignedDeals(funnel);
+  var warnings = [];
+  if (assigned.length === 0) warnings.push('No deals assigned to ' + funnel);
+  var totalWeight = assigned.reduce(function(s, d) { return s + getWeight(funnel, d.id); }, 0);
+  if (assigned.length > 0 && totalWeight !== 100) warnings.push('Weights add up to ' + totalWeight + '% (must be 100%)');
+  if (!smartlinkFallbacks[funnel]) warnings.push('No fallback URL set');
+  if (warnings.length > 0) {
+    var ok = confirm('Warning:\n\n• ' + warnings.join('\n• ') + '\n\nDownload anyway?');
+    if (!ok) return;
+  }
   var html = generateRedirectHtml(funnel);
   var blob = new Blob([html], { type: 'text/html' });
   var url = URL.createObjectURL(blob);
@@ -2653,15 +2613,23 @@ function toggleSmartlinks() {
 
 // ── Firebase save ──────────────────────────────────────────────────────────
 function saveToFirebase() {
+  showSaveIndicator('saving', 'Saving…');
   DOC_REF.set({
     deals: deals,
     assignments: assignments,
     dealWeights: dealWeights,
     smartlinkFallbacks: smartlinkFallbacks,
     smartlinkHostedUrls: smartlinkHostedUrls
-  }).catch(function(e) { console.error('Firebase save error:', e); });
+  }).then(function() {
+    showSaveIndicator('saved', 'Saved ✓');
+  }).catch(function(e) {
+    console.error('Firebase save error:', e);
+    showSaveIndicator('error', 'Save failed');
+  });
   saveRoutesToFirebase();
 }
+
+var debouncedSaveToFirebase = debounce(saveToFirebase, 600);
 
 function saveRoutesToFirebase() {
   FUNNEL_NAMES.forEach(function(f) {
@@ -2680,69 +2648,76 @@ function saveRoutesToFirebase() {
 // Show loading state
 document.body.innerHTML += '<div id="loadingOverlay" style="position:fixed;inset:0;background:#0d0f14;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px"><div style="font-size:16px;color:#7d8590">Loading dashboard\u2026</div></div>';
 
-DOC_REF.get().then(function(doc) {
-  if (doc.exists) {
-    var data = doc.data();
-    deals = data.deals || [];
-    assignments = data.assignments || JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
-    dealWeights = data.dealWeights || {};
-    smartlinkFallbacks = data.smartlinkFallbacks || {};
-    smartlinkHostedUrls = data.smartlinkHostedUrls || {};
-    // Run migrations on loaded deals
-    var seedMap = {};
-    SEED_DEALS.forEach(function(d) { seedMap[d.id] = d; });
-    var changed = false;
-    deals.forEach(function(d) {
-      var seed = seedMap[d.id];
-      if (!d.bgaming) { d.bgaming = true; changed = true; }
-      if (seed) {
-        if (d.username === undefined || d.username === null) { d.username = seed.username; changed = true; }
-        if (d.password === undefined || d.password === null) { d.password = seed.password; changed = true; }
-        if (d.contact === undefined || d.contact === null) { d.contact = seed.contact; changed = true; }
-        if (d.id === 3 && d.url.indexOf('brand=rolletto') !== -1) { d.url = seed.url; changed = true; }
-        if (d.id === 6 && d.url === 'https://track.ftdgallery.com/visit/?bta=35437&brand=spinania&utm_campaign=Dark') { d.url = seed.url; changed = true; }
-      }
+var isInitialLoad = true;
+
+DOC_REF.onSnapshot(function(doc) {
+  if (isInitialLoad) {
+    isInitialLoad = false;
+    if (doc.exists) {
+      var data = doc.data();
+      deals = data.deals || [];
+      assignments = data.assignments || JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
+      dealWeights = data.dealWeights || {};
+      smartlinkFallbacks = data.smartlinkFallbacks || {};
+      smartlinkHostedUrls = data.smartlinkHostedUrls || {};
+      // Run migrations
+      var seedMap = {};
+      SEED_DEALS.forEach(function(d) { seedMap[d.id] = d; });
+      var changed = false;
+      deals.forEach(function(d) {
+        var seed = seedMap[d.id];
+        if (!d.bgaming) { d.bgaming = true; changed = true; }
+        if (seed) {
+          if (d.username === undefined || d.username === null) { d.username = seed.username; changed = true; }
+          if (d.password === undefined || d.password === null) { d.password = seed.password; changed = true; }
+          if (d.contact === undefined || d.contact === null) { d.contact = seed.contact; changed = true; }
+          if (d.id === 3 && d.url.indexOf('brand=rolletto') !== -1) { d.url = seed.url; changed = true; }
+          if (d.id === 6 && d.url === 'https://track.ftdgallery.com/visit/?bta=35437&brand=spinania&utm_campaign=Dark') { d.url = seed.url; changed = true; }
+        }
+      });
+      if (changed) saveToFirebase();
+    } else {
+      // First time — seed with default data
+      deals = JSON.parse(JSON.stringify(SEED_DEALS));
+      assignments = JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
+      dealWeights = {};
+      smartlinkFallbacks = {};
+      smartlinkHostedUrls = {};
+      FUNNEL_NAMES.forEach(function(f) { equalizeWeights(f); });
+      saveToFirebase();
+    }
+    // Finalize weights
+    FUNNEL_NAMES.forEach(function(f) {
+      if (!dealWeights[f]) equalizeWeights(f);
     });
-    if (changed) saveToFirebase();
-  } else {
-    // First time — seed with default data
-    deals = JSON.parse(JSON.stringify(SEED_DEALS));
-    assignments = JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
-    dealWeights = {};
-    smartlinkFallbacks = {};
-    smartlinkHostedUrls = {};
-    FUNNEL_NAMES.forEach(function(f) { equalizeWeights(f); });
-    saveToFirebase();
-  }
-  // Finalize weights
-  FUNNEL_NAMES.forEach(function(f) {
-    if (!dealWeights[f]) equalizeWeights(f);
-  });
-  // Remove loading overlay and render
-  var overlay = document.getElementById('loadingOverlay');
-  if (overlay) overlay.remove();
-  render();
-  setFunnel(null);
-  renderGlitch();
-  renderConflictBadges();
-  renderSmartlinks();
-  renderFunnelGeoBar();
-  // Set up real-time listener for cross-browser sync
-  DOC_REF.onSnapshot(function(doc) {
-    if (!doc.exists) return;
-    var data = doc.data();
-    deals = data.deals || deals;
-    assignments = data.assignments || assignments;
-    dealWeights = data.dealWeights || dealWeights;
-    smartlinkFallbacks = data.smartlinkFallbacks || smartlinkFallbacks;
-    smartlinkHostedUrls = data.smartlinkHostedUrls || smartlinkHostedUrls;
+    // Remove loading overlay and render
+    var overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.remove();
     render();
-    renderSmartlinks();
+    setFunnel(null);
+    renderGlitch();
     renderConflictBadges();
+    renderSmartlinks();
     renderFunnelGeoBar();
-  }, function(e) { console.error('Snapshot error:', e); });
-}).catch(function(e) {
-  console.error('Firebase load error:', e);
+    return;
+  }
+
+  // Real-time update from another client/tab
+  if (!doc.exists) return;
+  var data = doc.data();
+  deals = data.deals || deals;
+  assignments = data.assignments || assignments;
+  dealWeights = data.dealWeights || dealWeights;
+  smartlinkFallbacks = data.smartlinkFallbacks || smartlinkFallbacks;
+  smartlinkHostedUrls = data.smartlinkHostedUrls || smartlinkHostedUrls;
+  render();
+  renderSmartlinks();
+  renderConflictBadges();
+  renderFunnelGeoBar();
+  if (currentPage === 'manage') renderManagePage();
+
+}, function(e) {
+  console.error('Firebase error:', e);
   var overlay = document.getElementById('loadingOverlay');
   if (overlay) overlay.innerHTML = '<div style="font-size:16px;color:#f85149">Failed to connect to database</div><div style="font-size:13px;color:#7d8590;margin-top:8px">' + e.message + '</div>';
 });
