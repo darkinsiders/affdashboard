@@ -1,0 +1,2573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Deals</title>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --card: #161b22;
+    --card2: #1c2230;
+    --border: #2a3140;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --badge-geo: #1a2744;
+    --badge-geo-text: #79c0ff;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* FUNNEL NAV */
+  .funnel-nav {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .funnel-nav::-webkit-scrollbar { display: none; }
+  .funnel-tab {
+    padding: 13px 20px;
+    font-size: 13px; font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .funnel-tab:hover { color: var(--text); }
+  .funnel-tab.active-universal { color: var(--purple); border-bottom-color: var(--purple); }
+  .funnel-tab.active-dark    { color: #58a6ff; border-bottom-color: #58a6ff; }
+  .funnel-tab.active-slotio  { color: #3fb950; border-bottom-color: #3fb950; }
+  .funnel-tab.active-scanio  { color: #f0883e; border-bottom-color: #f0883e; }
+  .funnel-tab.active-spin    { color: #f85149; border-bottom-color: #f85149; }
+  .funnel-tab.active-shadow  { color: #bc8cff; border-bottom-color: #bc8cff; }
+
+  .funnel-badge {
+    display: inline-block;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    padding: 2px 7px; border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge-universal { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .badge-dark      { background: rgba(88,166,255,0.15);  color: #58a6ff; }
+  .badge-slotio    { background: rgba(63,185,80,0.15);   color: #3fb950; }
+  .badge-scanio    { background: rgba(240,136,62,0.15);  color: #f0883e; }
+  .badge-spin      { background: rgba(248,81,73,0.15);   color: #f85149; }
+  .badge-shadow    { background: rgba(188,140,255,0.15); color: #bc8cff; }
+
+  /* HEADER */
+  .header {
+    background: var(--card);
+    border-bottom: none;
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: space-between;
+  }
+  .header-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #1f6feb, #388bfd);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  .header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* MAIN */
+  .main { padding: 24px 32px; max-width: 1800px; margin: 0 auto; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* TOOLBAR */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 220px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  #searchInput {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px 9px 34px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #searchInput:focus { border-color: var(--accent); }
+  #searchInput::placeholder { color: var(--muted); }
+
+  .toggle-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    color: var(--muted);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .toggle-pill.active { border-color: var(--green); color: var(--green); }
+  .toggle-pill .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.15s;
+  }
+  .toggle-pill.active .dot { background: var(--green); }
+
+  .sort-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .sort-btn.active { border-color: var(--accent); color: var(--accent); }
+  .sort-btn .sort-arrow { font-size: 11px; opacity: 0.7; }
+
+  .btn-add {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .btn-add:hover { opacity: 0.85; }
+
+  /* TABLE */
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+  thead th {
+    background: var(--card2);
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.025); }
+  td { padding: 12px 16px; vertical-align: middle; }
+
+  /* Casino name */
+  .casino-name { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; color: var(--text); }
+
+  /* Link cell */
+  .link-cell { display: flex; align-items: center; gap: 8px; }
+  .link-text { color: var(--muted); font-size: 12px; font-family: monospace; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn-copy {
+    flex-shrink: 0;
+    background: none; border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 7px;
+    cursor: pointer; color: var(--muted);
+    display: flex; align-items: center;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-copy:hover { color: var(--accent); border-color: var(--accent); }
+  .btn-copy.copied { color: var(--green); border-color: var(--green); }
+
+  /* Login cell */
+  .login-cell { display: flex; align-items: center; gap: 6px; }
+  .login-user {
+    font-size: 11px; font-family: monospace;
+    color: var(--muted);
+    max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .btn-pass {
+    flex-shrink: 0;
+    background: none; border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 7px;
+    cursor: pointer; color: var(--muted);
+    display: flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 600;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .btn-pass:hover { color: var(--purple); border-color: var(--purple); }
+  .btn-pass.copied { color: var(--green); border-color: var(--green); }
+
+  /* Contact cell */
+  .contact-handle {
+    font-size: 12px; font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  /* GEO badges */
+  .geo-wrap { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; max-width: 240px; overflow: hidden; }
+  .geo-badge {
+    background: var(--badge-geo);
+    color: var(--badge-geo-text);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .geo-more {
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .geo-more:hover { color: var(--accent); }
+
+  /* BGaming */
+  .bgaming-yes {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(63,185,80,0.12);
+    color: var(--green);
+    border: 1px solid rgba(63,185,80,0.3);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px; font-weight: 600;
+  }
+  .bgaming-no { color: var(--muted); font-size: 18px; }
+
+  /* Deal badge */
+  .deal-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .deal-green { background: rgba(63,185,80,0.12); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .deal-yellow { background: rgba(210,153,34,0.12); color: var(--yellow); border: 1px solid rgba(210,153,34,0.3); }
+
+  /* Actions */
+  .actions { display: flex; align-items: center; gap: 6px; }
+  .btn-icon {
+    background: none; border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px;
+    cursor: pointer; color: var(--muted);
+    display: flex; align-items: center;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-edit:hover { color: var(--accent); border-color: var(--accent); }
+  .btn-delete:hover { color: var(--red); border-color: var(--red); }
+
+  /* Inline delete confirm */
+  .confirm-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--red); }
+  .confirm-wrap span { white-space: nowrap; }
+  .btn-confirm-yes, .btn-confirm-no {
+    border-radius: 5px; padding: 3px 10px;
+    font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid;
+  }
+  .btn-confirm-yes { background: rgba(248,81,73,0.12); color: var(--red); border-color: var(--red); }
+  .btn-confirm-yes:hover { background: rgba(248,81,73,0.25); }
+  .btn-confirm-no { background: none; color: var(--muted); border-color: var(--border); }
+  .btn-confirm-no:hover { color: var(--text); border-color: var(--muted); }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+  .empty svg { margin-bottom: 12px; opacity: 0.4; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 100;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(3px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 540px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding: 28px;
+  }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .modal-title { font-size: 16px; font-weight: 700; }
+  .btn-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 20px; line-height: 1;
+    padding: 2px 6px; border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .btn-close:hover { color: var(--text); }
+
+  .form-section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 14px; margin-top: 4px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .form-group { margin-bottom: 18px; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .form-input {
+    width: 100%;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--muted); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Toggle switch */
+  .toggle-wrap { display: flex; align-items: center; gap: 12px; }
+  .switch { position: relative; width: 44px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .switch input:checked + .slider { background: var(--green); }
+  .switch input:checked + .slider::before { transform: translateX(20px); }
+  .toggle-label { font-size: 13px; color: var(--text); }
+
+  .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .btn-cancel {
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 18px;
+    color: var(--muted); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-cancel:hover { color: var(--text); border-color: var(--muted); }
+  .btn-save {
+    background: var(--accent); color: #000;
+    border: none; border-radius: 8px; padding: 9px 22px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-save:hover { opacity: 0.85; }
+
+  /* GLITCH TEMPLATES */
+  .glitch-section { margin-top: 32px; }
+  .glitch-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .glitch-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 700; color: var(--text);
+  }
+  .glitch-title-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
+    background: rgba(248,81,73,0.12); color: var(--red);
+    border: 1px solid rgba(248,81,73,0.3);
+    padding: 2px 8px; border-radius: 20px;
+  }
+  .glitch-count { font-size: 11px; color: var(--muted); }
+  .btn-toggle-glitch {
+    background: none; border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 12px;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-toggle-glitch:hover { color: var(--text); border-color: var(--muted); }
+  .glitch-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  .glitch-wrap table { width: 100%; border-collapse: collapse; min-width: 680px; }
+  .glitch-wrap thead th {
+    background: var(--card2);
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .glitch-wrap tbody tr { border-bottom: 1px solid var(--border); }
+  .glitch-wrap tbody tr:last-child { border-bottom: none; }
+  .glitch-wrap tbody tr:hover { background: rgba(255,255,255,0.025); }
+  .glitch-wrap td { padding: 10px 16px; font-size: 13px; vertical-align: middle; }
+  .slot-name { font-weight: 600; color: var(--text); }
+  .mono-val { font-family: monospace; font-size: 12px; color: var(--muted); }
+  .acc-high   { color: var(--green);  font-weight: 700; }
+  .acc-mid    { color: var(--yellow); font-weight: 700; }
+  .acc-low    { color: #f0883e;       font-weight: 700; }
+  .return-val { font-family: monospace; font-size: 12px; font-weight: 600; color: var(--accent); }
+
+  /* GEO tooltip */
+  .geo-tooltip-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 200;
+  }
+  .geo-tooltip {
+    position: fixed;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    max-width: 280px;
+    display: flex; flex-wrap: wrap; gap: 4px;
+    z-index: 201;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  /* SMARTLINKS SECTION */
+  .smartlinks-section { margin-top: 32px; }
+  .smartlinks-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .smartlinks-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 700; color: var(--text);
+  }
+  .btn-toggle-smartlinks {
+    background: none; border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 12px;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-toggle-smartlinks:hover { color: var(--text); border-color: var(--muted); }
+  .smartlink-stats { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .smartlink-fallback-row { margin-bottom: 10px; }
+  .smartlink-route-table { width: 100%; border-collapse: collapse; }
+  .smartlink-route-table thead th {
+    background: var(--bg);
+    padding: 5px 8px;
+    text-align: left;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .smartlink-route-table tbody tr { border-bottom: 1px solid var(--border); }
+  .smartlink-route-table tbody tr:last-child { border-bottom: none; }
+  .smartlink-route-table td { padding: 5px 8px; vertical-align: middle; }
+  .btn-download {
+    width: 100%;
+    background: rgba(188,140,255,0.15);
+    color: var(--purple);
+    border: 1px solid rgba(188,140,255,0.3);
+    border-radius: 7px;
+    padding: 8px 12px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .btn-download:hover { background: rgba(188,140,255,0.25); border-color: rgba(188,140,255,0.5); }
+  /* Smartlink flow diagram */
+  .smartlink-flow {
+    display: flex; align-items: center;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 20px;
+    margin-bottom: 12px; overflow-x: auto; scrollbar-width: none;
+  }
+  .smartlink-flow::-webkit-scrollbar { display: none; }
+  .flow-step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; min-width: 72px; }
+  .flow-step-icon {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .flow-step-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text); text-align: center; white-space: nowrap; }
+  .flow-step-sub { font-size: 10px; color: var(--muted); text-align: center; white-space: nowrap; }
+  .flow-arrow { flex: 1; min-width: 16px; text-align: center; color: var(--border); font-size: 16px; padding-bottom: 16px; }
+  /* Hosted URL row */
+  .smartlink-hosted-row {
+    background: rgba(88,166,255,0.06); border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 7px; padding: 8px; margin-bottom: 8px;
+  }
+  .smartlink-hosted-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); margin-bottom: 5px; }
+  .smartlink-url-display {
+    flex: 1; font-size: 11px; font-family: monospace; color: var(--text);
+    background: var(--card2); border: 1px solid var(--border); border-radius: 5px;
+    padding: 5px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+  .smartlink-url-row { display: flex; gap: 4px; align-items: center; }
+
+  @media (max-width: 700px) {
+    .main { padding: 16px; }
+    .header { padding: 16px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ASSIGNMENTS SECTION */
+  .assignments-section { margin-top: 32px; }
+  .assignments-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .assignments-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 700; color: var(--text);
+  }
+  .btn-toggle-assign {
+    background: none; border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 12px;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-toggle-assign:hover { color: var(--text); border-color: var(--muted); }
+  .funnel-cols {
+    display: flex;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  .funnel-col {
+    flex: 1;
+    min-width: 190px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .funnel-col:last-child { border-right: none; }
+  .funnel-col-header {
+    padding: 10px 14px;
+    background: var(--card2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .funnel-col-name {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .conflict-badge {
+    font-size: 10px; font-weight: 700;
+    background: rgba(240,136,62,0.15);
+    color: #f0883e;
+    border: 1px solid rgba(240,136,62,0.3);
+    border-radius: 20px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+  .tab-cbadge {
+    display: none;
+    font-size: 10px; font-weight: 700;
+    background: rgba(240,136,62,0.15);
+    color: #f0883e;
+    border: 1px solid rgba(240,136,62,0.3);
+    border-radius: 20px;
+    padding: 1px 6px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .funnel-col-body {
+    padding: 8px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .deal-card {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 9px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .deal-card-priority {
+    width: 20px; height: 20px;
+    background: rgba(88,166,255,0.12);
+    color: var(--accent);
+    border-radius: 50%;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .deal-card-name {
+    flex: 1;
+    font-size: 12px; font-weight: 600;
+    color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .deal-card-controls {
+    display: flex; align-items: center; gap: 2px;
+    flex-shrink: 0;
+  }
+  .btn-move, .btn-remove-deal {
+    background: none; border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 5px;
+    cursor: pointer; color: var(--muted);
+    font-size: 11px; line-height: 1;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-move:hover { color: var(--accent); border-color: var(--accent); }
+  .btn-remove-deal:hover { color: var(--red); border-color: var(--red); }
+  .btn-move:disabled { opacity: 0.3; cursor: default; }
+  .btn-move:disabled:hover { color: var(--muted); border-color: var(--border); }
+  .assign-add {
+    padding: 8px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .assign-add select {
+    width: 100%;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+  }
+  .assign-add select:hover { border-color: var(--accent); color: var(--text); }
+
+  /* GEO MATRIX */
+  .matrix-section { margin-top: 32px; }
+  .matrix-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .matrix-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 700; color: var(--text);
+  }
+  .btn-toggle-matrix {
+    background: none; border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 12px;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-toggle-matrix:hover { color: var(--text); border-color: var(--muted); }
+  .matrix-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  .geo-matrix { width: 100%; border-collapse: collapse; min-width: 480px; }
+  .geo-matrix thead th {
+    background: var(--card2);
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .geo-matrix tbody tr { border-bottom: 1px solid var(--border); }
+  .geo-matrix tbody tr:last-child { border-bottom: none; }
+  .geo-matrix tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .geo-matrix td { padding: 7px 16px; font-size: 12px; vertical-align: middle; }
+  .geo-matrix td.geo-code { font-weight: 600; color: var(--muted); font-size: 11px; }
+  .matrix-cell-ok { background: rgba(63,185,80,0.08); color: var(--green); font-weight: 600; }
+  .matrix-cell-conflict { background: rgba(210,153,34,0.12); color: var(--yellow); font-weight: 600; }
+  .matrix-cell-empty { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="header-icon">&#9824;</div>
+    <div>
+      <h1>Universal Deals</h1>
+      <p>Casino Partner Dashboard</p>
+    </div>
+  </div>
+  <button onclick="openGuide()" style="display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/></svg>
+    How It Works
+  </button>
+</div>
+
+<!-- Guide Modal -->
+<div id="guideOverlay" onclick="if(event.target===this)closeGuide()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;overflow-y:auto;padding:32px 16px">
+  <div style="max-width:780px;margin:0 auto;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+
+    <!-- Modal header -->
+    <div style="background:var(--card2);padding:20px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:18px;font-weight:700">How It Works — Full Guide</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">Everything you need to know to run and update smartlinks</div>
+      </div>
+      <button onclick="closeGuide()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--muted);font-size:13px;cursor:pointer">✕ Close</button>
+    </div>
+
+    <!-- Modal body -->
+    <div style="padding:28px;display:flex;flex-direction:column;gap:28px">
+
+      <!-- Section 1 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">① What is a Smartlink?</div>
+        <p style="font-size:13px;color:var(--text);line-height:1.7;margin:0">A smartlink is a single URL you give to traffic sources (Facebook, TikTok, media buyers). When a visitor opens it, the page instantly detects their country via IP and redirects them to the correct casino affiliate link — all in under 1 second. Each funnel (Dark, Slotio, Scanio, Spin, Shadow) has its own smartlink file.</p>
+      </div>
+
+      <!-- Section 2 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">② How the Redirect Works</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">1</span><span style="font-size:13px;color:var(--text);line-height:1.6">Visitor opens the smartlink URL hosted on Netlify</span></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">2</span><span style="font-size:13px;color:var(--text);line-height:1.6">The page calls <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">ipapi.co</code> to detect their country code (e.g. <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">DE</code>, <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">SI</code>)</span></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">3</span><span style="font-size:13px;color:var(--text);line-height:1.6">Their IP is hashed to a number — this maps them to a casino based on your traffic weights (e.g. 70% IVYBET / 30% ROLLETTO). The same IP always gets the same casino.</span></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">4</span><span style="font-size:13px;color:var(--text);line-height:1.6">If their country is not covered, they go to the Fallback URL you set</span></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">5</span><span style="font-size:13px;color:var(--text);line-height:1.6">If ipapi.co fails, it automatically retries with <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">freeipapi.com</code> as backup</span></div>
+        </div>
+      </div>
+
+      <!-- Section 3 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">③ Changing Which Casinos a Funnel Uses</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:13px;color:var(--text);line-height:1.6">1. Click the funnel tab (e.g. <strong>Dark</strong>) → scroll down to <strong>Smartlinks</strong> → <strong>Config tab</strong></div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">2. Under <strong>Assigned Deals</strong> — use the <strong>+ Add deal</strong> dropdown to add a casino, or <strong>×</strong> to remove one</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">3. Use ↑ ↓ arrows to change priority order</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">4. After changing — <strong>re-download the smartlink and re-upload to Netlify</strong></div>
+        </div>
+      </div>
+
+      <!-- Section 4 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">④ Pushing One Casino More Than Another (Traffic Weights)</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:13px;color:var(--text);line-height:1.6">Each assigned casino has a <strong>% weight</strong> input. Total must equal 100%.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">Example: IVYBET 70% + ROLLETTO 30% = visitors in shared GEOs get IVYBET 70% of the time, ROLLETTO 30% of the time — and it stays consistent per IP.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">Click <strong>Auto-balance</strong> to split evenly. After changing weights — <strong>re-download and re-upload</strong>.</div>
+        </div>
+      </div>
+
+      <!-- Section 5 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">⑤ Setting the Fallback URL</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.6">The fallback is where visitors go if their country is not covered by any assigned casino. Click <strong>← Use [CASINO] (X%)</strong> to auto-set it to your top-weighted casino, or paste any URL manually. Always set a fallback — leaving it blank causes a redirect loop.</div>
+      </div>
+
+      <!-- Section 6 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">⑥ Hosting on Netlify (Getting the Live URL)</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:13px;color:var(--text);line-height:1.6">1. Download the smartlink file (e.g. <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">dark-smartlink.html</code>)</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">2. Go to <strong>netlify.com</strong> → drag the file into the Netlify Drop area → it gives you a URL like <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">https://abc123.netlify.app</code></div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">3. The full smartlink URL is: <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">https://abc123.netlify.app/dark-smartlink.html</code></div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">4. Paste this URL into the <strong>Hosted URL</strong> field in the dashboard so it stays saved</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">5. To update: re-download the file → on Netlify go to your site → <strong>Deploys → drag new file</strong>. The URL stays the same.</div>
+        </div>
+      </div>
+
+      <!-- Section 7 -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">⑦ Adding a New Deal (Casino)</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:13px;color:var(--text);line-height:1.6">1. Click <strong>+ Add Deal</strong> in the toolbar → fill in name, affiliate URL, GEOs, and deal terms</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">2. The GEOs field accepts country codes separated by spaces (e.g. <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">DE AT BE NL</code>) or country names</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">3. After adding, go to the relevant funnel → Config → assign the new deal</div>
+        </div>
+      </div>
+
+      <!-- Section 8 -->
+      <div style="background:rgba(248,81,73,0.05);border:1px solid rgba(248,81,73,0.2);border-radius:8px;padding:16px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f85149;margin-bottom:10px">⑧ Free Plan Limits</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="font-size:13px;color:var(--text);line-height:1.6"><strong>ipapi.co</strong> — 1,000 visitors/day free. Above that, falls back to freeipapi.com automatically. Buy Pro (~$15/mo) for 30,000/day if needed.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6"><strong>freeipapi.com</strong> — generous free tier, no hard limit documented.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6"><strong>Netlify</strong> — 100GB bandwidth/month free ≈ 20 million redirects. No issues expected.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Funnel Nav -->
+<div class="funnel-nav" id="funnelNav">
+  <div class="funnel-tab" id="tab-universal" onclick="setFunnel(null)">Universal</div>
+  <div class="funnel-tab" id="tab-dark"      onclick="setFunnel('Dark')">Dark <span class="tab-cbadge" id="cbadge-dark"></span></div>
+  <div class="funnel-tab" id="tab-slotio"    onclick="setFunnel('Slotio')">Slotio <span class="tab-cbadge" id="cbadge-slotio"></span></div>
+  <div class="funnel-tab" id="tab-scanio"    onclick="setFunnel('Scanio')">Scanio <span class="tab-cbadge" id="cbadge-scanio"></span></div>
+  <div class="funnel-tab" id="tab-spin"      onclick="setFunnel('Spin')">Spin <span class="tab-cbadge" id="cbadge-spin"></span></div>
+  <div class="funnel-tab" id="tab-shadow"    onclick="setFunnel('Shadow')">Shadow <span class="tab-cbadge" id="cbadge-shadow"></span></div>
+</div>
+
+<div id="funnelGeoBar" style="display:none"></div>
+
+<div class="main">
+  <!-- Stats -->
+  <div class="stats" id="statsBar"></div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search by casino, GEO or contact&hellip;">
+    </div>
+    <div class="toggle-pill" id="bgamingFilter" onclick="toggleBgamingFilter()">
+      <div class="dot"></div>
+      BGaming only
+    </div>
+    <button class="sort-btn" id="sortDeal" onclick="setSort('deal')" title="Sort by rev share %">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M1 11.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 0-1h-5a.5.5 0 0 0-.5.5zm0-4a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 0-1h-9a.5.5 0 0 0-.5.5zm0-4a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 0-1h-13a.5.5 0 0 0-.5.5z"/></svg>
+      Best Deal <span class="sort-arrow" id="sortDealArrow"></span>
+    </button>
+    <button class="sort-btn" id="sortGeos" onclick="setSort('geos')" title="Sort by number of GEOs">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+      Most GEOs <span class="sort-arrow" id="sortGeosArrow"></span>
+    </button>
+    <button class="btn-add" onclick="openModal()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+      Add Deal
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Casino</th>
+          <th>Affiliate Link <span id="thFunnelBadge"></span></th>
+          <th>GEOs</th>
+          <th>BGaming</th>
+          <th>Deal</th>
+          <th>Login</th>
+          <th>Contact</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Glitch Templates -->
+<div class="glitch-section main" style="padding-top:0">
+  <div class="glitch-header">
+    <div class="glitch-title">
+      <span>Glitch Templates</span>
+      <span class="glitch-title-tag">Reference</span>
+      <span class="glitch-count" id="glitchCount"></span>
+    </div>
+    <button class="btn-toggle-glitch" id="btnToggleGlitch" onclick="toggleGlitch()">
+      <svg width="12" height="12" id="glitchChevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+      Hide
+    </button>
+  </div>
+  <div class="glitch-wrap" id="glitchWrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Slot</th>
+          <th>Spin Value</th>
+          <th>Return / Spin</th>
+          <th>Time Window</th>
+          <th>Scan Accuracy</th>
+          <th>Optimal Spins</th>
+        </tr>
+      </thead>
+      <tbody id="glitchBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Smartlinks Generator -->
+<div class="smartlinks-section main" style="padding-top:0">
+  <div class="smartlinks-header">
+    <div class="smartlinks-title">
+      <span>Smartlinks</span>
+      <span class="glitch-title-tag" style="background:rgba(188,140,255,0.12);color:var(--purple);border-color:rgba(188,140,255,0.3)">Generator</span>
+    </div>
+    <button class="btn-toggle-smartlinks" id="btnToggleSmartlinks" onclick="toggleSmartlinks()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+      Hide
+    </button>
+  </div>
+  <div id="smartlinksWrap">
+    <div class="smartlink-flow">
+      <div class="flow-step">
+        <div class="flow-step-icon" style="background:rgba(88,166,255,0.12)">&#128100;</div>
+        <div class="flow-step-label">Visitor</div>
+        <div class="flow-step-sub">opens link</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-step-icon" style="background:rgba(63,185,80,0.12)">&#127758;</div>
+        <div class="flow-step-label">IP Lookup</div>
+        <div class="flow-step-sub">ipapi.co</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-step-icon" style="background:rgba(210,153,34,0.12)">&#128205;</div>
+        <div class="flow-step-label">GEO Match</div>
+        <div class="flow-step-sub">country code</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-step-icon" style="background:rgba(188,140,255,0.12)">&#128274;</div>
+        <div class="flow-step-label">IP Pinned</div>
+        <div class="flow-step-sub">same casino always</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-step-icon" style="background:rgba(248,81,73,0.12)">&#127922;</div>
+        <div class="flow-step-label">Casino</div>
+        <div class="flow-step-sub">redirect</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-step-icon" style="background:rgba(63,185,80,0.12)">&#10003;</div>
+        <div class="flow-step-label">Converted</div>
+        <div class="flow-step-sub">&lt;1 second</div>
+      </div>
+    </div>
+    <div class="funnel-cols" id="smartlinkCols"></div>
+  </div>
+</div>
+
+<!-- GEO tooltip overlay -->
+<div class="geo-tooltip-overlay" id="geoOverlay" onclick="closeGeoTooltip()"></div>
+<div class="geo-tooltip" id="geoTooltip" style="display:none"></div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">Add Deal</span>
+      <button class="btn-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <form id="dealForm" onsubmit="saveDeal(event)">
+
+      <div class="form-section-label">Deal Info</div>
+      <div class="form-group">
+        <label class="form-label">Casino Name</label>
+        <input class="form-input" id="f-name" type="text" placeholder="e.g. IVYBET" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Affiliate URL</label>
+        <input class="form-input" id="f-url" type="url" placeholder="https://..." required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">GEOs</label>
+        <input class="form-input" id="f-geos" type="text" placeholder="AL AT AU BE CA CH DE&hellip;" autocomplete="off">
+        <div class="form-hint">Space or comma separated 2-letter country codes</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">BGaming Support</label>
+        <div class="toggle-wrap">
+          <label class="switch">
+            <input type="checkbox" id="f-bgaming">
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-label">Has BGaming integration</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Deposit Bonus %</label>
+          <input class="form-input" id="f-deposit" type="number" min="0" max="9999" placeholder="150" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rev Share %</label>
+          <input class="form-input" id="f-revshare" type="number" min="0" max="100" placeholder="40" required>
+        </div>
+      </div>
+
+      <div class="form-section-label">Access &amp; Contact</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input class="form-input" id="f-username" type="text" placeholder="darkadmin" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" id="f-password" type="text" placeholder="••••••••" autocomplete="off">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Manager Contact</label>
+        <input class="form-input" id="f-contact" type="text" placeholder="@username" autocomplete="off">
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-save">Save Deal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── Firebase ────────────────────────────────────────────────────────────────
+var firebaseConfig = {
+  apiKey: "AIzaSyCVegt6HxRbJAe1Es_SHEMPH1P3e9YvOvU",
+  authDomain: "affdashboard-3f1a3.firebaseapp.com",
+  projectId: "affdashboard-3f1a3",
+  storageBucket: "affdashboard-3f1a3.firebasestorage.app",
+  messagingSenderId: "1066401093922",
+  appId: "1:1066401093922:web:baf13dcde3aaf99e60ed7b"
+};
+firebase.initializeApp(firebaseConfig);
+var db = firebase.firestore();
+var DOC_REF = db.collection('dashboard').doc('data');
+
+var STORAGE_KEY = 'affiliate_deals';
+
+var SEED_DEALS = [
+  { id: 1, name: 'IVYBET',       url: 'https://track.7ladies.com/visit/?bta=35364&nci=5370&afp1&afp10=Facebook&utm_campaign=mindep10&afp2=Dark',   geos: 'AL AT AU BE CA CH DE DK ES FI GR HU IE IT LU ME MK NO NZ PL PT RO RS SI SK',    bgaming: true, deposit: 150, revshare: 40, username: 'darkadmin',                    password: 'Desc123$',     contact: '@SarahCass1' },
+  { id: 2, name: 'ROLLETTO',     url: 'https://track.rollettoaffiliate.com/visit/?bta=38243&brand=rolletto&utm_campaign=Dark',                      geos: 'AU AT BE DE IE IT RO SK SI ES SE CH GB',                                          bgaming: true, deposit: 200, revshare: 40, username: 'darkadmin',                    password: 'Desc123$',     contact: '@Dakhets' },
+  { id: 3, name: 'COSMOBET',     url: 'https://track.cosmobetpartners.com/visit/?bta=38241&brand=cosmobet&utm_campaign=Dark',                      geos: 'AU AT BE DE IE IT RO SK SI ES SE CH GB',                                          bgaming: true, deposit: 200, revshare: 40, username: 'darkadminR',                   password: 'Desc123$',     contact: '@Dakhets' },
+  { id: 4, name: 'VELOBET',      url: 'https://track.velobetpartners.com/visit/?bta=38242&brand=velobet&utm_campaign=Dark',                         geos: 'AU AT BE DE IE IT RO SK SI ES SE CH GB',                                          bgaming: true, deposit: 200, revshare: 40, username: 'darkadminV',                   password: 'Desc123$',     contact: '@Dakhets' },
+  { id: 5, name: 'NEEDFORSLOTS', url: 'https://track.padrinopartners.com/visit/?bta=35062&brand=needforslots&afp=Dark&utm_campaign=Dark',           geos: 'AL AT AU BE CA CH CZ DE DK ES FI GR HR HU IE IT LU NO NZ PL PT RO RS SI SK',   bgaming: true, deposit: 150, revshare: 40, username: 'darkadmin',                    password: 'Nilskikon2104', contact: '@luca36016' },
+  { id: 6, name: 'SPINANIA',     url: 'https://track.ftdgallery.com/visit/?bta=35437&nci=5486&utm_campaign=Dark&afp10=Facebook',                    geos: 'IT DE BE ES CH AT CZ GR HU PL SI CA AU PT DK IE NO FI KR RS AL MK ME',          bgaming: true, deposit: 150, revshare: 20, username: 'darkadmin',                    password: 'Desc123',      contact: '@ftdgallery_michael' },
+  { id: 7, name: 'TRUELUCK',     url: 'https://clicktrueluck.com/t1h17oaiw',                                                                        geos: 'NL BE GR IE DE FR SE ES',                                                         bgaming: true, deposit: 180, revshare: 40, username: 'darkinsidersbusiness@gmail.com', password: 'Desc123$',     contact: '@tina_bohoaffiliates' },
+  { id: 8, name: 'HOLYLUCK',     url: 'https://clickholyluck.com/tk4rxt4ru',                                                                        geos: 'NL BE GR IE DE FR SE ES',                                                         bgaming: true, deposit: 180, revshare: 40, username: 'darkinsidersbusiness@gmail.com', password: 'Desc123$',     contact: '@tina_bohoaffiliates' },
+  { id: 9, name: 'SPINORHINO',   url: 'https://clickspinorhino.com/tfa3iyaex',                                                                      geos: 'NL BE IE GR',                                                                     bgaming: true, deposit: 180, revshare: 40, username: 'darkinsidersbusiness@gmail.com', password: 'Desc123$',     contact: '@tina_bohoaffiliates' },
+];
+
+// ── Country name → code map ────────────────────────────────────────────────
+var COUNTRY_MAP = {
+  ALBANIA:'AL', AUSTRIA:'AT', AUSTRALIA:'AU', BELGIUM:'BE', CANADA:'CA',
+  SWITZERLAND:'CH', GERMANY:'DE', DENMARK:'DK', SPAIN:'ES', FINLAND:'FI',
+  FRANCE:'FR', 'UNITED KINGDOM':'GB', UK:'GB', GREECE:'GR', CROATIA:'HR',
+  HUNGARY:'HU', IRELAND:'IE', ITALY:'IT', 'SOUTH KOREA':'KR', KOREA:'KR',
+  LUXEMBOURG:'LU', MONTENEGRO:'ME', 'NORTH MACEDONIA':'MK', MACEDONIA:'MK',
+  NETHERLANDS:'NL', HOLLAND:'NL', NORWAY:'NO', 'NEW ZEALAND':'NZ',
+  POLAND:'PL', PORTUGAL:'PT', ROMANIA:'RO', SERBIA:'RS', SWEDEN:'SE',
+  SLOVENIA:'SI', SLOVAKIA:'SK', 'CZECH REPUBLIC':'CZ', CZECHIA:'CZ'
+};
+
+// Reverse map: code → name (lowercase) for search
+var CODE_TO_NAME = {};
+(function() {
+  Object.keys(COUNTRY_MAP).forEach(function(name) {
+    var code = COUNTRY_MAP[name];
+    if (!CODE_TO_NAME[code]) CODE_TO_NAME[code] = name.toLowerCase();
+  });
+})();
+
+// ── Funnels ────────────────────────────────────────────────────────────────
+var FUNNELS = ['dark','slotio','scanio','spin','shadow'];
+
+// Only replaces an existing utm_campaign value — never appends one
+function getFunnelUrl(url, funnel) {
+  if (!funnel) return url;
+  url = url.replace(/utm_campaign=[^&#]*/g, 'utm_campaign=' + funnel);
+  url = url.replace(/\bafp=([^&#]*)/g, 'afp=' + funnel);
+  url = url.replace(/\bafp2=([^&#]*)/g, 'afp2=' + funnel);
+  return url;
+}
+
+function setFunnel(funnel) {
+  currentFunnel = funnel;
+  // Update tab active classes
+  ['universal','dark','slotio','scanio','spin','shadow'].forEach(function(key) {
+    var el = document.getElementById('tab-' + key);
+    if (el) el.className = 'funnel-tab';
+  });
+  var activeKey = funnel ? funnel.toLowerCase() : 'universal';
+  var activeEl = document.getElementById('tab-' + activeKey);
+  if (activeEl) activeEl.classList.add('active-' + activeKey);
+
+  // Update column badge
+  var badge = document.getElementById('thFunnelBadge');
+  if (badge) {
+    badge.innerHTML = funnel
+      ? '<span class="funnel-badge badge-' + activeKey + '">' + funnel + '</span>'
+      : '';
+  }
+  smartlinkTab = 'config';
+  render();
+  renderFunnelGeoBar();
+  renderSmartlinks();
+}
+
+function openGuide() { document.getElementById('guideOverlay').style.display = 'block'; }
+function closeGuide() { document.getElementById('guideOverlay').style.display = 'none'; }
+
+function setSmartlinkTab(tab) {
+  smartlinkTab = tab;
+  renderSmartlinks();
+}
+
+function renderFunnelGeoBar() {
+  var el = document.getElementById('funnelGeoBar');
+  if (!el) return;
+  if (!currentFunnel) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  var f = currentFunnel;
+  var color = FUNNEL_COLORS[f];
+  var assignedDeals = getAssignedDeals(f);
+
+  var geoSet = {};
+  assignedDeals.forEach(function(d) {
+    geoArray(d).forEach(function(g) { geoSet[g] = 1; });
+  });
+  var geos = Object.keys(geoSet).sort();
+
+  if (!geos.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  var badges = geos.map(function(geo) {
+    var name = CODE_TO_NAME[geo] || geo;
+    return '<span style="display:inline-flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;white-space:nowrap">' +
+      '<span style="font-weight:700;color:var(--muted);font-size:11px">' + escHtml(geo) + '</span>' +
+      '<span style="color:var(--text)">' + escHtml(name) + '</span>' +
+    '</span>';
+  }).join('');
+
+  el.style.display = '';
+  el.innerHTML =
+    '<div style="padding:16px 32px;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px">' +
+        '<span style="font-size:13px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:0.5px">' + escHtml(f) + ' Funnel</span>' +
+        '<span style="font-size:12px;color:var(--muted)">Countries you can target — ' + geos.length + ' GEOs covered by at least 1 assigned casino</span>' +
+      '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px">' + badges + '</div>' +
+    '</div>';
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+var deals = [];
+var editingId = null;
+var filterBgaming = false;
+var confirmingId = null;
+var sortBy  = null; // 'deal' | 'geos' | null
+var sortDir = 1;    // 1 = desc, -1 = asc
+var currentFunnel = null; // null = Universal
+
+// ── Assignments ────────────────────────────────────────────────────────────
+var ASSIGNMENTS_KEY = 'funnel_assignments';
+var assignments = {};
+var DEFAULT_ASSIGNMENTS = {
+  Dark:   [1, 2, 7],
+  Slotio: [5, 3, 8],
+  Scanio: [6, 4, 9],
+  Spin:   [2, 1, 7],
+  Shadow: [3, 5, 8]
+};
+var FUNNEL_NAMES = ['Dark', 'Slotio', 'Scanio', 'Spin', 'Shadow'];
+var FUNNEL_COLORS = {
+  Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', Spin: '#f85149', Shadow: '#bc8cff'
+};
+var assignVisible = true;
+var matrixVisible = true;
+
+function saveAssignments() {
+  saveToFirebase();
+}
+
+function getAssignedDeals(funnel) {
+  var ids = assignments[funnel] || [];
+  return ids.map(function(id) {
+    return deals.find(function(d) { return d.id === id; });
+  }).filter(Boolean);
+}
+
+function getEffectiveDeal(funnel, geoCode) {
+  var assigned = getAssignedDeals(funnel);
+  return assigned.find(function(d) {
+    return geoArray(d).indexOf(geoCode) !== -1;
+  }) || null;
+}
+
+function detectConflicts() {
+  var result = {};
+  var allGeos = {};
+  FUNNEL_NAMES.forEach(function(f) {
+    getAssignedDeals(f).forEach(function(d) {
+      geoArray(d).forEach(function(g) { allGeos[g] = 1; });
+    });
+  });
+  Object.keys(allGeos).forEach(function(geo) {
+    var dealToFunnels = {};
+    FUNNEL_NAMES.forEach(function(f) {
+      var d = getEffectiveDeal(f, geo);
+      if (d) {
+        var key = String(d.id);
+        if (!dealToFunnels[key]) dealToFunnels[key] = [];
+        dealToFunnels[key].push(f);
+      }
+    });
+    Object.keys(dealToFunnels).forEach(function(did) {
+      if (dealToFunnels[did].length > 1) {
+        if (!result[geo]) result[geo] = {};
+        result[geo][did] = dealToFunnels[did];
+      }
+    });
+  });
+  return result;
+}
+
+function getConflictCount(funnel) {
+  var conflicts = detectConflicts();
+  var count = 0;
+  Object.keys(conflicts).forEach(function(geo) {
+    Object.keys(conflicts[geo]).forEach(function(did) {
+      if (conflicts[geo][did].indexOf(funnel) !== -1) count++;
+    });
+  });
+  return count;
+}
+
+function moveAssignment(funnel, idx, dir) {
+  var ids = assignments[funnel];
+  if (!ids) return;
+  var newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= ids.length) return;
+  var tmp = ids[idx]; ids[idx] = ids[newIdx]; ids[newIdx] = tmp;
+  saveAssignments();
+  renderConflictBadges();
+  renderSmartlinks();
+  render();
+}
+
+function removeAssignment(funnel, idx) {
+  var ids = assignments[funnel];
+  if (!ids) return;
+  ids.splice(idx, 1);
+  saveAssignments();
+  renderConflictBadges();
+  renderSmartlinks();
+  render();
+}
+
+function addAssignment(funnel, dealId) {
+  if (!dealId) return;
+  var ids = assignments[funnel];
+  if (!ids) { assignments[funnel] = []; ids = assignments[funnel]; }
+  if (ids.indexOf(dealId) !== -1) return;
+  ids.push(dealId);
+  saveAssignments();
+  renderConflictBadges();
+  renderSmartlinks();
+  render();
+}
+
+function renderConflictBadges() {
+  FUNNEL_NAMES.forEach(function(f) {
+    var fkey = f.toLowerCase();
+    var span = document.getElementById('cbadge-' + fkey);
+    if (!span) return;
+    var count = getConflictCount(f);
+    if (count > 0) {
+      span.textContent = '\u26a0 ' + count;
+      span.style.display = 'inline';
+    } else {
+      span.textContent = '';
+      span.style.display = 'none';
+    }
+  });
+}
+
+function renderAssignments() {
+  var container = document.getElementById('funnelCols');
+  if (!container) return;
+  container.innerHTML = FUNNEL_NAMES.map(function(f) {
+    var color = FUNNEL_COLORS[f];
+    var assigned = getAssignedDeals(f);
+    var assignedIds = assignments[f] || [];
+    var unassigned = deals.filter(function(d) { return assignedIds.indexOf(d.id) === -1; });
+    var conflictCount = getConflictCount(f);
+
+    var cardsHtml = assigned.map(function(deal, idx) {
+      return '<div class="deal-card">' +
+        '<div class="deal-card-priority">' + (idx + 1) + '</div>' +
+        '<div class="deal-card-name" title="' + escHtml(deal.name) + '">' + escHtml(deal.name) + '</div>' +
+        '<div class="deal-card-controls">' +
+          '<button class="btn-move" onclick="moveAssignment(\'' + f + '\',' + idx + ',-1)"' + (idx === 0 ? ' disabled' : '') + ' title="Move up">\u2191</button>' +
+          '<button class="btn-move" onclick="moveAssignment(\'' + f + '\',' + idx + ',1)"' + (idx === assigned.length - 1 ? ' disabled' : '') + ' title="Move down">\u2193</button>' +
+          '<button class="btn-remove-deal" onclick="removeAssignment(\'' + f + '\',' + idx + ')" title="Remove">\u00d7</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    var addHtml = unassigned.length > 0
+      ? '<div class="assign-add">' +
+          '<select onchange="addAssignment(\'' + f + '\',parseInt(this.value)||0);this.value=\'\'">' +
+          '<option value="">+ Add deal\u2026</option>' +
+          unassigned.map(function(d) { return '<option value="' + d.id + '">' + escHtml(d.name) + '</option>'; }).join('') +
+          '</select>' +
+        '</div>'
+      : '<div class="assign-add" style="color:var(--muted);font-size:11px;text-align:center;padding-top:4px">All deals assigned</div>';
+
+    var badgeHtml = conflictCount > 0
+      ? '<span class="conflict-badge">\u26a0 ' + conflictCount + ' conflict' + (conflictCount > 1 ? 's' : '') + '</span>'
+      : '';
+
+    return '<div class="funnel-col">' +
+      '<div class="funnel-col-header">' +
+        '<span class="funnel-col-name" style="color:' + color + '">' + f + '</span>' +
+        badgeHtml +
+      '</div>' +
+      '<div class="funnel-col-body">' +
+        (cardsHtml || '<div style="color:var(--muted);font-size:11px;text-align:center;padding:8px">No deals assigned</div>') +
+      '</div>' +
+      addHtml +
+    '</div>';
+  }).join('');
+}
+
+function renderGeoMatrix() {
+  var container = document.getElementById('matrixContent');
+  if (!container) return;
+
+  var allGeos = {};
+  FUNNEL_NAMES.forEach(function(f) {
+    getAssignedDeals(f).forEach(function(d) {
+      geoArray(d).forEach(function(g) { allGeos[g] = 1; });
+    });
+  });
+  var sortedGeos = Object.keys(allGeos).sort();
+
+  if (sortedGeos.length === 0) {
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted)">No GEOs covered</div>';
+    return;
+  }
+
+  var geoCounts = {};
+  FUNNEL_NAMES.forEach(function(f) {
+    geoCounts[f] = 0;
+    sortedGeos.forEach(function(geo) {
+      if (getEffectiveDeal(f, geo)) geoCounts[f]++;
+    });
+  });
+
+  var html = '<table class="geo-matrix"><thead><tr>' +
+    '<th>GEO</th>' +
+    FUNNEL_NAMES.map(function(f) {
+      var color = FUNNEL_COLORS[f];
+      return '<th style="color:' + color + '">' + f + '<br><span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">' + geoCounts[f] + ' GEOs</span></th>';
+    }).join('') +
+  '</tr></thead><tbody>';
+
+  html += sortedGeos.map(function(geo) {
+    var cellDeals = {};
+    FUNNEL_NAMES.forEach(function(f) {
+      cellDeals[f] = getEffectiveDeal(f, geo);
+    });
+
+    var dealCount = {};
+    FUNNEL_NAMES.forEach(function(f) {
+      if (cellDeals[f]) {
+        var key = String(cellDeals[f].id);
+        dealCount[key] = (dealCount[key] || 0) + 1;
+      }
+    });
+
+    var cells = FUNNEL_NAMES.map(function(f) {
+      var d = cellDeals[f];
+      if (!d) return '<td class="matrix-cell-empty">—</td>';
+      var isConflict = dealCount[String(d.id)] > 1;
+      return '<td class="' + (isConflict ? 'matrix-cell-conflict' : 'matrix-cell-ok') + '">' + escHtml(d.name) + '</td>';
+    }).join('');
+
+    return '<tr><td class="geo-code">' + escHtml(geo) + '</td>' + cells + '</tr>';
+  }).join('');
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function toggleAssignments() {
+  assignVisible = !assignVisible;
+  document.getElementById('assignWrap').style.display = assignVisible ? '' : 'none';
+  document.getElementById('btnToggleAssign').innerHTML = assignVisible
+    ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg> Hide'
+    : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show';
+}
+
+function toggleGeoMatrix() {
+  matrixVisible = !matrixVisible;
+  document.getElementById('matrixWrap').style.display = matrixVisible ? '' : 'none';
+  document.getElementById('btnToggleMatrix').innerHTML = matrixVisible
+    ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg> Hide'
+    : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show';
+}
+
+// ── Persistence ────────────────────────────────────────────────────────────
+function saveDeals() {
+  saveToFirebase();
+}
+
+function nextId() {
+  return deals.length > 0 ? Math.max.apply(null, deals.map(function(d) { return d.id; })) + 1 : 1;
+}
+
+// ── Parse GEOs ─────────────────────────────────────────────────────────────
+function parseGeos(str) {
+  var seen = {};
+  return str.toUpperCase().split(/[\s,]+/).map(function(s) { return s.trim(); }).filter(function(s) {
+    if (s.length !== 2 || seen[s]) return false;
+    seen[s] = true;
+    return true;
+  });
+}
+
+function geoArray(deal) {
+  if (Array.isArray(deal.geos)) return deal.geos;
+  return parseGeos(deal.geos || '');
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function renderStats() {
+  var statsDeals = currentFunnel ? getAssignedDeals(currentFunnel) : deals;
+  var total = statsDeals.length;
+  var bgamingCount = statsDeals.filter(function(d) { return d.bgaming; }).length;
+  var allGeos = {};
+  statsDeals.forEach(function(d) { geoArray(d).forEach(function(g) { allGeos[g] = 1; }); });
+  var geoCount = Object.keys(allGeos).length;
+  var avgRevshare = statsDeals.length ? (statsDeals.reduce(function(s,d) { return s + (d.revshare||0); }, 0) / statsDeals.length).toFixed(1) : 0;
+
+  var html =
+    '<div class="stat-card"><div class="stat-label">Total Deals</div><div class="stat-value">' + total + '</div><div class="stat-sub">' + (currentFunnel ? currentFunnel + ' funnel' : 'Active partnerships') + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">BGaming Deals</div><div class="stat-value" style="color:var(--green)">' + bgamingCount + '</div><div class="stat-sub">' + (total - bgamingCount) + ' without BGaming</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Unique GEOs</div><div class="stat-value" style="color:var(--purple)">' + geoCount + '</div><div class="stat-sub">Countries covered</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Avg Rev Share</div><div class="stat-value" style="color:var(--yellow)">' + avgRevshare + '%</div><div class="stat-sub">Across all deals</div></div>';
+
+  if (currentFunnel) {
+    var conflictGeos = getConflictCount(currentFunnel);
+    html += '<div class="stat-card"><div class="stat-label">Conflicts</div><div class="stat-value" style="color:#f0883e">' + conflictGeos + '</div><div class="stat-sub">GEOs with shared casino</div></div>';
+  }
+
+  document.getElementById('statsBar').innerHTML = html;
+}
+
+// ── GEO badges ─────────────────────────────────────────────────────────────
+function renderGeoBadges(geos, dealId) {
+  var MAX = 7;
+  var shown = geos.slice(0, MAX);
+  var rest = geos.slice(MAX);
+  var html = shown.map(function(g) { return '<span class="geo-badge">' + escHtml(g) + '</span>'; }).join('');
+  if (rest.length > 0) {
+    html += '<span class="geo-more" onclick="showGeoTooltip(event,' + dealId + ')">+' + rest.length + ' more</span>';
+  }
+  return '<div class="geo-wrap">' + html + '</div>';
+}
+
+// ── Deal badge ─────────────────────────────────────────────────────────────
+function renderDeal(deal) {
+  var cls = deal.revshare >= 40 ? 'deal-green' : 'deal-yellow';
+  return '<span class="deal-badge ' + cls + '">' + deal.deposit + '% + ' + deal.revshare + '%</span>';
+}
+
+// ── Sort ───────────────────────────────────────────────────────────────────
+function setSort(key) {
+  if (sortBy === key) {
+    if (sortDir === 1) { sortDir = -1; }
+    else { sortBy = null; sortDir = 1; } // third click → off
+  } else {
+    sortBy = key; sortDir = 1;
+  }
+  updateSortButtons();
+  renderTable();
+}
+
+function updateSortButtons() {
+  ['deal','geos'].forEach(function(key) {
+    var btn   = document.getElementById('sort' + (key === 'deal' ? 'Deal' : 'Geos'));
+    var arrow = document.getElementById('sort' + (key === 'deal' ? 'Deal' : 'Geos') + 'Arrow');
+    if (sortBy === key) {
+      btn.classList.add('active');
+      arrow.textContent = sortDir === 1 ? '↓' : '↑';
+    } else {
+      btn.classList.remove('active');
+      arrow.textContent = '';
+    }
+  });
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────
+function getFilteredDeals() {
+  var q = document.getElementById('searchInput').value.toLowerCase().trim();
+  var pool = currentFunnel ? getAssignedDeals(currentFunnel) : deals;
+
+  // Resolve search query: if it matches a country name, use the code
+  var resolvedCode = null;
+  if (q.length >= 3) {
+    var upper = q.toUpperCase();
+    // Check full name match
+    if (COUNTRY_MAP[upper]) {
+      resolvedCode = COUNTRY_MAP[upper];
+    } else {
+      // Partial name match — find codes whose country name contains query
+      resolvedCode = Object.keys(COUNTRY_MAP).filter(function(name) {
+        return name.toLowerCase().indexOf(q) !== -1;
+      }).map(function(name) { return COUNTRY_MAP[name]; });
+      if (resolvedCode.length === 0) resolvedCode = null;
+    }
+  }
+
+  var result = pool.filter(function(d) {
+    var nameMatch = d.name.toLowerCase().indexOf(q) !== -1;
+    var contactMatch = (d.contact || '').toLowerCase().indexOf(q) !== -1;
+    var geos = geoArray(d);
+    var geoMatch;
+    if (resolvedCode) {
+      var codes = Array.isArray(resolvedCode) ? resolvedCode : [resolvedCode];
+      geoMatch = geos.some(function(g) { return codes.indexOf(g) !== -1; });
+    } else {
+      geoMatch = geos.some(function(g) { return g.toLowerCase().indexOf(q) !== -1; });
+    }
+    var textOk = !q || nameMatch || geoMatch || contactMatch;
+    var bgamingOk = !filterBgaming || d.bgaming;
+    return textOk && bgamingOk;
+  });
+
+  if (sortBy === 'deal') {
+    result = result.slice().sort(function(a, b) {
+      var diff = (b.revshare - a.revshare) || (b.deposit - a.deposit);
+      return diff * sortDir;
+    });
+  } else if (sortBy === 'geos') {
+    result = result.slice().sort(function(a, b) {
+      return (geoArray(b).length - geoArray(a).length) * sortDir;
+    });
+  }
+
+  return result;
+}
+
+// ── Icon constants ─────────────────────────────────────────────────────────
+var ICON_EDIT  = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>';
+var ICON_TRASH = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>';
+var ICON_COPY  = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>';
+var ICON_CHECK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z"/></svg>';
+var ICON_LOCK  = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>';
+
+// ── Table ──────────────────────────────────────────────────────────────────
+function renderTable() {
+  var filtered = getFilteredDeals();
+  var tbody = document.getElementById('tableBody');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty">' +
+      '<svg width="32" height="32" viewBox="0 0 16 16" fill="var(--muted)"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/></svg>' +
+      '<div>No deals match your filter</div></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(function(deal, i) {
+    var geos = geoArray(deal);
+    var isConfirming = confirmingId === deal.id;
+
+    var actionsHtml = isConfirming
+      ? '<div class="confirm-wrap"><span>Delete?</span>' +
+          '<button class="btn-confirm-yes" onclick="confirmDelete(' + deal.id + ')">Yes</button>' +
+          '<button class="btn-confirm-no" onclick="cancelDelete()">No</button></div>'
+      : '<div class="actions">' +
+          '<button class="btn-icon btn-edit" onclick="openEditModal(' + deal.id + ')" title="Edit">' + ICON_EDIT + '</button>' +
+          '<button class="btn-icon btn-delete" onclick="startDelete(' + deal.id + ')" title="Delete">' + ICON_TRASH + '</button>' +
+        '</div>';
+
+    var bgamingHtml = deal.bgaming
+      ? '<span class="bgaming-yes">' + ICON_CHECK + ' Yes</span>'
+      : '<span class="bgaming-no">&mdash;</span>';
+
+    var loginHtml = '<div class="login-cell">' +
+      '<span class="login-user" title="' + escHtml(deal.username || '') + '">' + escHtml(deal.username || '&mdash;') + '</span>' +
+      (deal.password ? '<button class="btn-pass" onclick="copyPass(this,' + deal.id + ')" title="Copy password">' + ICON_LOCK + 'pw</button>' : '') +
+    '</div>';
+
+    var contactHtml = deal.contact
+      ? '<span class="contact-handle">' + escHtml(deal.contact) + '</span>'
+      : '<span style="color:var(--muted)">—</span>';
+
+    return '<tr>' +
+      '<td style="color:var(--muted);font-size:12px">' + (i + 1) + '</td>' +
+      '<td><span class="casino-name">' + escHtml(deal.name) + '</span></td>' +
+      (function() {
+        var fUrl = getFunnelUrl(deal.url, currentFunnel);
+        return '<td><div class="link-cell">' +
+          '<span class="link-text" title="' + escHtml(fUrl) + '">' + escHtml(fUrl) + '</span>' +
+          '<button class="btn-copy" onclick="copyUrl(this,' + deal.id + ')" title="Copy URL">' + ICON_COPY + '</button>' +
+        '</div></td>';
+      })() +
+      '<td>' + renderGeoBadges(geos, deal.id) + '</td>' +
+      '<td>' + bgamingHtml + '</td>' +
+      '<td>' + renderDeal(deal) + '</td>' +
+      '<td>' + loginHtml + '</td>' +
+      '<td>' + contactHtml + '</td>' +
+      '<td>' + actionsHtml + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function render() {
+  renderStats();
+  renderTable();
+}
+
+// ── GEO tooltip ────────────────────────────────────────────────────────────
+function showGeoTooltip(e, dealId) {
+  e.stopPropagation();
+  var deal = deals.find(function(d) { return d.id === dealId; });
+  if (!deal) return;
+  var geos = geoArray(deal);
+  var tooltip = document.getElementById('geoTooltip');
+  tooltip.innerHTML = geos.map(function(g) { return '<span class="geo-badge">' + escHtml(g) + '</span>'; }).join('');
+  var rect = e.target.getBoundingClientRect();
+  tooltip.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 150) + 'px';
+  tooltip.style.left = Math.min(rect.left, window.innerWidth - 296) + 'px';
+  tooltip.style.display = 'flex';
+  document.getElementById('geoOverlay').style.display = 'block';
+}
+
+function closeGeoTooltip() {
+  document.getElementById('geoTooltip').style.display = 'none';
+  document.getElementById('geoOverlay').style.display = 'none';
+}
+
+// ── Copy helpers ───────────────────────────────────────────────────────────
+function copyToClipboard(text, btn, resetHtml) {
+  function flash() {
+    btn.classList.add('copied');
+    btn.innerHTML = ICON_CHECK;
+    setTimeout(function() { btn.classList.remove('copied'); btn.innerHTML = resetHtml; }, 1800);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(flash).catch(function() { fallbackCopy(text); flash(); });
+  } else { fallbackCopy(text); flash(); }
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+function copyUrl(btn, dealId) {
+  var deal = deals.find(function(d) { return d.id === dealId; });
+  if (!deal) return;
+  copyToClipboard(getFunnelUrl(deal.url, currentFunnel), btn, ICON_COPY);
+}
+
+function copyPass(btn, dealId) {
+  var deal = deals.find(function(d) { return d.id === dealId; });
+  if (!deal || !deal.password) return;
+  copyToClipboard(deal.password, btn, ICON_LOCK + 'pw');
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────
+function startDelete(id) { confirmingId = id; renderTable(); }
+function cancelDelete()  { confirmingId = null; renderTable(); }
+function confirmDelete(id) {
+  deals = deals.filter(function(d) { return d.id !== id; });
+  confirmingId = null; saveDeals(); render();
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+function openModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Add Deal';
+  document.getElementById('dealForm').reset();
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('f-name').focus();
+}
+
+function openEditModal(id) {
+  var deal = deals.find(function(d) { return d.id === id; });
+  if (!deal) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'Edit Deal';
+  document.getElementById('f-name').value     = deal.name;
+  document.getElementById('f-url').value      = deal.url;
+  document.getElementById('f-geos').value     = geoArray(deal).join(' ');
+  document.getElementById('f-bgaming').checked = !!deal.bgaming;
+  document.getElementById('f-deposit').value  = deal.deposit;
+  document.getElementById('f-revshare').value = deal.revshare;
+  document.getElementById('f-username').value = deal.username || '';
+  document.getElementById('f-password').value = deal.password || '';
+  document.getElementById('f-contact').value  = deal.contact  || '';
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('f-name').focus();
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  editingId = null;
+}
+
+function saveDeal(e) {
+  e.preventDefault();
+  var name     = document.getElementById('f-name').value.trim().toUpperCase();
+  var url      = document.getElementById('f-url').value.trim();
+  var geos     = parseGeos(document.getElementById('f-geos').value.trim()).join(' ');
+  var bgaming  = document.getElementById('f-bgaming').checked;
+  var deposit  = parseInt(document.getElementById('f-deposit').value, 10);
+  var revshare = parseInt(document.getElementById('f-revshare').value, 10);
+  var username = document.getElementById('f-username').value.trim();
+  var password = document.getElementById('f-password').value.trim();
+  var contact  = document.getElementById('f-contact').value.trim();
+
+  if (editingId !== null) {
+    var idx = deals.findIndex(function(d) { return d.id === editingId; });
+    if (idx !== -1) deals[idx] = { id: deals[idx].id, name, url, geos, bgaming, deposit, revshare, username, password, contact };
+    saveDeals(); closeModal(); render();
+  } else {
+    var newDeal = { id: nextId(), name, url, geos, bgaming, deposit, revshare, username, password, contact };
+    deals.push(newDeal);
+    saveDeals();
+    autoAssignNewDeal(newDeal);
+    closeModal(); render();
+    renderSmartlinks();
+    renderFunnelGeoBar();
+  }
+}
+
+function autoAssignNewDeal(deal) {
+  var dealGeos = geoArray(deal);
+  if (!dealGeos.length) return;
+
+  var assigned = [];
+  FUNNEL_NAMES.forEach(function(f) {
+    var currentIds = assignments[f] || [];
+    if (currentIds.indexOf(deal.id) !== -1) return; // already assigned
+
+    // GEOs currently covered by this funnel
+    var coveredGeos = {};
+    getAssignedDeals(f).forEach(function(d) {
+      geoArray(d).forEach(function(g) { coveredGeos[g] = 1; });
+    });
+
+    // Count how many new GEOs this deal adds
+    var newGeos = dealGeos.filter(function(g) { return !coveredGeos[g]; }).length;
+    var overlapGeos = dealGeos.filter(function(g) { return coveredGeos[g]; }).length;
+
+    // Assign if: adds new GEOs, or funnel is empty, or funnel has <3 deals and overlaps
+    if (newGeos > 0 || currentIds.length === 0 || (currentIds.length < 3 && overlapGeos > 0)) {
+      if (!assignments[f]) assignments[f] = [];
+      assignments[f].push(deal.id);
+      assigned.push(f);
+    }
+  });
+
+  if (assigned.length) {
+    saveAssignments();
+    assigned.forEach(function(f) { equalizeWeights(f); });
+    renderConflictBadges();
+  }
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────
+function toggleBgamingFilter() {
+  filterBgaming = !filterBgaming;
+  document.getElementById('bgamingFilter').classList.toggle('active', filterBgaming);
+  renderTable();
+}
+
+document.getElementById('searchInput').addEventListener('input', renderTable);
+
+// ── Keyboard / overlay ─────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { closeModal(); closeGeoTooltip(); cancelDelete(); }
+});
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Glitch Templates ───────────────────────────────────────────────────────
+var GLITCH_DATA = [
+  { slot: 'Wild Tiger',     spin: '€0.60', ret: '€7.20',  time: '59min', acc: 80.2, spins: 23 },
+  { slot: 'Aztec Clusters', spin: '€0.75', ret: '€10.50', time: '71min', acc: 76.7, spins: 16 },
+  { slot: 'Gift Rush',      spin: '€0.70', ret: '€9.80',  time: '50min', acc: 83.8, spins: 18 },
+  { slot: 'Book of Panda',  spin: '€1.00', ret: '€12.00', time: '55min', acc: 81.6, spins: 14 },
+  { slot: 'Beer Bonanza',   spin: '€0.60', ret: '€7.80',  time: '74min', acc: 77.3, spins: 21 },
+  { slot: 'Wild Heart',     spin: '€2.00', ret: '€28.00', time: '46min', acc: 84.7, spins: 15 },
+  { slot: 'Fruit Million',  spin: '€1.00', ret: '€13.50', time: '52min', acc: 82.0, spins: 17 },
+  { slot: 'Joker Queen',    spin: '€1.20', ret: '€16.20', time: '68min', acc: 78.6, spins: 13 },
+  { slot: 'Fortune Bells',  spin: '€1.50', ret: '€21.00', time: '43min', acc: 85.0, spins: 20 },
+  { slot: 'Wild Cash x9990',spin: '€0.70', ret: '€9.45',  time: '62min', acc: 81.7, spins: 17 },
+  { slot: 'Joker Queen',    spin: '€0.80', ret: '€10.40', time: '44min', acc: 84.8, spins: 13 },
+  { slot: 'Aztec Clusters', spin: '€1.50', ret: '€19.50', time: '78min', acc: 77.0, spins: 20 },
+];
+
+var glitchVisible = true;
+
+function renderGlitch() {
+  document.getElementById('glitchCount').textContent = GLITCH_DATA.length + ' templates';
+  document.getElementById('glitchBody').innerHTML = GLITCH_DATA.map(function(g, i) {
+    var accClass = g.acc >= 84 ? 'acc-high' : g.acc >= 81 ? 'acc-mid' : 'acc-low';
+    return '<tr>' +
+      '<td style="color:var(--muted);font-size:12px">' + (i + 1) + '</td>' +
+      '<td><span class="slot-name">' + escHtml(g.slot) + '</span></td>' +
+      '<td><span class="mono-val">' + g.spin + '/spin</span></td>' +
+      '<td><span class="return-val">' + g.ret + '</span></td>' +
+      '<td><span class="mono-val">' + g.time + '</span></td>' +
+      '<td><span class="' + accClass + '">' + g.acc.toFixed(1) + '%</span></td>' +
+      '<td><span class="mono-val">' + g.spins + ' spins</span></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function toggleGlitch() {
+  glitchVisible = !glitchVisible;
+  document.getElementById('glitchWrap').style.display = glitchVisible ? '' : 'none';
+  var btn = document.getElementById('btnToggleGlitch');
+  var chevron = document.getElementById('glitchChevron');
+  btn.innerHTML = (glitchVisible
+    ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg> Hide'
+    : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show');
+}
+
+// ── Smartlinks ─────────────────────────────────────────────────────────────
+var SMARTLINKS_KEY = 'funnel_smartlinks';
+var SMARTLINK_URLS_KEY = 'funnel_hosted_urls';
+var DEAL_WEIGHTS_KEY = 'deal_weights';
+var dealWeights = {}; // { Dark: { '1': 70, '2': 30 }, ... }
+var smartlinkFallbacks = {};
+var smartlinkHostedUrls = {};
+var smartlinksVisible = true;
+var smartlinkTab = 'config'; // 'config' | 'countries'
+
+function saveSmartlinkFallbacks() {
+  saveToFirebase();
+}
+
+function saveDealWeights() {
+  saveToFirebase();
+}
+
+function getWeight(funnel, dealId) {
+  return ((dealWeights[funnel] || {})[String(dealId)]) || 0;
+}
+
+function setDealWeight(funnel, dealId, val) {
+  if (!dealWeights[funnel]) dealWeights[funnel] = {};
+  dealWeights[funnel][String(dealId)] = Math.max(0, Math.min(100, parseInt(val) || 0));
+  saveDealWeights();
+  renderSmartlinks();
+}
+
+function equalizeWeights(funnel) {
+  var ids = assignments[funnel] || [];
+  if (!dealWeights[funnel]) dealWeights[funnel] = {};
+  if (ids.length === 0) return;
+  var per = Math.floor(100 / ids.length);
+  var rem = 100 - per * ids.length;
+  ids.forEach(function(id, i) {
+    dealWeights[funnel][String(id)] = per + (i === 0 ? rem : 0);
+  });
+  saveDealWeights();
+  renderSmartlinks();
+}
+
+function saveSmartlinkHostedUrls() {
+  saveToFirebase();
+}
+
+// Returns { GEO: [[url, weight], ...] } — all deals covering each GEO with weights
+function buildMultiRouteMap(funnel) {
+  var assignedDeals = getAssignedDeals(funnel);
+  var allGeos = {};
+  assignedDeals.forEach(function(d) {
+    geoArray(d).forEach(function(g) { allGeos[g] = 1; });
+  });
+  var map = {};
+  Object.keys(allGeos).sort().forEach(function(geo) {
+    var entries = [];
+    assignedDeals.forEach(function(deal) {
+      if (geoArray(deal).indexOf(geo) !== -1) {
+        entries.push([getFunnelUrl(deal.url, funnel), getWeight(funnel, deal.id)]);
+      }
+    });
+    if (entries.length > 0) map[geo] = entries;
+  });
+  return map;
+}
+
+function generateRedirectHtml(funnel) {
+  var projectId = 'affdashboard-3f1a3';
+  var firestoreUrl = 'https://firestore.googleapis.com/v1/projects/' + projectId + '/databases/(default)/documents/routes/' + funnel.toLowerCase();
+  var fallbackVal = smartlinkFallbacks[funnel] || '';
+
+  return '<!DOCTYPE html>\n' +
+    '<html>\n' +
+    '<head>\n' +
+    '  <title>Redirecting\u2026</title>\n' +
+    '  <meta charset="UTF-8">\n' +
+    '  <style>\n' +
+    '    body { margin: 0; display: flex; align-items: center; justify-content: center;\n' +
+    '           min-height: 100vh; background: #0d0f14; color: #7d8590;\n' +
+    '           font-family: sans-serif; font-size: 14px; }\n' +
+    '  </style>\n' +
+    '</head>\n' +
+    '<body>\n' +
+    '  <div>Redirecting\u2026</div>\n' +
+    '  <script>\n' +
+    '    var FUNNEL = ' + JSON.stringify(funnel) + ';\n' +
+    '    var FIRESTORE_URL = ' + JSON.stringify(firestoreUrl) + ';\n' +
+    '    var HARDCODED_FALLBACK = ' + JSON.stringify(fallbackVal) + ';\n\n' +
+    '    function hashIP(ip) {\n' +
+    '      var h = 0;\n' +
+    '      for (var i = 0; i < ip.length; i++) {\n' +
+    '        h = (Math.imul(31, h) + ip.charCodeAt(i)) | 0;\n' +
+    '      }\n' +
+    '      return Math.abs(h);\n' +
+    '    }\n\n' +
+    '    function redirect(routes, fallback, code, ip) {\n' +
+    '      var options = routes[code];\n' +
+    '      if (!options || !options.length) { window.location.replace(fallback); return; }\n' +
+    '      var total = options.reduce(function(s, o) { return s + o[1]; }, 0);\n' +
+    '      if (total <= 0) { window.location.replace(fallback); return; }\n' +
+    '      var h = ip ? hashIP(ip) % total : 0;\n' +
+    '      var cum = 0;\n' +
+    '      for (var i = 0; i < options.length; i++) {\n' +
+    '        cum += options[i][1];\n' +
+    '        if (h < cum) { window.location.replace(options[i][0]); return; }\n' +
+    '      }\n' +
+    '      window.location.replace(options[options.length - 1][0]);\n' +
+    '    }\n\n' +
+    '    function doRedirect(routes, fallback) {\n' +
+    '      fetch(\'https://ipapi.co/json/\')\n' +
+    '        .then(function(r){ return r.json(); })\n' +
+    '        .then(function(d){ redirect(routes, fallback, d.country_code || d.country, d.ip || \'\'); })\n' +
+    '        .catch(function(){\n' +
+    '          fetch(\'https://freeipapi.com/api/json\')\n' +
+    '            .then(function(r){ return r.json(); })\n' +
+    '            .then(function(d){ redirect(routes, fallback, d.countryCode, d.ipAddress || \'\'); })\n' +
+    '            .catch(function(){ window.location.replace(fallback); });\n' +
+    '        });\n' +
+    '    }\n\n' +
+    '    fetch(FIRESTORE_URL)\n' +
+    '      .then(function(r){ return r.json(); })\n' +
+    '      .then(function(doc) {\n' +
+    '        var routes = JSON.parse(doc.fields.routes.stringValue);\n' +
+    '        var fallback = doc.fields.fallback.stringValue || HARDCODED_FALLBACK;\n' +
+    '        doRedirect(routes, fallback);\n' +
+    '      })\n' +
+    '      .catch(function() {\n' +
+    '        window.location.replace(HARDCODED_FALLBACK);\n' +
+    '      });\n' +
+    '  <\/script>\n' +
+    '</body>\n' +
+    '</html>';
+}
+
+function setTopDealAsFallback(funnel) {
+  var assigned = getAssignedDeals(funnel);
+  if (!assigned.length) return;
+  var top = assigned.reduce(function(best, d) {
+    return getWeight(funnel, d.id) > getWeight(funnel, best.id) ? d : best;
+  });
+  smartlinkFallbacks[funnel] = getFunnelUrl(top.url, funnel);
+  saveSmartlinkFallbacks();
+  renderSmartlinks();
+}
+
+function copySmartlinkUrl(funnel, btn) {
+  var url = smartlinkHostedUrls[funnel] || '';
+  if (!url) return;
+  copyToClipboard(url, btn, ICON_COPY);
+}
+
+function downloadSmartlink(funnel) {
+  var html = generateRedirectHtml(funnel);
+  var blob = new Blob([html], { type: 'text/html' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = funnel.toLowerCase() + '-smartlink.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderSmartlinks() {
+  var container = document.getElementById('smartlinkCols');
+  if (!container) return;
+
+  // ── Universal tab: rich overview grid ──────────────────────────────────
+  if (!currentFunnel) {
+    container.className = '';
+    container.innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' +
+      FUNNEL_NAMES.map(function(f, fi) {
+        var color = FUNNEL_COLORS[f];
+        var assignedDeals = getAssignedDeals(f);
+        var multiMap = buildMultiRouteMap(f);
+        var coveredCount = Object.keys(multiMap).length;
+        var hostedUrl = smartlinkHostedUrls[f] || '';
+        var fallbackVal = smartlinkFallbacks[f] || '';
+        var isLive = !!hostedUrl;
+        var totalWeight = assignedDeals.reduce(function(s, d) { return s + getWeight(f, d.id); }, 0);
+        var weightOk = totalWeight === 100;
+
+        // Deal weight bars
+        var dealBars = assignedDeals.length
+          ? assignedDeals.map(function(d) {
+              var w = getWeight(f, d.id);
+              return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
+                '<span style="font-size:12px;font-weight:600;min-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(d.name) + '">' + escHtml(d.name) + '</span>' +
+                '<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden">' +
+                  '<div style="width:' + w + '%;height:100%;background:' + color + ';border-radius:3px"></div>' +
+                '</div>' +
+                '<span style="font-size:11px;font-weight:700;color:' + color + ';min-width:34px;text-align:right">' + w + '%</span>' +
+              '</div>';
+            }).join('')
+          : '<div style="font-size:12px;color:var(--muted);padding:4px 0">No deals assigned</div>';
+
+        // Smartlink URL row
+        var urlRow = isLive
+          ? '<div style="display:flex;align-items:center;gap:6px;background:rgba(88,166,255,0.05);border:1px solid rgba(88,166,255,0.15);border-radius:6px;padding:7px 10px;margin-bottom:12px">' +
+              '<span style="font-size:10px;font-weight:700;color:var(--accent);white-space:nowrap">LIVE</span>' +
+              '<span style="flex:1;font-size:11px;font-family:monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(hostedUrl) + '">' + escHtml(hostedUrl) + '</span>' +
+              '<button onclick="event.stopPropagation();copyToClipboard(\'' + escHtml(hostedUrl) + '\',this,\'Copy\')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted);font-size:10px;cursor:pointer;white-space:nowrap">Copy</button>' +
+            '</div>'
+          : '<div style="display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:12px">' +
+              '<span style="font-size:11px;color:var(--muted)">No hosted URL — configure to go live</span>' +
+              '<button onclick="event.stopPropagation();setFunnel(\'' + f + '\')" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted);font-size:10px;cursor:pointer;white-space:nowrap">Set up &#8594;</button>' +
+            '</div>';
+
+        // Last card spans full width if 5 funnels (odd)
+        var spanStyle = (fi === 4) ? 'grid-column:1 / -1;max-width:calc(50% - 7px)' : '';
+
+        return '<div style="' + spanStyle + 'background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+
+          // Card header
+          '<div style="background:var(--card2);padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+            '<div style="display:flex;align-items:center;gap:10px">' +
+              '<span style="font-size:14px;font-weight:700;color:' + color + '">' + f + '</span>' +
+              '<span style="font-size:11px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1px 9px;color:var(--muted)">' + coveredCount + ' GEOs</span>' +
+              '<span style="font-size:11px;color:var(--muted)">' + assignedDeals.length + ' deal' + (assignedDeals.length !== 1 ? 's' : '') + '</span>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+              (isLive
+                ? '<span style="font-size:10px;font-weight:700;color:var(--green)">&#10003; Live</span>'
+                : '<span style="font-size:10px;color:var(--muted)">Not live</span>') +
+              '<button onclick="event.stopPropagation();setFunnel(\'' + f + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 10px;color:var(--muted);font-size:11px;cursor:pointer">Configure</button>' +
+            '</div>' +
+          '</div>' +
+
+          // Card body
+          '<div style="padding:14px 16px">' +
+
+            urlRow +
+
+            // Deal bars
+            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:8px">Traffic Split</div>' +
+            dealBars +
+            (!weightOk && assignedDeals.length > 0
+              ? '<div style="font-size:11px;color:var(--yellow);margin-top:6px">&#9888; Weights don\'t add up to 100% — <button onclick="event.stopPropagation();equalizeWeights(\'' + f + '\')" style="background:none;border:none;color:var(--yellow);font-size:11px;cursor:pointer;text-decoration:underline;padding:0">Auto-fix</button></div>'
+              : '') +
+
+            // Fallback + Download
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">' +
+              '<div style="font-size:11px;color:var(--muted)">' +
+                (fallbackVal
+                  ? 'Fallback: <span style="color:var(--text)">' + escHtml(fallbackVal.replace(/^https?:\/\//, '').split('/')[0]) + '</span>'
+                  : '<span style="color:var(--yellow)">&#9888; No fallback set</span>') +
+              '</div>' +
+              '<button onclick="event.stopPropagation();downloadSmartlink(\'' + f + '\')" style="display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer">\u2193 Download</button>' +
+            '</div>' +
+
+          '</div>' +
+        '</div>';
+      }).join('') +
+      '</div>';
+    return;
+  }
+
+  // ── Single funnel: full-width card ─────────────────────────────────────
+  container.className = '';
+
+  var f = currentFunnel;
+  var color = FUNNEL_COLORS[f];
+  var assignedDeals = getAssignedDeals(f);
+  var assignedIds = assignments[f] || [];
+  var unassigned = deals.filter(function(d) { return assignedIds.indexOf(d.id) === -1; });
+  var multiMap = buildMultiRouteMap(f);
+  var coveredGeos = Object.keys(multiMap).sort();
+  var coveredCount = coveredGeos.length;
+  var fallbackVal = smartlinkFallbacks[f] || '';
+  var hostedUrl = smartlinkHostedUrls[f] || '';
+
+  // Hosted URL bar
+  var hostedHtml = hostedUrl
+    ? '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:11px;font-weight:700;color:var(--accent);white-space:nowrap">&#128279; Smartlink</span>' +
+        '<span class="smartlink-url-display" style="flex:1" title="' + escHtml(hostedUrl) + '">' + escHtml(hostedUrl) + '</span>' +
+        '<button class="btn-copy" onclick="copySmartlinkUrl(\'' + f + '\',this)" title="Copy">' + ICON_COPY + '</button>' +
+        '<button class="btn-icon" onclick="smartlinkHostedUrls[\'' + f + '\']=\'\';saveSmartlinkHostedUrls();renderSmartlinks()" style="font-size:12px;padding:3px 7px" title="Change URL">&times;</button>' +
+      '</div>'
+    : '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap">&#128279; Hosted URL</span>' +
+        '<input type="url" class="form-input" style="flex:1;font-size:12px;padding:6px 9px" placeholder="Paste your Netlify / GitHub Pages URL here after uploading the file…" ' +
+          'oninput="smartlinkHostedUrls[\'' + f + '\']=this.value;saveSmartlinkHostedUrls()" onchange="renderSmartlinks()">' +
+      '</div>';
+
+  // Assigned deals with weight inputs
+  var totalWeight = assignedDeals.reduce(function(s, d) { return s + getWeight(f, d.id); }, 0);
+  var weightOk = totalWeight === 100;
+  var dealsHtml = assignedDeals.map(function(deal, idx) {
+    var w = getWeight(f, deal.id);
+    return '<div class="deal-card">' +
+      '<div class="deal-card-priority">' + (idx + 1) + '</div>' +
+      '<div class="deal-card-name" title="' + escHtml(deal.name) + '">' + escHtml(deal.name) + '</div>' +
+      '<input type="number" min="0" max="100" value="' + w + '" ' +
+        'style="width:46px;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:3px 5px;color:var(--text);font-size:12px;font-weight:600;text-align:center;outline:none" ' +
+        'onchange="setDealWeight(\'' + f + '\',' + deal.id + ',this.value)" ' +
+        'onclick="this.select()">' +
+      '<span style="font-size:11px;color:var(--muted)">%</span>' +
+      '<div class="deal-card-controls">' +
+        '<button class="btn-move" onclick="moveAssignment(\'' + f + '\',' + idx + ',-1)"' + (idx === 0 ? ' disabled' : '') + '>\u2191</button>' +
+        '<button class="btn-move" onclick="moveAssignment(\'' + f + '\',' + idx + ',1)"' + (idx === assignedDeals.length - 1 ? ' disabled' : '') + '>\u2193</button>' +
+        '<button class="btn-remove-deal" onclick="removeAssignment(\'' + f + '\',' + idx + ')">\u00d7</button>' +
+      '</div>' +
+    '</div>';
+  }).join('') || '<div style="color:var(--muted);font-size:11px;padding:4px 0">None assigned</div>';
+
+  var weightStatusHtml = assignedDeals.length > 0
+    ? '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding:6px 8px;background:' + (weightOk ? 'rgba(63,185,80,0.08)' : 'rgba(210,153,34,0.08)') + ';border:1px solid ' + (weightOk ? 'rgba(63,185,80,0.25)' : 'rgba(210,153,34,0.3)') + ';border-radius:5px">' +
+        '<span style="font-size:12px;font-weight:600;color:' + (weightOk ? 'var(--green)' : 'var(--yellow)') + '">Total: ' + totalWeight + '%' + (weightOk ? ' \u2713' : ' \u2014 must equal 100%') + '</span>' +
+        (!weightOk ? '<button onclick="equalizeWeights(\'' + f + '\')" style="background:none;border:1px solid var(--yellow);border-radius:5px;padding:2px 8px;color:var(--yellow);font-size:11px;font-weight:600;cursor:pointer">Auto-balance</button>' : '') +
+      '</div>'
+    : '';
+
+  var addDealHtml = unassigned.length > 0
+    ? '<select onchange="addAssignment(\'' + f + '\',parseInt(this.value)||0);this.value=\'\'" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--muted);font-size:12px;cursor:pointer;outline:none;margin-top:5px">' +
+        '<option value="">+ Add deal\u2026</option>' +
+        unassigned.map(function(d) { return '<option value="' + d.id + '">' + escHtml(d.name) + '</option>'; }).join('') +
+      '</select>'
+    : '';
+
+  // Casino coverage bars
+  var casinoStats = {};
+  assignedDeals.forEach(function(d) { casinoStats[d.name] = { total: 0, shared: 0 }; });
+  coveredGeos.forEach(function(geo) {
+    var names = [];
+    assignedDeals.forEach(function(d) { if (geoArray(d).indexOf(geo) !== -1) names.push(d.name); });
+    names.forEach(function(n) {
+      if (casinoStats[n]) { casinoStats[n].total++; if (names.length > 1) casinoStats[n].shared++; }
+    });
+  });
+  var maxTotal = Math.max.apply(null, assignedDeals.map(function(d) { return (casinoStats[d.name]||{total:0}).total; }).concat([1]));
+  var coverageBarsHtml = assignedDeals.map(function(deal) {
+    var s = casinoStats[deal.name] || { total: 0, shared: 0 };
+    var pct = maxTotal > 0 ? Math.round(s.total / maxTotal * 100) : 0;
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+      '<span style="font-size:12px;font-weight:600;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(deal.name) + '</span>' +
+      '<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden">' +
+        '<div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:3px"></div>' +
+      '</div>' +
+      '<span style="font-size:11px;color:var(--muted);white-space:nowrap;min-width:64px;text-align:right">' +
+        s.total + ' GEOs' + (s.shared > 0 ? ' <span style="color:var(--purple)">(' + s.shared + ' split)</span>' : '') +
+      '</span>' +
+    '</div>';
+  }).join('');
+
+  // Routing table rows — use actual weights
+  var routingRows = '';
+  coveredGeos.forEach(function(geo) {
+    var entries = multiMap[geo]; // [[url, weight], ...]
+    var n = entries.length;
+    var geoTotalWeight = entries.reduce(function(s, e) { return s + e[1]; }, 0);
+    var names = [];
+    assignedDeals.forEach(function(d) {
+      if (geoArray(d).indexOf(geo) !== -1) names.push({ name: d.name, weight: getWeight(f, d.id) });
+    });
+
+    if (n === 1) {
+      routingRows +=
+        '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:7px 14px;font-weight:700;color:var(--muted);font-size:12px;white-space:nowrap;width:52px">' + escHtml(geo) + '</td>' +
+          '<td style="padding:7px 14px;font-weight:600;font-size:13px">' + escHtml(names[0] ? names[0].name : '') + '</td>' +
+          '<td style="padding:7px 14px">' +
+            '<div style="display:flex;align-items:center;gap:10px">' +
+              '<div style="width:80px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">' +
+                '<div style="width:100%;height:100%;background:' + color + ';border-radius:3px"></div>' +
+              '</div>' +
+              '<span style="font-size:12px;color:var(--muted);min-width:36px">100%</span>' +
+              '<span style="font-size:11px;color:var(--muted)">only casino — always gets this IP</span>' +
+            '</div>' +
+          '</td>' +
+        '</tr>';
+    } else {
+      names.forEach(function(entry, ci) {
+        var chancePct = geoTotalWeight > 0 ? Math.round(entry.weight / geoTotalWeight * 100) : 0;
+        var barWidth = geoTotalWeight > 0 ? Math.round(entry.weight / geoTotalWeight * 80) : 0;
+        routingRows +=
+          '<tr style="border-bottom:1px solid ' + (ci === n - 1 ? 'var(--border)' : 'rgba(255,255,255,0.04)') + '">' +
+            (ci === 0
+              ? '<td rowspan="' + n + '" style="padding:7px 14px;font-weight:700;color:var(--muted);font-size:12px;white-space:nowrap;vertical-align:middle;border-right:2px solid ' + color + ';width:52px">' + escHtml(geo) + '</td>'
+              : '') +
+            '<td style="padding:6px 14px;font-size:13px;font-weight:600">' +
+              escHtml(entry.name) +
+              ' <span style="font-size:10px;background:rgba(188,140,255,0.1);color:var(--purple);border:1px solid rgba(188,140,255,0.2);border-radius:3px;padding:2px 6px">IP-pinned</span>' +
+            '</td>' +
+            '<td style="padding:6px 14px">' +
+              '<div style="display:flex;align-items:center;gap:10px">' +
+                '<div style="width:80px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">' +
+                  '<div style="width:' + barWidth + 'px;height:100%;background:' + color + ';border-radius:3px"></div>' +
+                '</div>' +
+                '<span style="font-size:12px;font-weight:600;color:' + color + ';min-width:36px">' + chancePct + '%</span>' +
+                '<span style="font-size:11px;color:var(--muted)">' + entry.weight + ' of ' + geoTotalWeight + ' pts</span>' +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+      });
+    }
+  });
+
+  // Top deal (highest weight) — for auto-fallback button
+  var topDeal = assignedDeals.length > 0
+    ? assignedDeals.reduce(function(best, d) { return getWeight(f, d.id) > getWeight(f, best.id) ? d : best; })
+    : null;
+  var topDealPct = topDeal ? getWeight(f, topDeal.id) : 0;
+
+  // Countries by deal — group covered GEOs per casino for the coverage section
+  var countriesHtml = '';
+  if (assignedDeals.length > 0) {
+    var dealGeoMap = {};
+    assignedDeals.forEach(function(deal) {
+      var geos = geoArray(deal).filter(function(g) { return multiMap[g]; });
+      if (geos.length > 0) {
+        dealGeoMap[deal.name] = { color: color, weight: getWeight(f, deal.id), geos: geos.sort() };
+      }
+    });
+    countriesHtml = Object.keys(dealGeoMap).map(function(casinoName) {
+      var entry = dealGeoMap[casinoName];
+      var badges = entry.geos.map(function(geo) {
+        var name = CODE_TO_NAME[geo] || geo;
+        return '<span title="' + escHtml(name) + '" style="display:inline-flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;white-space:nowrap">' +
+          '<span style="font-weight:700;color:var(--muted)">' + escHtml(geo) + '</span>' +
+          '<span style="color:var(--text);opacity:0.7;font-size:10px">' + escHtml(name.length > 16 ? name.slice(0,15) + '\u2026' : name) + '</span>' +
+        '</span>';
+      }).join('');
+      return '<div style="margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+          '<span style="font-size:12px;font-weight:700;color:' + entry.color + '">' + escHtml(casinoName) + '</span>' +
+          '<span style="font-size:11px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--muted)">' + entry.geos.length + ' countries</span>' +
+          '<span style="font-size:11px;color:var(--muted)">' + entry.weight + '% traffic weight</span>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px">' + badges + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // Countries tab stats
+  var bgamingDeals = assignedDeals.filter(function(d) { return d.bgaming; });
+  var nonBgamingDeals = assignedDeals.filter(function(d) { return !d.bgaming; });
+  var avgRevshare = assignedDeals.length > 0
+    ? Math.round(assignedDeals.reduce(function(s, d) { return s + (d.revshare || 0); }, 0) / assignedDeals.length)
+    : 0;
+
+  function statBox(label, value, col) {
+    return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;min-width:120px">' +
+      '<div style="font-size:22px;font-weight:700;color:' + (col || 'var(--text)') + ';line-height:1;margin-bottom:4px">' + value + '</div>' +
+      '<div style="font-size:11px;color:var(--muted)">' + label + '</div>' +
+    '</div>';
+  }
+
+  var countriesTabHtml =
+    '<div style="padding:24px 24px 28px">' +
+      '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:4px">' + escHtml(f) + ' Funnel</div>' +
+      '<div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:20px">Countries Accepted</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px">' +
+        statBox('GEOs Covered', coveredCount, color) +
+        statBox('Deals Assigned', assignedDeals.length) +
+        statBox('BGaming Deals', bgamingDeals.length, 'var(--green)') +
+        (nonBgamingDeals.length > 0 ? statBox('Non-BGaming', nonBgamingDeals.length, 'var(--yellow)') : '') +
+        statBox('Avg Revshare', avgRevshare + '%', avgRevshare >= 40 ? 'var(--green)' : 'var(--yellow)') +
+      '</div>' +
+      (assignedDeals.length > 0
+        ? assignedDeals.map(function(deal) {
+            var geos = geoArray(deal).filter(function(g) { return multiMap[g]; }).sort();
+            if (!geos.length) return '';
+            var w = getWeight(f, deal.id);
+            var badges = geos.map(function(geo) {
+              var cname = CODE_TO_NAME[geo] || geo;
+              return '<span style="display:inline-flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;white-space:nowrap">' +
+                '<span style="font-weight:700;font-size:11px;color:var(--muted)">' + escHtml(geo) + '</span>' +
+                '<span style="color:var(--text)">' + escHtml(cname) + '</span>' +
+              '</span>';
+            }).join('');
+            return '<div style="margin-bottom:20px">' +
+              '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+                '<span style="font-size:14px;font-weight:700;color:' + color + '">' + escHtml(deal.name) + '</span>' +
+                '<span style="font-size:11px;background:' + color + '22;border:1px solid ' + color + '44;border-radius:10px;padding:2px 10px;color:' + color + '">' + w + '% traffic</span>' +
+                '<span style="font-size:11px;color:var(--muted)">' + geos.length + ' countries</span>' +
+                (deal.bgaming ? '<span style="font-size:10px;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.25);border-radius:4px;padding:2px 7px;color:var(--green)">BGaming</span>' : '') +
+              '</div>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:5px">' + badges + '</div>' +
+            '</div>';
+          }).join('')
+        : '<div style="color:var(--muted);font-size:13px;padding:24px 0">No deals assigned — go to Config tab to assign deals.</div>') +
+    '</div>';
+
+  container.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+
+      // Header
+      '<div style="background:var(--card2);padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<span style="font-size:15px;font-weight:700;color:' + color + '">' + f + '</span>' +
+          '<span style="font-size:12px;color:var(--muted)">Smartlink</span>' +
+          '<span style="font-size:11px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2px 10px;color:var(--muted)">' + coveredCount + ' GEOs covered</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden">' +
+          '<button onclick="setSmartlinkTab(\'config\')" style="padding:5px 14px;font-size:12px;font-weight:600;background:' + (smartlinkTab === 'config' ? color : 'transparent') + ';color:' + (smartlinkTab === 'config' ? '#0d0f14' : 'var(--muted)') + ';border:none;cursor:pointer;transition:all 0.15s">\u2699 Config</button>' +
+          '<button onclick="setSmartlinkTab(\'countries\')" style="padding:5px 14px;font-size:12px;font-weight:600;background:' + (smartlinkTab === 'countries' ? color : 'transparent') + ';color:' + (smartlinkTab === 'countries' ? '#0d0f14' : 'var(--muted)') + ';border:none;cursor:pointer;border-left:1px solid var(--border);transition:all 0.15s">\uD83C\uDF0D Countries</button>' +
+        '</div>' +
+      '</div>' +
+
+      (smartlinkTab === 'config'
+        ?
+          // Hosted URL bar
+          '<div style="padding:12px 20px;border-bottom:1px solid var(--border);background:' + (hostedUrl ? 'rgba(88,166,255,0.04)' : 'transparent') + '">' +
+            hostedHtml +
+          '</div>' +
+
+          // 2-column body
+          '<div style="display:grid;grid-template-columns:290px 1fr">' +
+
+            // Left panel
+            '<div style="padding:18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:16px">' +
+
+              '<div>' +
+                '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:8px">Assigned Deals <span style="font-weight:400;text-transform:none;letter-spacing:0">(priority order)</span></div>' +
+                '<div style="display:flex;flex-direction:column;gap:4px">' + dealsHtml + '</div>' +
+                addDealHtml +
+                weightStatusHtml +
+              '</div>' +
+
+              (coverageBarsHtml
+                ? '<div>' +
+                    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:10px">Casino Coverage</div>' +
+                    coverageBarsHtml +
+                  '</div>'
+                : '') +
+
+              '<div style="margin-top:auto">' +
+                '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+                  '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Fallback URL</div>' +
+                  (topDeal
+                    ? '<button onclick="setTopDealAsFallback(\'' + f + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--muted);font-size:10px;cursor:pointer;white-space:nowrap" title="Auto-fill with top-weighted casino URL">&#8592; Use ' + escHtml(topDeal.name) + ' (' + topDealPct + '%)</button>'
+                    : '') +
+                '</div>' +
+                '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Used when visitor\'s GEO is not covered</div>' +
+                '<input type="url" class="form-input" style="font-size:12px;padding:6px 9px;margin-bottom:10px" placeholder="https://..." value="' + escHtml(fallbackVal) + '" oninput="smartlinkFallbacks[\'' + f + '\']=this.value;saveSmartlinkFallbacks()">' +
+                '<button class="btn-download" onclick="downloadSmartlink(\'' + f + '\')">\u2193 Download ' + f.toLowerCase() + '-smartlink.html</button>' +
+              '</div>' +
+
+            '</div>' +
+
+            // Right panel — routing table
+            '<div style="padding:18px">' +
+              '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:10px">GEO Routing — Which Casino &amp; What Chance</div>' +
+              (coveredCount > 0
+                ? '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">' +
+                    '<div style="background:var(--card2);display:grid;grid-template-columns:52px 1fr 280px;padding:7px 14px;border-bottom:1px solid var(--border)">' +
+                      '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">GEO</span>' +
+                      '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Casino</span>' +
+                      '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Chance</span>' +
+                    '</div>' +
+                    '<div style="max-height:380px;overflow-y:auto">' +
+                      '<table style="width:100%;border-collapse:collapse"><tbody>' + routingRows + '</tbody></table>' +
+                    '</div>' +
+                  '</div>'
+                : '<div style="color:var(--muted);font-size:13px;padding:32px 0;text-align:center">Assign deals on the left to see the routing</div>') +
+            '</div>' +
+
+          '</div>'
+
+        : // Countries tab
+          countriesTabHtml) +
+
+    '</div>';
+
+}
+
+function toggleSmartlinks() {
+  smartlinksVisible = !smartlinksVisible;
+  document.getElementById('smartlinksWrap').style.display = smartlinksVisible ? '' : 'none';
+  document.getElementById('btnToggleSmartlinks').innerHTML = smartlinksVisible
+    ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg> Hide'
+    : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show';
+}
+
+// ── Firebase save ──────────────────────────────────────────────────────────
+function saveToFirebase() {
+  DOC_REF.set({
+    deals: deals,
+    assignments: assignments,
+    dealWeights: dealWeights,
+    smartlinkFallbacks: smartlinkFallbacks,
+    smartlinkHostedUrls: smartlinkHostedUrls
+  }).catch(function(e) { console.error('Firebase save error:', e); });
+  saveRoutesToFirebase();
+}
+
+function saveRoutesToFirebase() {
+  FUNNEL_NAMES.forEach(function(f) {
+    var multiMap = buildMultiRouteMap(f);
+    var fallback = smartlinkFallbacks[f] || '';
+    db.collection('routes').doc(f.toLowerCase()).set({
+      routes: JSON.stringify(multiMap),
+      fallback: fallback,
+      funnel: f,
+      updated: new Date().toISOString()
+    }).catch(function(e) { console.error('Routes save error:', e); });
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+// Show loading state
+document.body.innerHTML += '<div id="loadingOverlay" style="position:fixed;inset:0;background:#0d0f14;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px"><div style="font-size:16px;color:#7d8590">Loading dashboard\u2026</div></div>';
+
+DOC_REF.get().then(function(doc) {
+  if (doc.exists) {
+    var data = doc.data();
+    deals = data.deals || [];
+    assignments = data.assignments || JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
+    dealWeights = data.dealWeights || {};
+    smartlinkFallbacks = data.smartlinkFallbacks || {};
+    smartlinkHostedUrls = data.smartlinkHostedUrls || {};
+    // Run migrations on loaded deals
+    var seedMap = {};
+    SEED_DEALS.forEach(function(d) { seedMap[d.id] = d; });
+    var changed = false;
+    deals.forEach(function(d) {
+      var seed = seedMap[d.id];
+      if (!d.bgaming) { d.bgaming = true; changed = true; }
+      if (seed) {
+        if (d.username === undefined || d.username === null) { d.username = seed.username; changed = true; }
+        if (d.password === undefined || d.password === null) { d.password = seed.password; changed = true; }
+        if (d.contact === undefined || d.contact === null) { d.contact = seed.contact; changed = true; }
+        if (d.id === 3 && d.url.indexOf('brand=rolletto') !== -1) { d.url = seed.url; changed = true; }
+        if (d.id === 6 && d.url === 'https://track.ftdgallery.com/visit/?bta=35437&brand=spinania&utm_campaign=Dark') { d.url = seed.url; changed = true; }
+      }
+    });
+    if (changed) saveToFirebase();
+  } else {
+    // First time — seed with default data
+    deals = JSON.parse(JSON.stringify(SEED_DEALS));
+    assignments = JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
+    dealWeights = {};
+    smartlinkFallbacks = {};
+    smartlinkHostedUrls = {};
+    FUNNEL_NAMES.forEach(function(f) { equalizeWeights(f); });
+    saveToFirebase();
+  }
+  // Finalize weights
+  FUNNEL_NAMES.forEach(function(f) {
+    if (!dealWeights[f]) equalizeWeights(f);
+  });
+  // Remove loading overlay and render
+  var overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.remove();
+  render();
+  setFunnel(null);
+  renderGlitch();
+  renderConflictBadges();
+  renderSmartlinks();
+  renderFunnelGeoBar();
+  // Set up real-time listener for cross-browser sync
+  DOC_REF.onSnapshot(function(doc) {
+    if (!doc.exists) return;
+    var data = doc.data();
+    deals = data.deals || deals;
+    assignments = data.assignments || assignments;
+    dealWeights = data.dealWeights || dealWeights;
+    smartlinkFallbacks = data.smartlinkFallbacks || smartlinkFallbacks;
+    smartlinkHostedUrls = data.smartlinkHostedUrls || smartlinkHostedUrls;
+    render();
+    renderSmartlinks();
+    renderConflictBadges();
+    renderFunnelGeoBar();
+  }, function(e) { console.error('Snapshot error:', e); });
+}).catch(function(e) {
+  console.error('Firebase load error:', e);
+  var overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.innerHTML = '<div style="font-size:16px;color:#f85149">Failed to connect to database</div><div style="font-size:13px;color:#7d8590;margin-top:8px">' + e.message + '</div>';
+});
+</script>
+</body>
+</html>
