@@ -61,6 +61,7 @@
   .funnel-tab.active-scanio  { color: #f0883e; border-bottom-color: #f0883e; }
   .funnel-tab.active-spin    { color: #f85149; border-bottom-color: #f85149; }
   .funnel-tab.active-shadow  { color: #bc8cff; border-bottom-color: #bc8cff; }
+  .funnel-tab.active-manage  { color: #bc8cff; border-bottom-color: #bc8cff; }
 
   .funnel-badge {
     display: inline-block;
@@ -859,7 +860,8 @@
 
 <!-- Funnel Nav -->
 <div class="funnel-nav" id="funnelNav">
-  <div class="funnel-tab" id="tab-universal" onclick="setFunnel(null)">Universal</div>
+  <div class="funnel-tab" id="tab-manage" onclick="setPage('manage')">Manage</div>
+  <div class="funnel-tab" id="tab-universal" onclick="setPage('dashboard')">Universal</div>
   <div class="funnel-tab" id="tab-dark"      onclick="setFunnel('Dark')">Dark <span class="tab-cbadge" id="cbadge-dark"></span></div>
   <div class="funnel-tab" id="tab-slotio"    onclick="setFunnel('Slotio')">Slotio <span class="tab-cbadge" id="cbadge-slotio"></span></div>
   <div class="funnel-tab" id="tab-scanio"    onclick="setFunnel('Scanio')">Scanio <span class="tab-cbadge" id="cbadge-scanio"></span></div>
@@ -867,6 +869,7 @@
   <div class="funnel-tab" id="tab-shadow"    onclick="setFunnel('Shadow')">Shadow <span class="tab-cbadge" id="cbadge-shadow"></span></div>
 </div>
 
+<div id="dashboardContent">
 <div id="funnelGeoBar" style="display:none"></div>
 
 <div class="main">
@@ -1005,6 +1008,10 @@
   </div>
 </div>
 
+</div><!-- end dashboardContent -->
+
+<div id="managePage" style="display:none"></div>
+
 <!-- GEO tooltip overlay -->
 <div class="geo-tooltip-overlay" id="geoOverlay" onclick="closeGeoTooltip()"></div>
 <div class="geo-tooltip" id="geoTooltip" style="display:none"></div>
@@ -1140,8 +1147,14 @@ function getFunnelUrl(url, funnel) {
 
 function setFunnel(funnel) {
   currentFunnel = funnel;
+  currentPage = 'dashboard';
+  // Ensure dashboard is visible and manage page is hidden
+  var manageDiv = document.getElementById('managePage');
+  var dashboardContent = document.getElementById('dashboardContent');
+  if (manageDiv) manageDiv.style.display = 'none';
+  if (dashboardContent) dashboardContent.style.display = '';
   // Update tab active classes
-  ['universal','dark','slotio','scanio','spin','shadow'].forEach(function(key) {
+  ['manage','universal','dark','slotio','scanio','spin','shadow'].forEach(function(key) {
     var el = document.getElementById('tab-' + key);
     if (el) el.className = 'funnel-tab';
   });
@@ -1160,6 +1173,169 @@ function setFunnel(funnel) {
   render();
   renderFunnelGeoBar();
   renderSmartlinks();
+}
+
+function setPage(page) {
+  currentPage = page;
+  ['manage','universal','dark','slotio','scanio','spin','shadow'].forEach(function(k) {
+    var el = document.getElementById('tab-' + k);
+    if (el) el.className = 'funnel-tab';
+  });
+  var el = document.getElementById('tab-' + page);
+  if (el) el.classList.add('active-' + page);
+
+  var manageDiv = document.getElementById('managePage');
+  var dashboardContent = document.getElementById('dashboardContent');
+
+  if (page === 'manage') {
+    if (manageDiv) manageDiv.style.display = '';
+    if (dashboardContent) dashboardContent.style.display = 'none';
+    renderManagePage();
+  } else {
+    if (manageDiv) manageDiv.style.display = 'none';
+    if (dashboardContent) dashboardContent.style.display = '';
+    setFunnel(null);
+  }
+}
+
+function renderManagePage() {
+  var container = document.getElementById('managePage');
+  if (!container) return;
+
+  // Funnel health cards
+  var healthHtml = FUNNEL_NAMES.map(function(f) {
+    var color = FUNNEL_COLORS[f];
+    var assignedDeals = getAssignedDeals(f);
+    var totalWeight = assignedDeals.reduce(function(s, d) { return s + getWeight(f, d.id); }, 0);
+    var hasFallback = !!smartlinkFallbacks[f];
+    var isLive = !!smartlinkHostedUrls[f];
+
+    function check(ok, text) {
+      var col = ok ? 'var(--green)' : 'var(--red)';
+      var icon = ok ? '&#10003;' : '&#10007;';
+      return '<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px">' +
+        '<span style="color:' + col + ';font-weight:700;font-size:13px">' + icon + '</span>' +
+        '<span style="color:' + (ok ? 'var(--text)' : 'var(--red)') + '">' + text + '</span>' +
+      '</div>';
+    }
+
+    function checkYellow(ok, text) {
+      var col = ok ? 'var(--green)' : 'var(--yellow)';
+      var icon = ok ? '&#10003;' : '&#9888;';
+      return '<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px">' +
+        '<span style="color:' + col + ';font-weight:700;font-size:13px">' + icon + '</span>' +
+        '<span style="color:' + (ok ? 'var(--text)' : 'var(--yellow)') + '">' + text + '</span>' +
+      '</div>';
+    }
+
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex:1;min-width:160px">' +
+      '<div style="background:var(--card2);padding:10px 14px;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:' + color + '">' + f + '</span>' +
+      '</div>' +
+      '<div style="padding:12px 14px">' +
+        check(assignedDeals.length > 0, assignedDeals.length + ' deal' + (assignedDeals.length !== 1 ? 's' : '') + ' assigned') +
+        checkYellow(totalWeight === 100, 'Weights = ' + totalWeight + '%') +
+        check(hasFallback, hasFallback ? 'Fallback set' : 'No fallback') +
+        check(isLive, isLive ? 'Smartlink live' : 'Not live yet') +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // Funnel badge short labels
+  var FUNNEL_SHORT = { Dark: 'Da', Slotio: 'Sl', Scanio: 'Sc', Spin: 'Sp', Shadow: 'Sh' };
+
+  // Deal cards
+  var dealCardsHtml = deals.map(function(deal) {
+    var geos = geoArray(deal);
+    var rsColor = deal.revshare >= 40 ? 'var(--green)' : 'var(--yellow)';
+    var rsBg = deal.revshare >= 40 ? 'rgba(63,185,80,0.1)' : 'rgba(210,153,34,0.1)';
+    var rsBorder = deal.revshare >= 40 ? 'rgba(63,185,80,0.3)' : 'rgba(210,153,34,0.3)';
+
+    // Which funnels this deal is assigned to
+    var funnelBadges = FUNNEL_NAMES.map(function(f) {
+      var ids = assignments[f] || [];
+      if (ids.indexOf(deal.id) === -1) return '';
+      var color = FUNNEL_COLORS[f];
+      var fBg = color.replace(')', ',0.12)').replace('rgb', 'rgba');
+      // Build rgba background from hex color
+      var hexMap = { Dark: 'rgba(88,166,255,0.12)', Slotio: 'rgba(63,185,80,0.12)', Scanio: 'rgba(240,136,62,0.12)', Spin: 'rgba(248,81,73,0.12)', Shadow: 'rgba(188,140,255,0.12)' };
+      var borderMap = { Dark: 'rgba(88,166,255,0.3)', Slotio: 'rgba(63,185,80,0.3)', Scanio: 'rgba(240,136,62,0.3)', Spin: 'rgba(248,81,73,0.3)', Shadow: 'rgba(188,140,255,0.3)' };
+      return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:' + hexMap[f] + ';color:' + color + ';border:1px solid ' + borderMap[f] + ';white-space:nowrap">' + FUNNEL_SHORT[f] + '</span>';
+    }).join('');
+
+    var bgamingHtml = deal.bgaming
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(63,185,80,0.1);color:var(--green);border:1px solid rgba(63,185,80,0.25)">BGaming &#10003;</span>'
+      : '';
+
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
+        '<span style="font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.3px">' + escHtml(deal.name) + '</span>' +
+        '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--badge-geo);color:var(--badge-geo-text);white-space:nowrap;flex-shrink:0">' + geos.length + ' GEOs</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">' +
+        '<span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;background:' + rsBg + ';color:' + rsColor + ';border:1px solid ' + rsBorder + '">' + deal.revshare + '% RS</span>' +
+        bgamingHtml +
+      '</div>' +
+      (funnelBadges
+        ? '<div style="display:flex;flex-wrap:wrap;gap:4px"><span style="font-size:10px;color:var(--muted);margin-right:2px;align-self:center">Funnels:</span>' + funnelBadges + '</div>'
+        : '<div style="font-size:11px;color:var(--muted)">Not assigned to any funnel</div>') +
+      '<div style="display:flex;gap:7px;padding-top:4px;border-top:1px solid var(--border)">' +
+        '<button onclick="openEditModal(' + deal.id + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--accent)\';this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Edit</button>' +
+        '<button onclick="startDeleteManage(' + deal.id + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--red)\';this.style.borderColor=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Delete</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  container.innerHTML =
+    '<div style="padding:24px 32px;max-width:1800px;margin:0 auto">' +
+
+      // Page header
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;gap:16px;flex-wrap:wrap">' +
+        '<div>' +
+          '<div style="font-size:20px;font-weight:700;letter-spacing:0.3px">Manage Deals</div>' +
+          '<div style="font-size:13px;color:var(--muted);margin-top:4px">Add, edit and manage casino deals</div>' +
+        '</div>' +
+        '<button onclick="openModal()" style="display:flex;align-items:center;gap:7px;background:var(--accent);color:#000;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity 0.15s" onmouseover="this.style.opacity=\'0.85\'" onmouseout="this.style.opacity=\'1\'">' +
+          '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>' +
+          '+ Add New Deal' +
+        '</button>' +
+      '</div>' +
+
+      // Funnel Health
+      '<div style="margin-bottom:28px">' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:12px">Funnel Health</div>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap">' + healthHtml + '</div>' +
+      '</div>' +
+
+      // All Deals
+      '<div>' +
+        '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">All Deals (' + deals.length + ')</div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">New deals are auto-assigned to funnels based on GEO coverage when saved.</div>' +
+        (deals.length > 0
+          ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">' + dealCardsHtml + '</div>'
+          : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:48px;text-align:center;color:var(--muted)">No deals yet — click + Add New Deal to get started.</div>') +
+      '</div>' +
+
+    '</div>';
+}
+
+function startDeleteManage(id) {
+  var deal = deals.find(function(d) { return d.id === id; });
+  if (!deal) return;
+  if (!confirm('Delete "' + deal.name + '"? This cannot be undone.')) return;
+  deals = deals.filter(function(d) { return d.id !== id; });
+  // Remove from all funnel assignments
+  FUNNEL_NAMES.forEach(function(f) {
+    var ids = assignments[f];
+    if (ids) {
+      var idx = ids.indexOf(id);
+      if (idx !== -1) ids.splice(idx, 1);
+    }
+  });
+  saveDeals();
+  renderManagePage();
 }
 
 function openGuide() { document.getElementById('guideOverlay').style.display = 'block'; }
@@ -1207,6 +1383,7 @@ function renderFunnelGeoBar() {
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
+var currentPage = 'dashboard'; // 'dashboard' | 'manage'
 var deals = [];
 var editingId = null;
 var filterBgaming = false;
@@ -1467,6 +1644,7 @@ function toggleGeoMatrix() {
 // ── Persistence ────────────────────────────────────────────────────────────
 function saveDeals() {
   saveToFirebase();
+  if (currentPage === 'manage') renderManagePage();
 }
 
 function nextId() {
