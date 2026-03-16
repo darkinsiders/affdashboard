@@ -2127,7 +2127,7 @@ function renderSlotValues() {
 
   document.getElementById('svProviderTabs').innerHTML = SLOT_VALUES_DATA.map(function(p) {
     return '<button class="sv-tab' + (p.provider === slotValuesActiveProvider ? ' active' : '') +
-      '" onclick="setSlotProvider(' + JSON.stringify(p.provider) + ')">' + escHtml(p.provider) + '</button>';
+      '" onclick="setSlotProvider(\'' + p.provider + '\')">' + escHtml(p.provider) + '</button>';
   }).join('');
 
   var provider = SLOT_VALUES_DATA.find(function(p) { return p.provider === slotValuesActiveProvider; });
