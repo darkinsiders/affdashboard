@@ -494,6 +494,40 @@
   .acc-low    { color: #f0883e;       font-weight: 700; }
   .return-val { font-family: monospace; font-size: 12px; font-weight: 600; color: var(--accent); }
 
+  /* SLOT VALUES */
+  .slot-values-section { margin-top: 32px; }
+  .slot-values-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .slot-values-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 700; color: var(--text);
+  }
+  .sv-provider-tabs { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .sv-tab {
+    padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); color: var(--muted);
+    background: var(--card); transition: all 0.15s;
+  }
+  .sv-tab:hover { color: var(--text); border-color: var(--muted); }
+  .sv-tab.active { background: rgba(88,166,255,0.12); color: var(--accent); border-color: rgba(88,166,255,0.35); }
+  .sv-badge {
+    display: inline-block; font-size: 11px; font-family: monospace; font-weight: 600;
+    padding: 2px 7px; border-radius: 5px; margin: 2px;
+    background: rgba(88,166,255,0.1); color: var(--accent); border: 1px solid rgba(88,166,255,0.2);
+  }
+  .sv-badge-bonus {
+    display: inline-block; font-size: 11px; font-family: monospace; font-weight: 600;
+    padding: 2px 7px; border-radius: 5px; margin: 2px;
+    background: rgba(63,185,80,0.1); color: var(--green); border: 1px solid rgba(63,185,80,0.25);
+  }
+  .sv-badge-special {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+    padding: 2px 8px; border-radius: 5px; margin: 2px;
+    background: rgba(210,153,34,0.12); color: var(--yellow); border: 1px solid rgba(210,153,34,0.3);
+  }
+
   /* GEO tooltip */
   .geo-tooltip-overlay {
     display: none;
@@ -974,6 +1008,36 @@
       </thead>
       <tbody id="glitchBody"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Slot Values Reference -->
+<div class="slot-values-section main" style="padding-top:0">
+  <div class="slot-values-header">
+    <div class="slot-values-title">
+      <span>Slot Values</span>
+      <span class="glitch-title-tag" style="background:rgba(63,185,80,0.12);color:var(--green);border-color:rgba(63,185,80,0.3)">Reference</span>
+      <span class="glitch-count" id="slotValuesCount"></span>
+    </div>
+    <button class="btn-toggle-glitch" id="btnToggleSlotValues" onclick="toggleSlotValues()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+      Hide
+    </button>
+  </div>
+  <div id="slotValuesWrap">
+    <div class="sv-provider-tabs" id="svProviderTabs"></div>
+    <div class="glitch-wrap">
+      <table style="min-width:500px">
+        <thead>
+          <tr>
+            <th>Game</th>
+            <th>Spin Values (EUR)</th>
+            <th>Bonus Buy (EUR)</th>
+          </tr>
+        </thead>
+        <tbody id="slotValuesBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -2024,6 +2088,82 @@ function toggleGlitch() {
     : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show');
 }
 
+// ── Slot Values ─────────────────────────────────────────────────────────────
+var SLOT_VALUES_DATA = [
+  { provider: 'Pragmatic', games: [
+    { name: 'Sweet Bonanza',         spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [20,40,60] },
+    { name: 'Gates of Olympus 1000', spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [20,40,60] },
+    { name: 'Starlight Princess',    spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [20,40,60] },
+    { name: 'Gates Of Olympus',      spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [20,40,60] },
+  ]},
+  { provider: 'Hacksaw', games: [
+    { name: 'Le Bandit', spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [20, 40, 'LUCK OF THE BANDIT'] },
+    { name: 'Klowns',    spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [28, 42, "LESTER\u2019S CASH CAROUSEL"] },
+    { name: 'Evil Eyes', spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [20, 40, 'WICKED NIGHT'] },
+  ]},
+  { provider: 'Bgaming', games: [
+    { name: 'Bonanza Billion', spins: [0.8,1,1.2,1.4,1.6,1.8,2], bonus: [20,40,60] },
+    { name: 'Aztec Clusters',  spins: [1.25,1.50,2],              bonus: [25,50] },
+    { name: 'Gold of Minos',   spins: [1.60,2,3],                 bonus: [19.20,24,36] },
+  ]},
+  { provider: 'Nolimit City', games: [
+    { name: 'Beheaded',      spins: [0.8,1,1.2,1.6,2], bonus: [20,40,60] },
+    { name: 'Bonus Bunnies', spins: [1.25,1.50,2],     bonus: [24,36] },
+    { name: 'Dead Canary',   spins: [1.60,2,3],         bonus: [27.20,40.80] },
+  ]},
+];
+
+var slotValuesVisible = true;
+var slotValuesActiveProvider = 'Pragmatic';
+
+function fmtNum(v) {
+  var s = parseFloat(v.toFixed(2)).toString();
+  return s;
+}
+
+function renderSlotValues() {
+  var total = SLOT_VALUES_DATA.reduce(function(s, p) { return s + p.games.length; }, 0);
+  document.getElementById('slotValuesCount').textContent = total + ' games';
+
+  document.getElementById('svProviderTabs').innerHTML = SLOT_VALUES_DATA.map(function(p) {
+    return '<button class="sv-tab' + (p.provider === slotValuesActiveProvider ? ' active' : '') +
+      '" onclick="setSlotProvider(' + JSON.stringify(p.provider) + ')">' + escHtml(p.provider) + '</button>';
+  }).join('');
+
+  var provider = SLOT_VALUES_DATA.find(function(p) { return p.provider === slotValuesActiveProvider; });
+  if (!provider) return;
+
+  document.getElementById('slotValuesBody').innerHTML = provider.games.map(function(g) {
+    var spinHtml = g.spins.map(function(v) {
+      return '<span class="sv-badge">\u20AC' + fmtNum(v) + '</span>';
+    }).join('');
+    var bonusHtml = g.bonus.map(function(v) {
+      if (typeof v === 'string') {
+        return '<span class="sv-badge-special">' + escHtml(v) + '</span>';
+      }
+      return '<span class="sv-badge-bonus">\u20AC' + fmtNum(v) + '</span>';
+    }).join('');
+    return '<tr>' +
+      '<td><span class="slot-name">' + escHtml(g.name) + '</span></td>' +
+      '<td>' + spinHtml + '</td>' +
+      '<td>' + bonusHtml + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function setSlotProvider(name) {
+  slotValuesActiveProvider = name;
+  renderSlotValues();
+}
+
+function toggleSlotValues() {
+  slotValuesVisible = !slotValuesVisible;
+  document.getElementById('slotValuesWrap').style.display = slotValuesVisible ? '' : 'none';
+  document.getElementById('btnToggleSlotValues').innerHTML = slotValuesVisible
+    ? '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg> Hide'
+    : '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg> Show';
+}
+
 // ── Smartlinks ─────────────────────────────────────────────────────────────
 var SMARTLINKS_KEY = 'funnel_smartlinks';
 var SMARTLINK_URLS_KEY = 'funnel_hosted_urls';
@@ -2696,6 +2836,7 @@ DOC_REF.onSnapshot(function(doc) {
     render();
     setFunnel(null);
     renderGlitch();
+    renderSlotValues();
     renderConflictBadges();
     renderSmartlinks();
     renderFunnelGeoBar();
