@@ -61,7 +61,8 @@
   .funnel-tab.active-scanio  { color: #f0883e; border-bottom-color: #f0883e; }
   .funnel-tab.active-spin    { color: #f85149; border-bottom-color: #f85149; }
   .funnel-tab.active-shadow  { color: #bc8cff; border-bottom-color: #bc8cff; }
-  .funnel-tab.active-manage  { color: #bc8cff; border-bottom-color: #bc8cff; }
+  .funnel-tab.active-manage    { color: #bc8cff; border-bottom-color: #bc8cff; }
+  .funnel-tab.active-analytics { color: #58a6ff; border-bottom-color: #58a6ff; }
 
   .funnel-badge {
     display: inline-block;
@@ -917,6 +918,7 @@
 
 <!-- Funnel Nav -->
 <div class="funnel-nav" id="funnelNav">
+  <div class="funnel-tab" id="tab-analytics" onclick="setPage('analytics')">Analytics</div>
   <div class="funnel-tab" id="tab-manage" onclick="setPage('manage')">Manage</div>
   <div class="funnel-tab" id="tab-universal" onclick="setPage('dashboard')">Universal</div>
   <div class="funnel-tab" id="tab-dark"      onclick="setFunnel('Dark')">Dark <span class="tab-cbadge" id="cbadge-dark"></span></div>
@@ -1097,6 +1099,7 @@
 
 </div><!-- end dashboardContent -->
 
+<div id="analyticsPage" style="display:none"></div>
 <div id="managePage" style="display:none"></div>
 
 <!-- GEO tooltip overlay -->
@@ -1261,13 +1264,15 @@ function getFunnelUrl(url, funnel) {
 function setFunnel(funnel) {
   currentFunnel = funnel;
   currentPage = 'dashboard';
-  // Ensure dashboard is visible and manage page is hidden
+  // Ensure dashboard is visible and other pages are hidden
   var manageDiv = document.getElementById('managePage');
+  var analyticsDiv = document.getElementById('analyticsPage');
   var dashboardContent = document.getElementById('dashboardContent');
   if (manageDiv) manageDiv.style.display = 'none';
+  if (analyticsDiv) analyticsDiv.style.display = 'none';
   if (dashboardContent) dashboardContent.style.display = '';
   // Update tab active classes
-  ['manage','universal','dark','slotio','scanio','spin','shadow'].forEach(function(key) {
+  ['analytics','manage','universal','dark','slotio','scanio','spin','shadow'].forEach(function(key) {
     var el = document.getElementById('tab-' + key);
     if (el) el.className = 'funnel-tab';
   });
@@ -1298,14 +1303,22 @@ function setPage(page) {
   if (el) el.classList.add('active-' + page);
 
   var manageDiv = document.getElementById('managePage');
+  var analyticsDiv = document.getElementById('analyticsPage');
   var dashboardContent = document.getElementById('dashboardContent');
 
   if (page === 'manage') {
+    if (analyticsDiv) analyticsDiv.style.display = 'none';
     if (manageDiv) manageDiv.style.display = '';
     if (dashboardContent) dashboardContent.style.display = 'none';
     renderManagePage();
+  } else if (page === 'analytics') {
+    if (manageDiv) manageDiv.style.display = 'none';
+    if (dashboardContent) dashboardContent.style.display = 'none';
+    if (analyticsDiv) analyticsDiv.style.display = '';
+    renderAnalyticsPage();
   } else {
     if (manageDiv) manageDiv.style.display = 'none';
+    if (analyticsDiv) analyticsDiv.style.display = 'none';
     if (dashboardContent) dashboardContent.style.display = '';
     setFunnel(null);
   }
@@ -2230,10 +2243,13 @@ function buildMultiRouteMap(funnel) {
   return map;
 }
 
-function generateRedirectHtml(funnel) {
+function generateRedirectHtml(funnel, urlToCasino) {
   var projectId = 'affdashboard-3f1a3';
+  var apiKey = 'AIzaSyCVegt6HxRbJAe1Es_SHEMPH1P3e9YvOvU';
   var firestoreUrl = 'https://firestore.googleapis.com/v1/projects/' + projectId + '/databases/(default)/documents/routes/' + funnel.toLowerCase();
+  var clicksUrl = 'https://firestore.googleapis.com/v1/projects/' + projectId + '/databases/(default)/documents/clicks?key=' + apiKey;
   var fallbackVal = smartlinkFallbacks[funnel] || '';
+  var casinoMapJson = JSON.stringify(urlToCasino || {});
 
   return '<!DOCTYPE html>\n' +
     '<html>\n' +
@@ -2251,7 +2267,10 @@ function generateRedirectHtml(funnel) {
     '  <script>\n' +
     '    var FUNNEL = ' + JSON.stringify(funnel) + ';\n' +
     '    var FIRESTORE_URL = ' + JSON.stringify(firestoreUrl) + ';\n' +
-    '    var HARDCODED_FALLBACK = ' + JSON.stringify(fallbackVal) + ';\n\n' +
+    '    var CLICKS_URL = ' + JSON.stringify(clicksUrl) + ';\n' +
+    '    var HARDCODED_FALLBACK = ' + JSON.stringify(fallbackVal) + ';\n' +
+    '    var URL_TO_CASINO = ' + casinoMapJson + ';\n' +
+    '    var sub1 = new URLSearchParams(window.location.search).get(\'sub1\') || \'\';\n\n' +
     '    function hashIP(ip) {\n' +
     '      var h = 0;\n' +
     '      for (var i = 0; i < ip.length; i++) {\n' +
@@ -2259,18 +2278,43 @@ function generateRedirectHtml(funnel) {
     '      }\n' +
     '      return Math.abs(h);\n' +
     '    }\n\n' +
+    '    function logClick(geo, casino) {\n' +
+    '      try {\n' +
+    '        fetch(CLICKS_URL, {\n' +
+    '          method: \'POST\',\n' +
+    '          headers: { \'Content-Type\': \'application/json\' },\n' +
+    '          body: JSON.stringify({ fields: {\n' +
+    '            ts:     { stringValue: new Date().toISOString() },\n' +
+    '            funnel: { stringValue: FUNNEL },\n' +
+    '            geo:    { stringValue: geo || \'\' },\n' +
+    '            casino: { stringValue: casino || \'unknown\' },\n' +
+    '            sub1:   { stringValue: sub1 }\n' +
+    '          }})\n' +
+    '        });\n' +
+    '      } catch(e) {}\n' +
+    '    }\n\n' +
     '    function redirect(routes, fallback, code, ip) {\n' +
+    '      var url, casino;\n' +
     '      var options = routes[code];\n' +
-    '      if (!options || !options.length) { window.location.replace(fallback); return; }\n' +
-    '      var total = options.reduce(function(s, o) { return s + o[1]; }, 0);\n' +
-    '      if (total <= 0) { window.location.replace(fallback); return; }\n' +
-    '      var h = ip ? hashIP(ip) % total : 0;\n' +
-    '      var cum = 0;\n' +
-    '      for (var i = 0; i < options.length; i++) {\n' +
-    '        cum += options[i][1];\n' +
-    '        if (h < cum) { window.location.replace(options[i][0]); return; }\n' +
+    '      if (!options || !options.length) {\n' +
+    '        url = fallback; casino = \'fallback\';\n' +
+    '      } else {\n' +
+    '        var total = options.reduce(function(s, o) { return s + o[1]; }, 0);\n' +
+    '        if (total <= 0) {\n' +
+    '          url = fallback; casino = \'fallback\';\n' +
+    '        } else {\n' +
+    '          var h = ip ? hashIP(ip) % total : 0;\n' +
+    '          var cum = 0;\n' +
+    '          for (var i = 0; i < options.length; i++) {\n' +
+    '            cum += options[i][1];\n' +
+    '            if (h < cum) { url = options[i][0]; break; }\n' +
+    '          }\n' +
+    '          if (!url) url = options[options.length - 1][0];\n' +
+    '          casino = URL_TO_CASINO[url] || \'unknown\';\n' +
+    '        }\n' +
     '      }\n' +
-    '      window.location.replace(options[options.length - 1][0]);\n' +
+    '      logClick(code, casino);\n' +
+    '      window.location.replace(url);\n' +
     '    }\n\n' +
     '    function doRedirect(routes, fallback) {\n' +
     '      fetch(\'https://ipapi.co/json/\')\n' +
@@ -2280,7 +2324,10 @@ function generateRedirectHtml(funnel) {
     '          fetch(\'https://freeipapi.com/api/json\')\n' +
     '            .then(function(r){ return r.json(); })\n' +
     '            .then(function(d){ redirect(routes, fallback, d.countryCode, d.ipAddress || \'\'); })\n' +
-    '            .catch(function(){ window.location.replace(fallback); });\n' +
+    '            .catch(function(){\n' +
+    '              logClick(\'unknown\', \'fallback\');\n' +
+    '              window.location.replace(fallback);\n' +
+    '            });\n' +
     '        });\n' +
     '    }\n\n' +
     '    fetch(FIRESTORE_URL)\n' +
@@ -2291,6 +2338,7 @@ function generateRedirectHtml(funnel) {
     '        doRedirect(routes, fallback);\n' +
     '      })\n' +
     '      .catch(function() {\n' +
+    '        logClick(\'unknown\', \'fallback\');\n' +
     '        window.location.replace(HARDCODED_FALLBACK);\n' +
     '      });\n' +
     '  <\/script>\n' +
@@ -2326,7 +2374,9 @@ function downloadSmartlink(funnel) {
     var ok = confirm('Warning:\n\n• ' + warnings.join('\n• ') + '\n\nDownload anyway?');
     if (!ok) return;
   }
-  var html = generateRedirectHtml(funnel);
+  var urlToCasino = {};
+  assigned.forEach(function(d) { urlToCasino[getFunnelUrl(d.url, funnel)] = d.name; });
+  var html = generateRedirectHtml(funnel, urlToCasino);
   var blob = new Blob([html], { type: 'text/html' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -2752,7 +2802,10 @@ function toggleSmartlinks() {
 }
 
 // ── Firebase save ──────────────────────────────────────────────────────────
+var dataLoaded = false;
+
 function saveToFirebase() {
+  if (!dataLoaded) return;
   showSaveIndicator('saving', 'Saving…');
   DOC_REF.set({
     deals: deals,
@@ -2800,6 +2853,7 @@ DOC_REF.onSnapshot(function(doc) {
       dealWeights = data.dealWeights || {};
       smartlinkFallbacks = data.smartlinkFallbacks || {};
       smartlinkHostedUrls = data.smartlinkHostedUrls || {};
+      dataLoaded = true;
       // Run migrations
       var seedMap = {};
       SEED_DEALS.forEach(function(d) { seedMap[d.id] = d; });
@@ -2823,6 +2877,7 @@ DOC_REF.onSnapshot(function(doc) {
       dealWeights = {};
       smartlinkFallbacks = {};
       smartlinkHostedUrls = {};
+      dataLoaded = true;
       FUNNEL_NAMES.forEach(function(f) { equalizeWeights(f); });
       saveToFirebase();
     }
@@ -2856,12 +2911,168 @@ DOC_REF.onSnapshot(function(doc) {
   renderConflictBadges();
   renderFunnelGeoBar();
   if (currentPage === 'manage') renderManagePage();
+  if (currentPage === 'analytics') renderAnalyticsPage();
 
 }, function(e) {
   console.error('Firebase error:', e);
   var overlay = document.getElementById('loadingOverlay');
   if (overlay) overlay.innerHTML = '<div style="font-size:16px;color:#f85149">Failed to connect to database</div><div style="font-size:13px;color:#7d8590;margin-top:8px">' + e.message + '</div>';
 });
+
+// ── Analytics ───────────────────────────────────────────────────────────────
+var analyticsFilterFunnel = '';
+var analyticsFilterDays = 7;
+
+function renderAnalyticsPage() {
+  var container = document.getElementById('analyticsPage');
+  if (!container) return;
+  container.innerHTML =
+    '<div style="padding:32px 32px 0">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+        '<div>' +
+          '<div style="font-size:18px;font-weight:700">Click Analytics</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Tracked smartlink clicks stored in Firestore</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+          '<select id="analyticsFilterFunnel" onchange="analyticsFilterFunnel=this.value;loadAnalyticsClicks()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+            '<option value="">All Funnels</option>' +
+            FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '">' + f + '</option>'; }).join('') +
+          '</select>' +
+          '<select id="analyticsFilterDays" onchange="analyticsFilterDays=+this.value;loadAnalyticsClicks()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+            '<option value="1">Today</option>' +
+            '<option value="7" selected>Last 7 days</option>' +
+            '<option value="30">Last 30 days</option>' +
+            '<option value="0">All time</option>' +
+          '</select>' +
+          '<button onclick="loadAnalyticsClicks()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div id="analyticsBody" style="padding:0 32px 32px"><div style="font-size:13px;color:var(--muted);padding:20px 0">Loading...</div></div>';
+  loadAnalyticsClicks();
+}
+
+function loadAnalyticsClicks() {
+  var body = document.getElementById('analyticsBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:20px 0">Loading clicks...</div>';
+
+  var cutoff = null;
+  if (analyticsFilterDays > 0) {
+    cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - analyticsFilterDays);
+    cutoff.setHours(0,0,0,0);
+  }
+
+  var query = db.collection('clicks').orderBy('ts', 'desc').limit(1000);
+  query.get().then(function(snap) {
+    var clicks = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.ts ? new Date(d.ts) : null;
+      if (cutoff && ts && ts < cutoff) return;
+      if (analyticsFilterFunnel && d.funnel !== analyticsFilterFunnel) return;
+      clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', sub1: d.sub1 || '' });
+    });
+    renderClicksData(body, clicks);
+  }).catch(function(err) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0">Failed to load: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function renderClicksData(container, clicks) {
+  var now = new Date();
+  var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var hourAgo = new Date(now.getTime() - 3600000);
+
+  var todayCount = 0, hourCount = 0;
+  var byFunnel = {}, byCasino = {}, byGeo = {};
+
+  clicks.forEach(function(c) {
+    if (c.ts && c.ts >= todayStart) todayCount++;
+    if (c.ts && c.ts >= hourAgo) hourCount++;
+    if (c.funnel) byFunnel[c.funnel] = (byFunnel[c.funnel] || 0) + 1;
+    if (c.casino) byCasino[c.casino] = (byCasino[c.casino] || 0) + 1;
+    if (c.geo) byGeo[c.geo] = (byGeo[c.geo] || 0) + 1;
+  });
+
+  var total = clicks.length;
+
+  function statCard(label, value, sub) {
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;flex:1;min-width:120px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:28px;font-weight:700;color:var(--accent)">' + value + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + sub + '</div>' +
+    '</div>';
+  }
+
+  function breakdownTable(title, dataObj, colorFn) {
+    var sorted = Object.keys(dataObj).sort(function(a,b){ return dataObj[b]-dataObj[a]; }).slice(0,10);
+    if (!sorted.length) return '';
+    var maxVal = dataObj[sorted[0]] || 1;
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;flex:1;min-width:200px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:12px">' + title + '</div>' +
+      sorted.map(function(key) {
+        var count = dataObj[key];
+        var pct = total ? Math.round(count / total * 100) : 0;
+        var barPct = Math.round(count / maxVal * 100);
+        var color = colorFn ? colorFn(key) : 'var(--accent)';
+        return '<div style="margin-bottom:10px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+            '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(key) + '</span>' +
+            '<span style="font-size:11px;color:var(--muted)">' + count + ' <span style="color:var(--border)">(' + pct + '%)</span></span>' +
+          '</div>' +
+          '<div style="height:4px;background:var(--card2);border-radius:2px">' +
+            '<div style="height:4px;background:' + color + ';border-radius:2px;width:' + barPct + '%"></div>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  var funnelColors = { Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', Spin: '#f85149', Shadow: '#bc8cff' };
+  function funnelColor(f) { return funnelColors[f] || 'var(--accent)'; }
+
+  var recentRows = clicks.slice(0, 50).map(function(c) {
+    var timeStr = c.ts ? c.ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' ' + c.ts.toLocaleDateString([], {month:'short',day:'numeric'}) : '—';
+    var fc = funnelColors[c.funnel] || 'var(--muted)';
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:7px 10px;font-size:11px;color:var(--muted);white-space:nowrap">' + timeStr + '</td>' +
+      '<td style="padding:7px 10px"><span style="font-size:11px;font-weight:700;color:' + fc + '">' + escHtml(c.funnel || '—') + '</span></td>' +
+      '<td style="padding:7px 10px;font-size:12px;font-weight:600">' + escHtml(c.casino || '—') + '</td>' +
+      '<td style="padding:7px 10px"><span style="background:var(--badge-geo);color:var(--badge-geo-text);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">' + escHtml(c.geo || '??') + '</span></td>' +
+      '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(c.sub1 || '—') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  container.innerHTML =
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">' +
+      statCard('Total Clicks', total, analyticsFilterDays ? 'last ' + analyticsFilterDays + ' day' + (analyticsFilterDays !== 1 ? 's' : '') : 'all time') +
+      statCard('Today', todayCount, 'since midnight') +
+      statCard('Last Hour', hourCount, 'past 60 minutes') +
+    '</div>' +
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">' +
+      breakdownTable('By Funnel', byFunnel, funnelColor) +
+      breakdownTable('By Casino', byCasino, null) +
+      breakdownTable('By GEO', byGeo, null) +
+    '</div>' +
+    (clicks.length === 0
+      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No clicks recorded yet. Download and deploy your smartlinks to start tracking.</div>'
+      : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+          '<div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Recent Clicks (last 50)</div>' +
+          '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+            '<thead><tr style="background:var(--card2)">' +
+              '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Time</th>' +
+              '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnel</th>' +
+              '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Casino</th>' +
+              '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">GEO</th>' +
+              '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Sub1</th>' +
+            '</tr></thead>' +
+            '<tbody>' + recentRows + '</tbody>' +
+          '</table></div>' +
+        '</div>'
+    );
+}
 </script>
 </body>
 </html>
