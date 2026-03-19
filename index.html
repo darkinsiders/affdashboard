@@ -2985,14 +2985,48 @@ function renderClicksData(container, clicks) {
   var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   var hourAgo = new Date(now.getTime() - 3600000);
 
+  // Build URL → casino name lookup from deals
+  var urlToCasinoName = {};
+  deals.forEach(function(d) {
+    urlToCasinoName[d.url] = d.name;
+    // Also index by all funnel variants of the URL
+    FUNNEL_NAMES.forEach(function(f) {
+      urlToCasinoName[getFunnelUrl(d.url, f)] = d.name;
+    });
+  });
+
+  function normalizeFunnel(f) {
+    if (!f) return '';
+    var s = f.charAt(0).toUpperCase() + f.slice(1).toLowerCase();
+    return s;
+  }
+
+  function normalizeCasino(c) {
+    if (!c) return '';
+    // If it looks like a URL, resolve to casino name
+    if (c.indexOf('http') === 0) {
+      // Try exact match first
+      if (urlToCasinoName[c]) return urlToCasinoName[c];
+      // Try matching by domain fragment
+      for (var url in urlToCasinoName) {
+        if (c.indexOf(url.split('?')[0]) === 0) return urlToCasinoName[url];
+      }
+      // Fallback: extract domain
+      try { return new URL(c).hostname.replace('www.','').replace('track.','').split('.')[0].toUpperCase(); } catch(e) {}
+    }
+    return c;
+  }
+
   var todayCount = 0, hourCount = 0;
   var byFunnel = {}, byCasino = {}, byGeo = {};
 
   clicks.forEach(function(c) {
+    var funnel = normalizeFunnel(c.funnel);
+    var casino = normalizeCasino(c.casino);
     if (c.ts && c.ts >= todayStart) todayCount++;
     if (c.ts && c.ts >= hourAgo) hourCount++;
-    if (c.funnel) byFunnel[c.funnel] = (byFunnel[c.funnel] || 0) + 1;
-    if (c.casino) byCasino[c.casino] = (byCasino[c.casino] || 0) + 1;
+    if (funnel) byFunnel[funnel] = (byFunnel[funnel] || 0) + 1;
+    if (casino) byCasino[casino] = (byCasino[casino] || 0) + 1;
     if (c.geo) byGeo[c.geo] = (byGeo[c.geo] || 0) + 1;
   });
 
@@ -3035,11 +3069,13 @@ function renderClicksData(container, clicks) {
 
   var recentRows = clicks.slice(0, 50).map(function(c) {
     var timeStr = c.ts ? c.ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' ' + c.ts.toLocaleDateString([], {month:'short',day:'numeric'}) : '—';
-    var fc = funnelColors[c.funnel] || 'var(--muted)';
+    var funnel = normalizeFunnel(c.funnel);
+    var casino = normalizeCasino(c.casino);
+    var fc = funnelColors[funnel] || 'var(--muted)';
     return '<tr style="border-bottom:1px solid var(--border)">' +
       '<td style="padding:7px 10px;font-size:11px;color:var(--muted);white-space:nowrap">' + timeStr + '</td>' +
-      '<td style="padding:7px 10px"><span style="font-size:11px;font-weight:700;color:' + fc + '">' + escHtml(c.funnel || '—') + '</span></td>' +
-      '<td style="padding:7px 10px;font-size:12px;font-weight:600">' + escHtml(c.casino || '—') + '</td>' +
+      '<td style="padding:7px 10px"><span style="font-size:11px;font-weight:700;color:' + fc + '">' + escHtml(funnel || '—') + '</span></td>' +
+      '<td style="padding:7px 10px;font-size:12px;font-weight:600">' + escHtml(casino || '—') + '</td>' +
       '<td style="padding:7px 10px"><span style="background:var(--badge-geo);color:var(--badge-geo-text);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">' + escHtml(c.geo || '??') + '</span></td>' +
       '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(c.sub1 || '—') + '</td>' +
     '</tr>';
