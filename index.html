@@ -2188,7 +2188,7 @@ var smartlinksVisible = true;
 var smartlinkTab = 'config'; // 'config' | 'countries'
 
 function saveSmartlinkFallbacks() {
-  saveToFirebase();
+  debouncedSaveToFirebase();
 }
 
 function saveDealWeights() {
@@ -2220,7 +2220,7 @@ function equalizeWeights(funnel) {
 }
 
 function saveSmartlinkHostedUrls() {
-  saveToFirebase();
+  debouncedSaveToFirebase();
 }
 
 // Returns { GEO: [[url, weight], ...] } — all deals covering each GEO with weights
