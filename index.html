@@ -2314,7 +2314,8 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '        }\n' +
     '      }\n' +
     '      logClick(code, casino);\n' +
-    '      window.location.replace(url);\n' +
+    '      var finalUrl = sub1 ? url + (url.indexOf(\'?\') >= 0 ? \'&\' : \'?\') + \'sub1=\' + encodeURIComponent(sub1) : url;\n' +
+    '      window.location.replace(finalUrl);\n' +
     '    }\n\n' +
     '    function doRedirect(routes, fallback) {\n' +
     '      fetch(\'https://ipapi.co/json/\')\n' +
