@@ -1381,6 +1381,17 @@
   </div>
 </div>
 
+<!-- Postback URL Modal -->
+<div class="modal-overlay" id="postbackModalOverlay">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <span class="modal-title">Postback URLs</span>
+      <button class="btn-close" onclick="closePostbackModal()">&#x2715;</button>
+    </div>
+    <div id="postbackModalBody" style="padding:0 1.5rem 1.5rem"></div>
+  </div>
+</div>
+
 <script>
 // ── Firebase ────────────────────────────────────────────────────────────────
 var firebaseConfig = {
@@ -1998,6 +2009,7 @@ var ICON_TRASH = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentC
 var ICON_COPY  = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>';
 var ICON_CHECK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z"/></svg>';
 var ICON_LOCK  = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>';
+var ICON_POSTBACK = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M11 1a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zM9.5 3a1.5 1.5 0 1 1 3 0v4a1.5 1.5 0 1 1-3 0V3z"/><path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5z"/></svg>';
 
 // ── Table ──────────────────────────────────────────────────────────────────
 function renderTable() {
@@ -2020,6 +2032,7 @@ function renderTable() {
           '<button class="btn-confirm-yes" onclick="confirmDelete(' + deal.id + ')">Yes</button>' +
           '<button class="btn-confirm-no" onclick="cancelDelete()">No</button></div>'
       : '<div class="actions">' +
+          '<button class="btn-icon" onclick="openPostbackModal(' + deal.id + ')" title="Postback URLs" style="color:var(--accent)">' + ICON_POSTBACK + '</button>' +
           '<button class="btn-icon btn-edit" onclick="openEditModal(' + deal.id + ')" title="Edit">' + ICON_EDIT + '</button>' +
           '<button class="btn-icon btn-delete" onclick="startDelete(' + deal.id + ')" title="Delete">' + ICON_TRASH + '</button>' +
         '</div>';
@@ -2141,6 +2154,81 @@ function toggleShowPass(btn, dealId) {
   }
 }
 
+// ── Postback Modal ─────────────────────────────────────────────────────────
+var WORKER = 'https://affdashboard-postback.darkinsidersbusiness.workers.dev';
+var PBK_TOKEN = 'pbkDark2026xZ';
+
+function detectNetwork(url) {
+  if (!url) return null;
+  var u = url.toLowerCase();
+  if (u.indexOf('7ladies') !== -1) return { name: 'cellxpert', clickMacro: '[afp1]' };
+  if (u.indexOf('cellxpert') !== -1 || u.indexOf('cosmobetpartners') !== -1 ||
+      u.indexOf('rollettoaffiliate') !== -1 || u.indexOf('velobetpartners') !== -1 ||
+      u.indexOf('ivybetpartners') !== -1) return { name: 'cellxpert', clickMacro: '[afp]' };
+  if (u.indexOf('ftdgallery') !== -1 || u.indexOf('spinania') !== -1) return { name: 'ftdgallery', clickMacro: '[afp]' };
+  if (u.indexOf('padrino') !== -1 || u.indexOf('needforslots') !== -1) return { name: 'padrino', clickMacro: '[afp]' };
+  return null;
+}
+
+function buildPostbackUrls(network) {
+  var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + '&funnel=[trackingcode]&offer=' + network.name;
+  return {
+    reg:  base + '&status=Registration&type=Registration&sum=0',
+    ftd:  base + '&status=FTD&type=FTD&sum=0',
+    qftd: base + '&status=QFTD&type=QFTD&sum=[commissionamount]'
+  };
+}
+
+function openPostbackModal(dealId) {
+  var deal = deals.find(function(d) { return d.id === dealId; });
+  if (!deal) return;
+  var net = detectNetwork(deal.url);
+  var body = document.getElementById('postbackModalBody');
+
+  if (!net) {
+    body.innerHTML = '<p style="color:var(--muted);padding-top:.5rem">Could not detect affiliate network from URL.<br>Check <strong>postback-urls.txt</strong> for manual templates.</p>';
+    document.getElementById('postbackModalOverlay').classList.add('open');
+    return;
+  }
+
+  var urls = buildPostbackUrls(net);
+  var networkLabel = net.name.toUpperCase();
+  if (net.clickMacro === '[afp1]') networkLabel += ' (uses [afp1])';
+
+  function row(label, url) {
+    var id = 'pburl-' + label.toLowerCase().replace(/ /g, '-') + '-' + dealId;
+    return '<div style="margin-bottom:1rem">' +
+      '<div style="font-size:.7rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem">' + label + '</div>' +
+      '<div style="display:flex;gap:.5rem;align-items:center">' +
+        '<input id="' + id + '" type="text" readonly value="' + url + '" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;font-size:.72rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+        '<button class="btn-icon" onclick="copyPostbackUrl(this,\'' + id + '\')" title="Copy" style="color:var(--accent);flex-shrink:0">' + ICON_COPY + '</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  body.innerHTML =
+    '<div style="margin-bottom:1.25rem;padding-top:.25rem">' +
+      '<span style="font-size:.75rem;color:var(--muted)">Network detected: </span>' +
+      '<span style="font-size:.75rem;font-weight:700;color:var(--accent)">' + networkLabel + '</span>' +
+    '</div>' +
+    row('Registration', urls.reg) +
+    row('FTD', urls.ftd) +
+    row('Qualified CPA', urls.qftd) +
+    '<p style="font-size:.7rem;color:var(--muted);margin-top:.5rem">Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically.</p>';
+
+  document.getElementById('postbackModalOverlay').classList.add('open');
+}
+
+function copyPostbackUrl(btn, inputId) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  copyToClipboard(input.value, btn, ICON_COPY);
+}
+
+function closePostbackModal() {
+  document.getElementById('postbackModalOverlay').classList.remove('open');
+}
+
 // ── Delete ─────────────────────────────────────────────────────────────────
 function startDelete(id) { confirmingId = id; renderTable(); }
 function cancelDelete()  { confirmingId = null; renderTable(); }
@@ -2257,6 +2345,9 @@ document.addEventListener('keydown', function(e) {
 });
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+document.getElementById('postbackModalOverlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('postbackModalOverlay')) closePostbackModal();
 });
 
 // ── Utils ──────────────────────────────────────────────────────────────────
