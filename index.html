@@ -3130,12 +3130,34 @@ DOC_REF.onSnapshot(function(doc) {
 // ── Analytics ───────────────────────────────────────────────────────────────
 var analyticsFilterFunnel = '';
 var analyticsFilterDays = 7;
+var analyticsTab = 'clicks';
+var perfFilterDays = 7;
+var perfFilterFunnel = '';
 
 function renderAnalyticsPage() {
   var container = document.getElementById('analyticsPage');
   if (!container) return;
+  function tabBtn(id, label) {
+    var active = analyticsTab === id;
+    return '<button onclick="analyticsTab=\'' + id + '\';renderAnalyticsPage()" style="background:none;border:none;border-bottom:2px solid ' + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';font-size:13px;font-weight:' + (active ? '700' : '500') + ';padding:10px 18px;cursor:pointer;font-family:var(--font-body);transition:all 0.15s;margin-bottom:-1px">' + label + '</button>';
+  }
   container.innerHTML =
-    '<div style="padding:32px 32px 0">' +
+    '<div style="padding:32px 32px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;gap:0">' +
+        tabBtn('clicks', 'Click Analytics') +
+        tabBtn('performance', 'Performance') +
+      '</div>' +
+    '</div>' +
+    '<div id="analyticsTabBody"></div>';
+  if (analyticsTab === 'clicks') renderClicksTab();
+  else renderPerformanceTab();
+}
+
+function renderClicksTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  body.innerHTML =
+    '<div style="padding:24px 32px 0">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
         '<div>' +
           '<div style="font-size:18px;font-weight:700">Click Analytics</div>' +
@@ -3313,6 +3335,115 @@ function renderClicksData(container, clicks) {
               '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Sub1</th>' +
             '</tr></thead>' +
             '<tbody>' + recentRows + '</tbody>' +
+          '</table></div>' +
+        '</div>'
+    );
+}
+
+// ── Performance Tab ──────────────────────────────────────────────────────────
+
+function renderPerformanceTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  var funnelOpts = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (perfFilterFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('');
+  var daysOpts = [['1','Today'],['7','Last 7 days'],['30','Last 30 days'],['0','All time']].map(function(o){
+    return '<option value="' + o[0] + '"' + (perfFilterDays === +o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+  }).join('');
+  body.innerHTML =
+    '<div style="padding:24px 32px 0">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+        '<div>' +
+          '<div style="font-size:18px;font-weight:700">Performance</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Conversions tracked via postback</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+          '<select onchange="perfFilterFunnel=this.value;loadPerformanceData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + funnelOpts + '</select>' +
+          '<select onchange="perfFilterDays=+this.value;loadPerformanceData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
+          '<button onclick="loadPerformanceData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div id="perfBody" style="padding:0 32px 32px"><div style="font-size:13px;color:var(--muted);padding:20px 0">Loading...</div></div>';
+  loadPerformanceData();
+}
+
+function loadPerformanceData() {
+  var body = document.getElementById('perfBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:20px 0">Loading conversions...</div>';
+  db.collection('conversions').get().then(function(snap) {
+    var rows = [];
+    var cutoff = null;
+    if (perfFilterDays > 0) {
+      var cd = new Date();
+      cd.setDate(cd.getDate() - perfFilterDays);
+      cutoff = cd.toISOString().split('T')[0];
+    }
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if (cutoff && d.date < cutoff) return;
+      if (perfFilterFunnel && d.funnel !== perfFilterFunnel) return;
+      rows.push({ date: d.date || '', funnel: d.funnel || '', regs: +(d.regs || 0), ftds: +(d.ftds || 0), revenue: +(d.revenue || 0) });
+    });
+    rows.sort(function(a, b) { return b.date > a.date ? 1 : b.date < a.date ? -1 : a.funnel.localeCompare(b.funnel); });
+    renderPerformanceData(body, rows);
+  }).catch(function(err) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0">Failed to load: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function renderPerformanceData(container, rows) {
+  var totalRegs = 0, totalFtds = 0, totalRevenue = 0;
+  rows.forEach(function(r) { totalRegs += r.regs; totalFtds += r.ftds; totalRevenue += r.revenue; });
+  var regToFtd = totalRegs > 0 ? (totalFtds / totalRegs * 100).toFixed(1) + '%' : '—';
+
+  var funnelColors = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: 'var(--orange)', Spin: 'var(--red)', Shadow: 'var(--purple)' };
+
+  function kpiCard(label, value, sub, color) {
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;flex:1;min-width:130px;position:relative;overflow:hidden">' +
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + color + '"></div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:28px;font-weight:700;color:' + color + ';font-family:var(--font-mono)">' + value + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + sub + '</div>' +
+    '</div>';
+  }
+
+  var tableRows = rows.map(function(r) {
+    var r2f = r.regs > 0 ? (r.ftds / r.regs * 100).toFixed(0) + '%' : '—';
+    var fc = funnelColors[r.funnel] || 'var(--muted)';
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:9px 12px;font-size:12px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap">' + r.date + '</td>' +
+      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + fc + '">' + escHtml(r.funnel) + '</span></td>' +
+      '<td style="padding:9px 12px;font-size:13px;font-weight:600;font-family:var(--font-mono);color:var(--text);text-align:right">' + r.regs + '</td>' +
+      '<td style="padding:9px 12px;font-size:13px;font-weight:600;font-family:var(--font-mono);color:var(--green);text-align:right">' + r.ftds + '</td>' +
+      '<td style="padding:9px 12px;font-size:13px;font-weight:600;font-family:var(--font-mono);color:var(--yellow);text-align:right">' + (r.revenue > 0 ? '€' + r.revenue.toFixed(0) : '—') + '</td>' +
+      '<td style="padding:9px 12px;font-size:12px;color:var(--muted);text-align:right">' + r2f + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var periodLabel = perfFilterDays === 1 ? 'today' : perfFilterDays > 0 ? 'last ' + perfFilterDays + ' days' : 'all time';
+
+  container.innerHTML =
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">' +
+      kpiCard('Registrations', totalRegs, periodLabel, 'var(--accent)') +
+      kpiCard('FTDs', totalFtds, 'first time deposits', 'var(--green)') +
+      kpiCard('Revenue', '€' + totalRevenue.toFixed(0), 'from qualified CPAs', 'var(--yellow)') +
+      kpiCard('Reg → FTD', regToFtd, 'conversion rate', 'var(--purple)') +
+    '</div>' +
+    (rows.length === 0
+      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No conversion data yet for this period.</div>'
+      : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+          '<div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Daily Breakdown</div>' +
+          '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+            '<thead><tr style="background:var(--card2)">' +
+              '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Date</th>' +
+              '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnel</th>' +
+              '<th style="padding:9px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Regs</th>' +
+              '<th style="padding:9px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">FTDs</th>' +
+              '<th style="padding:9px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Revenue</th>' +
+              '<th style="padding:9px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Reg→FTD</th>' +
+            '</tr></thead>' +
+            '<tbody>' + tableRows + '</tbody>' +
           '</table></div>' +
         '</div>'
     );
