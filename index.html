@@ -2529,7 +2529,8 @@ function detectNetwork(url) {
       u.indexOf('ivybetpartners') !== -1) return { name: 'cellxpert', clickMacro: '[afp]' };
   if (u.indexOf('ftdgallery') !== -1 || u.indexOf('spinania') !== -1) return { name: 'ftdgallery', clickMacro: '[afp]' };
   if (u.indexOf('padrino') !== -1 || u.indexOf('needforslots') !== -1) return { name: 'padrino', clickMacro: '[afp]' };
-  if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('affilika') !== -1) return { name: 'affilika', clickMacro: '{visit_id}' };
+  if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('clicktrueluck') !== -1 ||
+      u.indexOf('clickholyluck') !== -1 || u.indexOf('affilika') !== -1) return { name: 'affilika', clickMacro: '{visit_id}' };
   return null;
 }
 
@@ -2704,7 +2705,10 @@ function autoAssignNewDeal(deal) {
 
   if (assigned.length) {
     saveAssignments();
-    assigned.forEach(function(f) { equalizeWeights(f); });
+    assigned.forEach(function(f) {
+      equalizeWeights(f);
+      setTopDealAsFallback(f);
+    });
     renderConflictBadges();
   }
 }
@@ -3043,7 +3047,7 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '      })\n' +
     '      .catch(function() {\n' +
     '        logClick(\'unknown\', \'fallback\');\n' +
-    '        window.location.replace(HARDCODED_FALLBACK);\n' +
+    '        window.location.replace(injectTracking(HARDCODED_FALLBACK));\n' +
     '      });\n' +
     '  <\/script>\n' +
     '</body>\n' +
@@ -3600,7 +3604,7 @@ DOC_REF.onSnapshot(function(doc) {
         if (!d.bgaming) { d.bgaming = true; changed = true; }
         if (d.status === undefined) { d.status = 'active'; changed = true; }
         if (d.dealType === undefined) { d.dealType = 'RS'; changed = true; }
-        if (d.network === undefined) { d.network = getNetworkId(d.url); changed = true; }
+        if (d.network === undefined || d.network === 'other') { var reNet = getNetworkId(d.url); if (reNet !== d.network) { d.network = reNet; changed = true; } }
         if (d.cpaAmount === undefined) { d.cpaAmount = 0; changed = true; }
         if (seed) {
           if (d.username === undefined || d.username === null) { d.username = seed.username; changed = true; }
@@ -4001,7 +4005,8 @@ function getNetworkId(url) {
       u.indexOf('cellxpert') !== -1) return 'cellxpert';
   if (u.indexOf('ftdgallery') !== -1) return 'ftdgallery';
   if (u.indexOf('padrino') !== -1) return 'padrino';
-  if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('affilika') !== -1) return 'affilika';
+  if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('clicktrueluck') !== -1 ||
+      u.indexOf('clickholyluck') !== -1 || u.indexOf('affilika') !== -1) return 'affilika';
   return 'other';
 }
 
