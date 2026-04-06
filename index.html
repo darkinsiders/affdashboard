@@ -2521,23 +2521,28 @@ function detectNetwork(url) {
       u.indexOf('ivybetpartners') !== -1) return { name: 'cellxpert', clickMacro: '[afp]' };
   if (u.indexOf('ftdgallery') !== -1 || u.indexOf('spinania') !== -1) return { name: 'ftdgallery', clickMacro: '[afp]' };
   if (u.indexOf('padrino') !== -1 || u.indexOf('needforslots') !== -1) return { name: 'padrino', clickMacro: '[afp]' };
+  if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('affilika') !== -1) return { name: 'affilika', clickMacro: '{visit_id}' };
   return null;
 }
 
-function buildPostbackUrls(network) {
+function buildPostbackUrls(network, funnelOverride) {
   // Source/campaign macros vary by network
   var srcParams;
   if (network.name === 'ftdgallery') {
     srcParams = '&source=[s1]&campaign=[s2]';
+  } else if (network.name === 'affilika') {
+    srcParams = ''; // Affilika sub-param postback macros not confirmed
   } else {
     // CellXpert and Padrino both use afp2/afp3
     srcParams = '&source=[afp2]&campaign=[afp3]';
   }
-  var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=[trackingcode]&offer=' + network.name;
+  var funnelParam = funnelOverride ? encodeURIComponent(funnelOverride) : '[trackingcode]';
+  var sumMacro    = network.name === 'affilika' ? '{deposits_sum}' : '[commissionamount]';
+  var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=' + funnelParam + '&offer=' + network.name;
   return {
     reg:  base + '&status=Registration&type=Registration&sum=0',
     ftd:  base + '&status=FTD&type=FTD&sum=0',
-    qftd: base + '&status=QFTD&type=QFTD&sum=[commissionamount]'
+    qftd: base + '&status=QFTD&type=QFTD&sum=' + sumMacro
   };
 }
 
@@ -3961,6 +3966,7 @@ function getNetworkId(url) {
       u.indexOf('cellxpert') !== -1) return 'cellxpert';
   if (u.indexOf('ftdgallery') !== -1) return 'ftdgallery';
   if (u.indexOf('padrino') !== -1) return 'padrino';
+  if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('affilika') !== -1) return 'affilika';
   return 'other';
 }
 
@@ -3968,6 +3974,7 @@ var NETWORK_COLORS = {
   cellxpert: { bg: 'rgba(61,142,240,0.12)', color: '#4a9eff', border: 'rgba(61,142,240,0.25)' },
   ftdgallery: { bg: 'rgba(224,115,51,0.12)', color: '#e07333', border: 'rgba(224,115,51,0.25)' },
   padrino:   { bg: 'rgba(29,179,104,0.12)', color: '#3fb950', border: 'rgba(29,179,104,0.25)' },
+  affilika:  { bg: 'rgba(168,85,247,0.12)', color: '#a855f7', border: 'rgba(168,85,247,0.25)' },
   other:     { bg: 'rgba(139,92,246,0.12)', color: '#bc8cff', border: 'rgba(139,92,246,0.25)' }
 };
 
@@ -4381,10 +4388,12 @@ function saveMetaSettings() {
 }
 
 // ── Link Builder ────────────────────────────────────────────────────────────
-var builderFunnel   = 'Dark';
-var builderSource   = 'meta';
-var builderCampaign = '';
-var builderType     = 'direct'; // 'direct' | 'tg'
+var builderFunnel     = 'Dark';
+var builderSource     = 'meta';
+var builderCampaign   = '';
+var builderType       = 'direct'; // 'direct' | 'tg'
+var builderCasinoUrl  = '';
+var builderGenerated  = false;
 
 function saveLinkHistory(entry) {
   linkHistory.unshift(entry);
@@ -4416,15 +4425,37 @@ function builderGetTgUrl() {
   return bot.tme + '?start=' + encodeURIComponent(param);
 }
 
+function builderTagCasinoUrl(rawUrl, source, campaign) {
+  if (!rawUrl) return '';
+  var net = detectNetwork(rawUrl);
+  if (!net) return rawUrl;
+  var sep = rawUrl.indexOf('?') !== -1 ? '&' : '?';
+  var params;
+  if (net.name === 'ftdgallery') {
+    params = 's1=' + encodeURIComponent(source);
+    if (campaign) params += '&s2=' + encodeURIComponent(campaign);
+  } else if (net.name === 'affilika') {
+    params = 'sub1=' + encodeURIComponent(source);
+    if (campaign) params += '&sub2=' + encodeURIComponent(campaign);
+  } else {
+    // cellxpert, padrino
+    params = 'afp2=' + encodeURIComponent(source);
+    if (campaign) params += '&afp3=' + encodeURIComponent(campaign);
+  }
+  return rawUrl + sep + params;
+}
+
 function builderGenerate() {
-  builderFunnel   = document.getElementById('bl-funnel').value;
-  builderSource   = document.getElementById('bl-source').value;
-  builderCampaign = document.getElementById('bl-campaign').value.trim().replace(/\s+/g, '_');
-  builderType     = document.querySelector('input[name="bl-type"]:checked').value;
+  builderFunnel     = document.getElementById('bl-funnel').value;
+  builderSource     = document.getElementById('bl-source').value;
+  builderCampaign   = document.getElementById('bl-campaign').value.trim().replace(/\s+/g, '_');
+  builderType       = document.querySelector('input[name="bl-type"]:checked').value;
+  builderCasinoUrl  = document.getElementById('bl-casino-url').value.trim();
+  builderGenerated  = true;
   var directUrl = builderGetDirectUrl();
   var tgUrl     = builderType === 'tg' ? builderGetTgUrl() : '';
-  if (directUrl) {
-    saveLinkHistory({ src: builderSource, campaign: builderCampaign, funnel: builderFunnel, type: builderType, url: directUrl, tgUrl: tgUrl, ts: new Date().toISOString() });
+  if (directUrl || builderCasinoUrl) {
+    saveLinkHistory({ src: builderSource, campaign: builderCampaign, funnel: builderFunnel, type: builderType, url: directUrl, casinoUrl: builderCasinoUrl, tgUrl: tgUrl, ts: new Date().toISOString() });
   }
   renderBuilderPage();
 }
@@ -4433,24 +4464,112 @@ function renderBuilderPage() {
   var container = document.getElementById('builderPage');
   if (!container) return;
 
-  var srcLabel = (TRAFFIC_SOURCES.find(function(s){ return s.id === builderSource; }) || {}).name || builderSource;
-  var bot      = FUNNEL_TO_BOT[builderFunnel];
-  var directUrl = builderGetDirectUrl();
-  var tgUrl     = builderType === 'tg' ? builderGetTgUrl() : '';
+  var srcLabel    = (TRAFFIC_SOURCES.find(function(s){ return s.id === builderSource; }) || {}).name || builderSource;
+  var bot         = FUNNEL_TO_BOT[builderFunnel];
+  var directUrl   = builderGetDirectUrl();
+  var tgUrl       = builderType === 'tg' ? builderGetTgUrl() : '';
   var noSmartlink = !smartlinkHostedUrls[builderFunnel] && !FUNNEL_SMARTLINK_DOMAIN[builderFunnel];
+  var detectedNet = detectNetwork(builderCasinoUrl);
+  var taggedCasino = builderGenerated && builderCasinoUrl ? builderTagCasinoUrl(builderCasinoUrl, builderSource, builderCampaign) : '';
 
   function copyBtn(id) {
     return '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + id + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--accent);flex-shrink:0">&#128203;</button>';
   }
 
+  function urlRow(label, val, id, note) {
+    return '<div style="margin-bottom:12px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">' + label + (note ? ' <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">' + note + '</span>' : '') + '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input id="' + id + '" type="text" readonly value="' + escHtml(val) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.42rem .65rem;font-size:.7rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+        copyBtn(id) +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── Output section (only after generate with casino URL) ──
+  var outputHtml = '';
+  if (builderGenerated) {
+    var postbackSection = '';
+    if (builderCasinoUrl && detectedNet) {
+      var pbUrls = buildPostbackUrls(detectedNet, builderFunnel);
+      var netBadge = networkBadge(detectedNet.name);
+      var netNote  = detectedNet.name === 'affilika' ? '<span style="font-size:10px;color:#f0b429;margin-left:8px">&#9888; Source tracking in postbacks not confirmed — re-paste URLs after verifying Affilika sub macros</span>' : '';
+      postbackSection =
+        '<div style="border-top:1px solid var(--border);padding-top:18px;margin-top:18px">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
+            '<div style="font-size:13px;font-weight:700">Postback URLs</div>' +
+            netBadge + netNote +
+          '</div>' +
+          urlRow('Registration', pbUrls.reg,  'pb-reg',  '→ paste in affiliate platform') +
+          urlRow('First Deposit', pbUrls.ftd,  'pb-ftd',  '') +
+          urlRow('Qualified CPA / QFTD', pbUrls.qftd, 'pb-qftd', '') +
+          '<div style="font-size:11px;color:#f0b429;padding:6px 10px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.2);border-radius:6px;margin-top:4px">' +
+            '&#9888; If you previously set postback URLs for this deal, re-paste the updated versions above.' +
+          '</div>' +
+        '</div>';
+    } else if (builderCasinoUrl && !detectedNet) {
+      postbackSection =
+        '<div style="border-top:1px solid var(--border);padding-top:18px;margin-top:18px">' +
+          '<div style="font-size:12px;color:#f0b429;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px">' +
+            '&#9888; Could not auto-detect affiliate network from this URL. Check postback-urls.txt for manual templates.' +
+          '</div>' +
+        '</div>';
+    }
+
+    var casinoSection = '';
+    if (builderCasinoUrl) {
+      casinoSection =
+        '<div style="margin-bottom:16px">' +
+          urlRow(
+            'Tagged Casino CTA Link',
+            taggedCasino || builderCasinoUrl,
+            'bl-casino-tagged',
+            detectedNet ? '(' + detectedNet.name + ' params injected)' : '(network unknown — raw URL)'
+          ) +
+        '</div>';
+    }
+
+    var lpDomain = FUNNEL_SMARTLINK_DOMAIN[builderFunnel] ? FUNNEL_SMARTLINK_DOMAIN[builderFunnel].replace(/^https?:\/\//, '').split('/')[0] : builderFunnel.toLowerCase() + ' LP';
+    var lpSnippetId = 'bl-lp-snippet';
+    var lpSnippet = "// Add to your LP's casino CTA button click handler:\nvar src = new URLSearchParams(window.location.search).get('src') || '';\nvar c   = new URLSearchParams(window.location.search).get('c')   || '';\nvar url = '" + escHtml(builderCasinoUrl || 'CASINO_URL') + "';\nif (src) url += (url.indexOf('?') >= 0 ? '&' : '?') + '" + (detectedNet && detectedNet.name === 'ftdgallery' ? 's1' : detectedNet && detectedNet.name === 'affilika' ? 'sub1' : 'afp2') + "=' + encodeURIComponent(src);\nif (c)   url += '&" + (detectedNet && detectedNet.name === 'ftdgallery' ? 's2' : detectedNet && detectedNet.name === 'affilika' ? 'sub2' : 'afp3') + "=' + encodeURIComponent(c);\nwindow.location.href = url;";
+
+    outputHtml =
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+        '<div style="font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px">&#9654; Output Package <span style="font-size:11px;font-weight:400;color:var(--muted)">' + escHtml(srcLabel) + ' / ' + escHtml(builderFunnel) + (builderCampaign ? ' / ' + escHtml(builderCampaign) : '') + '</span></div>' +
+
+        casinoSection +
+
+        urlRow('LP Ad Link', directUrl, 'bl-out-direct', '(put in Meta / TikTok ad — drives traffic to LP)') +
+
+        (builderType === 'tg' && bot
+          ? urlRow('Telegram Deep Link', tgUrl, 'bl-out-tg', '(for Telegram traffic → LP → bot)')
+          : '') +
+
+        postbackSection +
+
+        '<div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">' +
+          '<details>' +
+            '<summary style="font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;text-transform:uppercase;letter-spacing:.07em">&#9881; LP Code Snippet — pass tracking params through casino CTA</summary>' +
+            '<div style="margin-top:10px;font-size:11px;color:var(--muted);margin-bottom:8px">Add to <strong style="color:var(--fg)">' + escHtml(lpDomain) + '</strong> so source/campaign are forwarded when visitor clicks Play Now.</div>' +
+            '<div style="display:flex;gap:8px;align-items:flex-start">' +
+              '<textarea id="' + lpSnippetId + '" readonly rows="7" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.6rem .75rem;font-size:.68rem;font-family:var(--font-mono);color:var(--fg);resize:none;line-height:1.5">' + escHtml(lpSnippet) + '</textarea>' +
+              '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + lpSnippetId + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--accent);flex-shrink:0;margin-top:4px">&#128203;</button>' +
+            '</div>' +
+          '</details>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // ── History ──
   var histRows = linkHistory.length === 0
     ? '<div style="color:var(--muted);font-size:12px;padding:12px 0">No links generated yet.</div>'
     : linkHistory.slice(0, 20).map(function(h, i) {
         var srcN = (TRAFFIC_SOURCES.find(function(s){ return s.id === h.src; }) || {}).name || h.src;
-        var dt = h.ts ? h.ts.substring(0, 16).replace('T', ' ') : '';
-        var hid = 'hist-url-' + i;
+        var dt   = h.ts ? h.ts.substring(0, 16).replace('T', ' ') : '';
+        var hid  = 'hist-url-' + i;
+        var displayUrl = h.url || h.casinoUrl || '';
         return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">' +
-          '<input id="' + hid + '" type="text" readonly value="' + escHtml(h.url) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:11px;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+          '<input id="' + hid + '" type="text" readonly value="' + escHtml(displayUrl) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:11px;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
           '<span style="font-size:11px;color:var(--muted);white-space:nowrap">' + escHtml(srcN) + ' / ' + escHtml(h.funnel) + (h.campaign ? ' / ' + escHtml(h.campaign) : '') + '</span>' +
           '<span style="font-size:10px;color:var(--muted);white-space:nowrap">' + dt + '</span>' +
           copyBtn(hid) +
@@ -4458,77 +4577,63 @@ function renderBuilderPage() {
       }).join('');
 
   container.innerHTML =
-    '<div style="padding:28px 32px 40px;max-width:820px">' +
+    '<div style="padding:28px 32px 40px;max-width:860px">' +
       '<div style="font-size:20px;font-weight:800;margin-bottom:4px">Link Builder</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Generate tracking links. Every click is logged to Firestore and source attribution flows through to postbacks.</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Paste a casino affiliate link, choose funnel/source/campaign — get tagged links, postback URLs, LP ad link and TG deep link in one shot.</div>' +
 
+      // ── INPUT CARD ──
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
 
+        // Casino URL input
+        '<div style="margin-bottom:18px">' +
+          '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Casino Affiliate Link <span style="font-weight:400;text-transform:none;letter-spacing:0">(paste raw tracking URL from affiliate platform)</span></label>' +
+          '<div style="display:flex;gap:8px;align-items:center">' +
+            '<input id="bl-casino-url" type="text" value="' + escHtml(builderCasinoUrl) + '" placeholder="https://track.7ladies.com/visit/?bta=..." oninput="builderCasinoUrl=this.value.trim();builderGenerated=false;renderBuilderPage()" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:13px;font-family:var(--font-mono);box-sizing:border-box">' +
+            (builderCasinoUrl && detectedNet
+              ? '<span style="white-space:nowrap">' + networkBadge(detectedNet.name) + '</span>'
+              : (builderCasinoUrl ? '<span style="font-size:11px;color:#f0b429;white-space:nowrap">&#9888; unknown network</span>' : '')) +
+          '</div>' +
+        '</div>' +
+
+        // Funnel / Source / Campaign
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px">' +
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Funnel</label>' +
-            '<select id="bl-funnel" onchange="builderFunnel=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
+            '<select id="bl-funnel" onchange="builderFunnel=this.value;builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
             FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (builderFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
             '</select></div>' +
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Traffic Source</label>' +
-            '<select id="bl-source" onchange="builderSource=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
+            '<select id="bl-source" onchange="builderSource=this.value;builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
             TRAFFIC_SOURCES.map(function(s){ return '<option value="' + s.id + '"' + (builderSource === s.id ? ' selected' : '') + '>' + s.name + '</option>'; }).join('') +
             '</select></div>' +
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Campaign Name</label>' +
-            '<input id="bl-campaign" type="text" value="' + escHtml(builderCampaign) + '" placeholder="summer_de_promo" oninput="builderCampaign=this.value.trim().replace(/\\s+/g,\'_\')" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
+            '<input id="bl-campaign" type="text" value="' + escHtml(builderCampaign) + '" placeholder="summer_de_promo" oninput="builderCampaign=this.value.trim().replace(/\\s+/g,\'_\');builderGenerated=false" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
         '</div>' +
 
+        // Type radio
         '<div style="margin-bottom:20px">' +
           '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Funnel Type</label>' +
           '<div style="display:flex;gap:20px">' +
             '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">' +
-              '<input type="radio" name="bl-type" value="direct"' + (builderType === 'direct' ? ' checked' : '') + ' onchange="builderType=this.value;renderBuilderPage()">' +
+              '<input type="radio" name="bl-type" value="direct"' + (builderType === 'direct' ? ' checked' : '') + ' onchange="builderType=this.value;builderGenerated=false;renderBuilderPage()">' +
               'Direct (Traffic &#8594; LP &#8594; Casino)</label>' +
             '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">' +
-              '<input type="radio" name="bl-type" value="tg"' + (builderType === 'tg' ? ' checked' : '') + ' onchange="builderType=this.value;renderBuilderPage()">' +
+              '<input type="radio" name="bl-type" value="tg"' + (builderType === 'tg' ? ' checked' : '') + ' onchange="builderType=this.value;builderGenerated=false;renderBuilderPage()">' +
               'Telegram (Traffic &#8594; LP &#8594; Bot &#8594; Casino)</label>' +
           '</div>' +
         '</div>' +
 
-        '<div style="border-top:1px solid var(--border);padding-top:20px">' +
+        (noSmartlink
+          ? '<div style="color:#f0b429;font-size:12px;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px;margin-bottom:14px">&#9888; No smartlink URL configured for ' + escHtml(builderFunnel) + '. Add it in Manage &#8594; Funnel Config.</div>'
+          : '') +
 
-          (noSmartlink
-            ? '<div style="color:#f0b429;font-size:12px;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px;margin-bottom:14px">&#9888; No smartlink URL configured for ' + escHtml(builderFunnel) + '. Add it in Manage &#8594; Funnel Config.</div>'
-            : '') +
+        '<button onclick="builderGenerate()" style="background:var(--accent);border:none;border-radius:6px;padding:9px 24px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">&#9654; Generate Package</button>' +
 
-          '<div style="margin-bottom:16px">' +
-            '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Direct Link <span style="color:var(--muted);font-weight:400">(share in ads / bio / posts)</span></div>' +
-            '<div style="display:flex;gap:8px;align-items:center">' +
-              '<input id="bl-direct-url" type="text" readonly value="' + escHtml(directUrl) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.45rem .7rem;font-size:.72rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
-              copyBtn('bl-direct-url') +
-            '</div>' +
-          '</div>' +
-
-          (builderType === 'tg' && bot
-            ? '<div style="margin-bottom:16px">' +
-                '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Telegram Deep Link <span style="color:var(--muted);font-weight:400">(for Telegram traffic — bot reads the source param)</span></div>' +
-                '<div style="display:flex;gap:8px;align-items:center">' +
-                  '<input id="bl-tg-url" type="text" readonly value="' + escHtml(tgUrl) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.45rem .7rem;font-size:.72rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
-                  copyBtn('bl-tg-url') +
-                '</div>' +
-              '</div>'
-            : '') +
-
-          '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:12px">' +
-            '<div style="font-weight:700;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Tracking Preview</div>' +
-            '<div style="color:var(--fg)">Source: <span style="color:var(--accent);font-weight:600">' + escHtml(srcLabel) + ' (' + escHtml(builderSource) + ')</span>' +
-            ' &#8594; Funnel: <span style="color:var(--accent);font-weight:600">' + escHtml(builderFunnel) + '</span>' +
-            (builderType === 'tg' && bot ? ' &#8594; Bot: <span style="color:var(--accent);font-weight:600">@' + escHtml(bot.username) + '</span>' : '') + '</div>' +
-            (builderCampaign ? '<div style="color:var(--muted);margin-top:4px">Campaign: <span style="color:var(--fg)">' + escHtml(builderCampaign) + '</span></div>' : '') +
-            '<div style="color:var(--muted);margin-top:4px">Postback will record: <code style="background:var(--border);padding:1px 5px;border-radius:3px;font-size:11px">source=' + escHtml(builderSource) + (builderCampaign ? ', campaign=' + escHtml(builderCampaign) : '') + '</code></div>' +
-          '</div>' +
-
-          '<div style="margin-top:16px;display:flex;gap:10px">' +
-            '<button onclick="builderGenerate()" style="background:var(--accent);border:none;border-radius:6px;padding:9px 22px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Generate &amp; Save to History</button>' +
-          '</div>' +
-
-        '</div>' +
       '</div>' +
 
+      // ── OUTPUT ──
+      outputHtml +
+
+      // ── HISTORY ──
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 24px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
           '<div style="font-size:14px;font-weight:700">Recently Generated</div>' +
