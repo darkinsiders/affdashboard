@@ -112,9 +112,11 @@
   .funnel-tab.active-dark    { color: #4a9eff; border-bottom-color: #4a9eff; }
   .funnel-tab.active-slotio  { color: var(--green); border-bottom-color: var(--green); }
   .funnel-tab.active-scanio  { color: var(--orange); border-bottom-color: var(--orange); }
-  .funnel-tab.active-spin    { color: var(--red); border-bottom-color: var(--red); }
+  .funnel-tab.active-spingpt { color: var(--red); border-bottom-color: var(--red); }
   .funnel-tab.active-shadow  { color: var(--purple); border-bottom-color: var(--purple); }
-  .funnel-tab.active-manage    { color: var(--purple); border-bottom-color: var(--purple); }
+  .funnel-tab.active-deals    { color: var(--green); border-bottom-color: var(--green); }
+  .funnel-tab.active-funnels  { color: var(--purple); border-bottom-color: var(--purple); }
+  .funnel-tab.active-settings { color: var(--muted); border-bottom-color: var(--muted); }
   .funnel-tab.active-analytics { color: var(--accent); border-bottom-color: var(--accent); }
 
   .funnel-badge {
@@ -129,7 +131,7 @@
   .badge-dark      { background: rgba(61,142,240,0.10); color: #4a9eff; border: 1px solid rgba(61,142,240,0.2); }
   .badge-slotio    { background: rgba(29,179,104,0.10); color: var(--green); border: 1px solid rgba(29,179,104,0.2); }
   .badge-scanio    { background: rgba(224,115,51,0.10); color: var(--orange); border: 1px solid rgba(224,115,51,0.2); }
-  .badge-spin      { background: rgba(217,62,62,0.10);  color: var(--red); border: 1px solid rgba(217,62,62,0.2); }
+  .badge-spingpt   { background: rgba(217,62,62,0.10);  color: var(--red); border: 1px solid rgba(217,62,62,0.2); }
   .badge-shadow    { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.2); }
 
   /* HEADER */
@@ -1045,7 +1047,7 @@
       <!-- Section 1 -->
       <div>
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">① What is a Smartlink?</div>
-        <p style="font-size:13px;color:var(--text);line-height:1.7;margin:0">A smartlink is a single URL you give to traffic sources (Facebook, TikTok, media buyers). When a visitor opens it, the page instantly detects their country via IP and redirects them to the correct casino affiliate link — all in under 1 second. Each funnel (Dark, Slotio, Scanio, Spin, Shadow) has its own smartlink file.</p>
+        <p style="font-size:13px;color:var(--text);line-height:1.7;margin:0">A smartlink is a single URL you give to traffic sources (Facebook, TikTok, media buyers). When a visitor opens it, the page instantly detects their country via IP and redirects them to the correct casino affiliate link — all in under 1 second. Each funnel (Dark, Slotio, Scanio, SpinGPT, Shadow) has its own smartlink file.</p>
       </div>
 
       <!-- Section 2 -->
@@ -1126,12 +1128,14 @@
 <!-- Funnel Nav -->
 <div class="funnel-nav" id="funnelNav">
   <div class="funnel-tab" id="tab-analytics" onclick="setPage('analytics')">Analytics</div>
-  <div class="funnel-tab" id="tab-manage" onclick="setPage('manage')">Manage</div>
+  <div class="funnel-tab" id="tab-deals"     onclick="setPage('deals')">Deals</div>
+  <div class="funnel-tab" id="tab-funnels"   onclick="setPage('funnels')">Funnels</div>
+  <div class="funnel-tab" id="tab-settings"  onclick="setPage('settings')">Settings</div>
   <div class="funnel-tab" id="tab-universal" onclick="setPage('dashboard')">Universal</div>
   <div class="funnel-tab" id="tab-dark"      onclick="setFunnel('Dark')">Dark <span class="tab-cbadge" id="cbadge-dark"></span></div>
   <div class="funnel-tab" id="tab-slotio"    onclick="setFunnel('Slotio')">Slotio <span class="tab-cbadge" id="cbadge-slotio"></span></div>
   <div class="funnel-tab" id="tab-scanio"    onclick="setFunnel('Scanio')">Scanio <span class="tab-cbadge" id="cbadge-scanio"></span></div>
-  <div class="funnel-tab" id="tab-spin"      onclick="setFunnel('Spin')">Spin <span class="tab-cbadge" id="cbadge-spin"></span></div>
+  <div class="funnel-tab" id="tab-spingpt"   onclick="setFunnel('SpinGPT')">SpinGPT <span class="tab-cbadge" id="cbadge-spingpt"></span></div>
   <div class="funnel-tab" id="tab-shadow"    onclick="setFunnel('Shadow')">Shadow <span class="tab-cbadge" id="cbadge-shadow"></span></div>
 </div>
 
@@ -1308,6 +1312,9 @@
 
 <div id="analyticsPage" style="display:none"></div>
 <div id="managePage" style="display:none"></div>
+<div id="dealsPage" style="display:none"></div>
+<div id="funnelsPage" style="display:none"></div>
+<div id="settingsPage" style="display:none"></div>
 
 <!-- GEO tooltip overlay -->
 <div class="geo-tooltip-overlay" id="geoOverlay" onclick="closeGeoTooltip()"></div>
@@ -1479,21 +1486,29 @@ function getFunnelUrl(url, funnel) {
   return url;
 }
 
-function setFunnel(funnel) {
-  currentFunnel = funnel;
-  currentPage = 'dashboard';
-  // Ensure dashboard is visible and other pages are hidden
-  var manageDiv = document.getElementById('managePage');
-  var analyticsDiv = document.getElementById('analyticsPage');
-  var dashboardContent = document.getElementById('dashboardContent');
-  if (manageDiv) manageDiv.style.display = 'none';
-  if (analyticsDiv) analyticsDiv.style.display = 'none';
-  if (dashboardContent) dashboardContent.style.display = '';
-  // Update tab active classes
-  ['analytics','manage','universal','dark','slotio','scanio','spin','shadow'].forEach(function(key) {
+function hideAllPages() {
+  ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  var dash = document.getElementById('dashboardContent');
+  if (dash) dash.style.display = 'none';
+}
+
+function clearTabActive() {
+  ['analytics','deals','funnels','settings','universal','dark','slotio','scanio','spingpt','shadow'].forEach(function(key) {
     var el = document.getElementById('tab-' + key);
     if (el) el.className = 'funnel-tab';
   });
+}
+
+function setFunnel(funnel) {
+  currentFunnel = funnel;
+  currentPage = 'dashboard';
+  hideAllPages();
+  var dashboardContent = document.getElementById('dashboardContent');
+  if (dashboardContent) dashboardContent.style.display = '';
+  clearTabActive();
   var activeKey = funnel ? funnel.toLowerCase() : 'universal';
   var activeEl = document.getElementById('tab-' + activeKey);
   if (activeEl) activeEl.classList.add('active-' + activeKey);
@@ -1513,31 +1528,35 @@ function setFunnel(funnel) {
 
 function setPage(page) {
   currentPage = page;
-  ['manage','universal','dark','slotio','scanio','spin','shadow'].forEach(function(k) {
-    var el = document.getElementById('tab-' + k);
-    if (el) el.className = 'funnel-tab';
-  });
-  var el = document.getElementById('tab-' + page);
-  if (el) el.classList.add('active-' + page);
+  hideAllPages();
+  clearTabActive();
+  var tabEl = document.getElementById('tab-' + page);
+  if (tabEl) tabEl.classList.add('active-' + page);
 
-  var manageDiv = document.getElementById('managePage');
-  var analyticsDiv = document.getElementById('analyticsPage');
-  var dashboardContent = document.getElementById('dashboardContent');
-
-  if (page === 'manage') {
-    if (analyticsDiv) analyticsDiv.style.display = 'none';
-    if (manageDiv) manageDiv.style.display = '';
-    if (dashboardContent) dashboardContent.style.display = 'none';
-    renderManagePage();
-  } else if (page === 'analytics') {
-    if (manageDiv) manageDiv.style.display = 'none';
-    if (dashboardContent) dashboardContent.style.display = 'none';
-    if (analyticsDiv) analyticsDiv.style.display = '';
+  if (page === 'analytics') {
+    var el = document.getElementById('analyticsPage');
+    if (el) el.style.display = '';
     renderAnalyticsPage();
+  } else if (page === 'deals') {
+    var el = document.getElementById('dealsPage');
+    if (el) el.style.display = '';
+    renderDealsPage();
+  } else if (page === 'funnels') {
+    var el = document.getElementById('funnelsPage');
+    if (el) el.style.display = '';
+    renderFunnelsPage();
+  } else if (page === 'settings') {
+    var el = document.getElementById('settingsPage');
+    if (el) el.style.display = '';
+    renderSettingsPage();
+  } else if (page === 'manage') {
+    var el = document.getElementById('managePage');
+    if (el) el.style.display = '';
+    renderManagePage();
   } else {
-    if (manageDiv) manageDiv.style.display = 'none';
-    if (analyticsDiv) analyticsDiv.style.display = 'none';
-    if (dashboardContent) dashboardContent.style.display = '';
+    // dashboard
+    var el = document.getElementById('dashboardContent');
+    if (el) el.style.display = '';
     setFunnel(null);
   }
 }
@@ -1586,7 +1605,7 @@ function renderManagePage() {
   }).join('');
 
   // Funnel badge short labels
-  var FUNNEL_SHORT = { Dark: 'Da', Slotio: 'Sl', Scanio: 'Sc', Spin: 'Sp', Shadow: 'Sh' };
+  var FUNNEL_SHORT = { Dark: 'Da', Slotio: 'Sl', Scanio: 'Sc', SpinGPT: 'Sg', Shadow: 'Sh' };
 
   // Deal cards
   var dealCardsHtml = deals.map(function(deal) {
@@ -1602,8 +1621,8 @@ function renderManagePage() {
       var color = FUNNEL_COLORS[f];
       var fBg = color.replace(')', ',0.12)').replace('rgb', 'rgba');
       // Build rgba background from hex color
-      var hexMap = { Dark: 'rgba(88,166,255,0.12)', Slotio: 'rgba(63,185,80,0.12)', Scanio: 'rgba(240,136,62,0.12)', Spin: 'rgba(248,81,73,0.12)', Shadow: 'rgba(188,140,255,0.12)' };
-      var borderMap = { Dark: 'rgba(88,166,255,0.3)', Slotio: 'rgba(63,185,80,0.3)', Scanio: 'rgba(240,136,62,0.3)', Spin: 'rgba(248,81,73,0.3)', Shadow: 'rgba(188,140,255,0.3)' };
+      var hexMap = { Dark: 'rgba(88,166,255,0.12)', Slotio: 'rgba(63,185,80,0.12)', Scanio: 'rgba(240,136,62,0.12)', SpinGPT: 'rgba(248,81,73,0.12)', Shadow: 'rgba(188,140,255,0.12)' };
+      var borderMap = { Dark: 'rgba(88,166,255,0.3)', Slotio: 'rgba(63,185,80,0.3)', Scanio: 'rgba(240,136,62,0.3)', SpinGPT: 'rgba(248,81,73,0.3)', Shadow: 'rgba(188,140,255,0.3)' };
       return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:' + hexMap[f] + ';color:' + color + ';border:1px solid ' + borderMap[f] + ';white-space:nowrap">' + FUNNEL_SHORT[f] + '</span>';
     }).join('');
 
@@ -1727,29 +1746,43 @@ function renderFunnelGeoBar() {
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
-var currentPage = 'dashboard'; // 'dashboard' | 'manage'
+var currentPage = 'dashboard'; // 'dashboard' | 'deals' | 'funnels' | 'analytics' | 'settings'
 var deals = [];
+var landingPages = [];
+var dealsFilterStatus = 'active'; // 'active' | 'paused' | 'archived' | 'all'
+var dealsFilterFunnel = '';
+var lpEditingId = null;
 var editingId = null;
 var filterBgaming = false;
 var confirmingId = null;
 var sortBy  = null; // 'deal' | 'geos' | null
 var sortDir = 1;    // 1 = desc, -1 = asc
 var currentFunnel = null; // null = Universal
+var metaToken = '';
+var metaAccountId = '';
+var manualSpendEntries = [];
 
 // ── Assignments ────────────────────────────────────────────────────────────
 var ASSIGNMENTS_KEY = 'funnel_assignments';
 var assignments = {};
 var DEFAULT_ASSIGNMENTS = {
-  Dark:   [1, 2, 7],
-  Slotio: [5, 3, 8],
-  Scanio: [6, 4, 9],
-  Spin:   [2, 1, 7],
-  Shadow: [3, 5, 8]
+  Dark:    [1, 2, 7],
+  Slotio:  [5, 3, 8],
+  Scanio:  [6, 4, 9],
+  SpinGPT: [2, 1, 7],
+  Shadow:  [3, 5, 8]
 };
-var FUNNEL_NAMES = ['Dark', 'Slotio', 'Scanio', 'Spin', 'Shadow'];
+var FUNNEL_NAMES = ['Dark', 'Slotio', 'Scanio', 'SpinGPT', 'Shadow'];
 var FUNNEL_COLORS = {
-  Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', Spin: '#f85149', Shadow: '#bc8cff'
+  Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', SpinGPT: '#f85149', Shadow: '#bc8cff'
 };
+var TRAFFIC_SOURCES = [
+  { id: 'meta',      name: 'Meta Ads',    type: 'paid',    color: '#1877F2' },
+  { id: 'tiktok',    name: 'TikTok',      type: 'paid',    color: '#69C9D0' },
+  { id: 'organic',   name: 'Organic/SEO', type: 'organic', color: '#3fb950' },
+  { id: 'spam',      name: 'Spam/DM',     type: 'spam',    color: '#f0883e' },
+  { id: 'phonefarm', name: 'Phone Farm',  type: 'content', color: '#bc8cff' }
+];
 
 function saveAssignments() {
   saveToFirebase();
@@ -1863,6 +1896,7 @@ function renderConflictBadges() {
 function saveDeals() {
   saveToFirebase();
   if (currentPage === 'manage') renderManagePage();
+  if (currentPage === 'deals') renderDealsPage();
 }
 
 function nextId() {
@@ -1955,7 +1989,8 @@ function updateSortButtons() {
 // ── Filters ────────────────────────────────────────────────────────────────
 function getFilteredDeals() {
   var q = document.getElementById('searchInput').value.toLowerCase().trim();
-  var pool = currentFunnel ? getAssignedDeals(currentFunnel) : deals;
+  var activeDeals = deals.filter(function(d) { return (d.status || 'active') === 'active'; });
+  var pool = currentFunnel ? getAssignedDeals(currentFunnel).filter(function(d){ return (d.status||'active')==='active'; }) : activeDeals;
 
   // Resolve search query: if it matches a country name, use the code
   var resolvedCode = null;
@@ -2283,10 +2318,15 @@ function saveDeal(e) {
 
   if (editingId !== null) {
     var idx = deals.findIndex(function(d) { return d.id === editingId; });
-    if (idx !== -1) deals[idx] = { id: deals[idx].id, name, url, geos, bgaming, deposit, revshare, username, password, contact };
+    if (idx !== -1) {
+      var existing = deals[idx];
+      deals[idx] = { id: existing.id, name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, username: username, password: password, contact: contact,
+        status: existing.status || 'active', dealType: existing.dealType || 'RS', network: getNetworkId(url), cpaAmount: existing.cpaAmount || 0 };
+    }
     saveDeals(); closeModal(); render();
   } else {
-    var newDeal = { id: nextId(), name, url, geos, bgaming, deposit, revshare, username, password, contact };
+    var newDeal = { id: nextId(), name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, username: username, password: password, contact: contact,
+      status: 'active', dealType: 'RS', network: getNetworkId(url), cpaAmount: 0 };
     deals.push(newDeal);
     saveDeals();
     autoAssignNewDeal(newDeal);
@@ -2341,7 +2381,7 @@ document.getElementById('searchInput').addEventListener('input', renderTable);
 
 // ── Keyboard / overlay ─────────────────────────────────────────────────────
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { closeModal(); closeGeoTooltip(); cancelDelete(); }
+  if (e.key === 'Escape') { closeModal(); closeGeoTooltip(); cancelDelete(); closeLpModal(); }
 });
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
@@ -3111,7 +3151,11 @@ function saveToFirebase() {
     assignments: assignments,
     dealWeights: dealWeights,
     smartlinkFallbacks: smartlinkFallbacks,
-    smartlinkHostedUrls: smartlinkHostedUrls
+    smartlinkHostedUrls: smartlinkHostedUrls,
+    landingPages: landingPages,
+    manualSpendEntries: manualSpendEntries,
+    metaToken: metaToken,
+    metaAccountId: metaAccountId
   }).then(function() {
     showSaveIndicator('saved', 'Saved ✓');
   }).catch(function(e) {
@@ -3152,14 +3196,44 @@ DOC_REF.onSnapshot(function(doc) {
       dealWeights = data.dealWeights || {};
       smartlinkFallbacks = data.smartlinkFallbacks || {};
       smartlinkHostedUrls = data.smartlinkHostedUrls || {};
+      landingPages = data.landingPages || [];
+      manualSpendEntries = data.manualSpendEntries || [];
+      if (data.metaToken) metaToken = data.metaToken;
+      if (data.metaAccountId) metaAccountId = data.metaAccountId;
       dataLoaded = true;
       // Run migrations
       var seedMap = {};
       SEED_DEALS.forEach(function(d) { seedMap[d.id] = d; });
       var changed = false;
+      // Migrate Spin → SpinGPT in assignments
+      if (assignments.Spin !== undefined && assignments.SpinGPT === undefined) {
+        assignments.SpinGPT = assignments.Spin;
+        delete assignments.Spin;
+        changed = true;
+      }
+      if (dealWeights.Spin !== undefined && dealWeights.SpinGPT === undefined) {
+        dealWeights.SpinGPT = dealWeights.Spin;
+        delete dealWeights.Spin;
+        changed = true;
+      }
+      if (smartlinkFallbacks.Spin !== undefined && smartlinkFallbacks.SpinGPT === undefined) {
+        smartlinkFallbacks.SpinGPT = smartlinkFallbacks.Spin;
+        delete smartlinkFallbacks.Spin;
+        changed = true;
+      }
+      if (smartlinkHostedUrls.Spin !== undefined && smartlinkHostedUrls.SpinGPT === undefined) {
+        smartlinkHostedUrls.SpinGPT = smartlinkHostedUrls.Spin;
+        delete smartlinkHostedUrls.Spin;
+        changed = true;
+      }
+      // Migrate deal objects with new fields
       deals.forEach(function(d) {
         var seed = seedMap[d.id];
         if (!d.bgaming) { d.bgaming = true; changed = true; }
+        if (d.status === undefined) { d.status = 'active'; changed = true; }
+        if (d.dealType === undefined) { d.dealType = 'RS'; changed = true; }
+        if (d.network === undefined) { d.network = getNetworkId(d.url); changed = true; }
+        if (d.cpaAmount === undefined) { d.cpaAmount = 0; changed = true; }
         if (seed) {
           if (d.username === undefined || d.username === null) { d.username = seed.username; changed = true; }
           if (d.password === undefined || d.password === null) { d.password = seed.password; changed = true; }
@@ -3205,11 +3279,17 @@ DOC_REF.onSnapshot(function(doc) {
   dealWeights = data.dealWeights || dealWeights;
   smartlinkFallbacks = data.smartlinkFallbacks || smartlinkFallbacks;
   smartlinkHostedUrls = data.smartlinkHostedUrls || smartlinkHostedUrls;
+  landingPages = data.landingPages || landingPages;
+  manualSpendEntries = data.manualSpendEntries || manualSpendEntries;
+  if (data.metaToken) metaToken = data.metaToken;
+  if (data.metaAccountId) metaAccountId = data.metaAccountId;
   render();
   renderSmartlinks();
   renderConflictBadges();
   renderFunnelGeoBar();
   if (currentPage === 'manage') renderManagePage();
+  if (currentPage === 'deals') renderDealsPage();
+  if (currentPage === 'funnels') renderFunnelsPage();
   if (currentPage === 'analytics') renderAnalyticsPage();
 
 }, function(e) {
@@ -3237,11 +3317,15 @@ function renderAnalyticsPage() {
       '<div style="display:flex;gap:0">' +
         tabBtn('clicks', 'Click Analytics') +
         tabBtn('performance', 'Performance') +
+        tabBtn('sources', 'Sources') +
+        tabBtn('roi', 'ROI') +
       '</div>' +
     '</div>' +
     '<div id="analyticsTabBody"></div>';
   if (analyticsTab === 'clicks') renderClicksTab();
-  else renderPerformanceTab();
+  else if (analyticsTab === 'performance') renderPerformanceTab();
+  else if (analyticsTab === 'sources') renderSourcesTab();
+  else if (analyticsTab === 'roi') renderRoiTab();
 }
 
 function renderClicksTab() {
@@ -3385,7 +3469,7 @@ function renderClicksData(container, clicks) {
     '</div>';
   }
 
-  var funnelColors = { Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', Spin: '#f85149', Shadow: '#bc8cff' };
+  var funnelColors = { Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', SpinGPT: '#f85149', Shadow: '#bc8cff' };
   function funnelColor(f) { return funnelColors[f] || 'var(--accent)'; }
 
   var recentRows = clicks.slice(0, 50).map(function(c) {
@@ -3488,7 +3572,7 @@ function renderPerformanceData(container, rows) {
   rows.forEach(function(r) { totalRegs += r.regs; totalFtds += r.ftds; totalRevenue += r.revenue; });
   var regToFtd = totalRegs > 0 ? (totalFtds / totalRegs * 100).toFixed(1) + '%' : '—';
 
-  var funnelColors = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: 'var(--orange)', Spin: 'var(--red)', Shadow: 'var(--purple)' };
+  var funnelColors = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: 'var(--orange)', SpinGPT: 'var(--red)', Shadow: 'var(--purple)' };
 
   function kpiCard(label, value, sub, color) {
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;flex:1;min-width:130px;position:relative;overflow:hidden">' +
@@ -3539,6 +3623,757 @@ function renderPerformanceData(container, rows) {
         '</div>'
     );
 }
+
+// ── Network ID detection (returns string ID for badges/filtering) ───────────
+function getNetworkId(url) {
+  if (!url) return 'other';
+  var u = url.toLowerCase();
+  if (u.indexOf('7ladies') !== -1 || u.indexOf('cosmobet') !== -1 ||
+      u.indexOf('rolletto') !== -1 || u.indexOf('velobet') !== -1 ||
+      u.indexOf('cellxpert') !== -1) return 'cellxpert';
+  if (u.indexOf('ftdgallery') !== -1) return 'ftdgallery';
+  if (u.indexOf('padrino') !== -1) return 'padrino';
+  return 'other';
+}
+
+var NETWORK_COLORS = {
+  cellxpert: { bg: 'rgba(61,142,240,0.12)', color: '#4a9eff', border: 'rgba(61,142,240,0.25)' },
+  ftdgallery: { bg: 'rgba(224,115,51,0.12)', color: '#e07333', border: 'rgba(224,115,51,0.25)' },
+  padrino:   { bg: 'rgba(29,179,104,0.12)', color: '#3fb950', border: 'rgba(29,179,104,0.25)' },
+  other:     { bg: 'rgba(139,92,246,0.12)', color: '#bc8cff', border: 'rgba(139,92,246,0.25)' }
+};
+
+function networkBadge(net) {
+  var c = NETWORK_COLORS[net] || NETWORK_COLORS.other;
+  return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;background:' + c.bg + ';color:' + c.color + ';border:1px solid ' + c.border + ';text-transform:uppercase;letter-spacing:0.04em">' + escHtml(net) + '</span>';
+}
+
+function statusBadge(status) {
+  var cfg = {
+    active:   { bg: 'rgba(29,179,104,0.12)', color: 'var(--green)', border: 'rgba(29,179,104,0.3)', label: 'Active' },
+    paused:   { bg: 'rgba(212,136,10,0.12)', color: 'var(--yellow)', border: 'rgba(212,136,10,0.3)', label: 'Paused' },
+    archived: { bg: 'rgba(61,84,112,0.15)',  color: 'var(--muted)',  border: 'rgba(61,84,112,0.3)',  label: 'Archived' }
+  }[status] || { bg: '', color: 'var(--muted)', border: 'var(--border)', label: status };
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:' + cfg.bg + ';color:' + cfg.color + ';border:1px solid ' + cfg.border + ';text-transform:uppercase;letter-spacing:0.04em">' + cfg.label + '</span>';
+}
+
+function dealTypeBadge(deal) {
+  if (deal.dealType === 'CPA') return '<span style="font-size:11px;font-weight:700;color:var(--green)">€' + (deal.cpaAmount||0) + ' CPA</span>';
+  if (deal.dealType === 'hybrid') return '<span style="font-size:11px;font-weight:700;color:var(--purple)">' + deal.revshare + '% + €' + (deal.cpaAmount||0) + '</span>';
+  var col = (deal.revshare||0) >= 40 ? 'var(--green)' : 'var(--yellow)';
+  return '<span style="font-size:11px;font-weight:700;color:' + col + '">' + deal.revshare + '% RS</span>';
+}
+
+function toggleDealStatus(id) {
+  var deal = deals.find(function(d) { return d.id === id; });
+  if (!deal) return;
+  deal.status = deal.status === 'active' ? 'paused' : 'active';
+  saveDeals();
+  renderDealsPage();
+}
+
+function archiveDeal(id) {
+  var deal = deals.find(function(d) { return d.id === id; });
+  if (!deal) return;
+  deal.status = deal.status === 'archived' ? 'active' : 'archived';
+  saveDeals();
+  renderDealsPage();
+}
+
+function toggleFunnelAssignment(funnel, dealId) {
+  var ids = assignments[funnel];
+  if (!ids) { assignments[funnel] = []; ids = assignments[funnel]; }
+  var idx = ids.indexOf(dealId);
+  if (idx !== -1) { ids.splice(idx, 1); }
+  else { ids.push(dealId); }
+  saveAssignments();
+  renderConflictBadges();
+  renderDealsPage();
+}
+
+var dealsSubTab = 'deals'; // 'deals' | 'lps'
+
+function renderDealsPage() {
+  var container = document.getElementById('dealsPage');
+  if (!container) return;
+
+  function subTabBtn(id, label) {
+    var active = dealsSubTab === id;
+    return '<button onclick="dealsSubTab=\'' + id + '\';renderDealsPage()" style="background:none;border:none;border-bottom:2px solid ' + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';font-size:13px;font-weight:' + (active ? '700' : '500') + ';padding:10px 18px;cursor:pointer;font-family:var(--font-body);transition:all 0.15s;margin-bottom:-1px">' + label + '</button>';
+  }
+
+  container.innerHTML =
+    '<div style="padding:24px 32px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;gap:0">' +
+        subTabBtn('deals', 'Casino Deals (' + deals.length + ')') +
+        subTabBtn('lps', 'Landing Pages (' + landingPages.length + ')') +
+      '</div>' +
+    '</div>' +
+    '<div id="dealsSubBody" style="padding:24px 32px 32px"></div>';
+
+  if (dealsSubTab === 'deals') renderDealsTable();
+  else renderLandingPagesTab();
+}
+
+function renderDealsTable() {
+  var body = document.getElementById('dealsSubBody');
+  if (!body) return;
+
+  // Filter bar
+  var statusOpts = [['all','All'],['active','Active'],['paused','Paused'],['archived','Archived']].map(function(o){
+    var active = dealsFilterStatus === o[0];
+    return '<button onclick="dealsFilterStatus=\'' + o[0] + '\';renderDealsTable()" style="padding:5px 14px;border-radius:5px;border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';background:' + (active ? 'var(--accent-dim)' : 'var(--card)') + ';color:' + (active ? 'var(--accent)' : 'var(--muted)') + ';font-size:12px;font-weight:' + (active ? '700' : '500') + ';cursor:pointer;transition:all 0.15s">' + o[1] + '</button>';
+  }).join('');
+
+  var funnelOptsSel = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){
+    return '<option value="' + f + '"' + (dealsFilterFunnel === f ? ' selected' : '') + '>' + f + '</option>';
+  }).join('');
+
+  var filtered = deals.filter(function(d) {
+    var statusOk = dealsFilterStatus === 'all' || d.status === dealsFilterStatus;
+    var funnelOk = !dealsFilterFunnel || (assignments[dealsFilterFunnel] || []).indexOf(d.id) !== -1;
+    return statusOk && funnelOk;
+  });
+
+  var rows = filtered.map(function(deal) {
+    var net = deal.network || getNetworkId(deal.url);
+    var assignedFunnels = FUNNEL_NAMES.filter(function(f) {
+      return (assignments[f] || []).indexOf(deal.id) !== -1;
+    });
+    var funnelChips = FUNNEL_NAMES.map(function(f) {
+      var assigned = assignedFunnels.indexOf(f) !== -1;
+      var color = FUNNEL_COLORS[f] || 'var(--muted)';
+      var fkey = f.toLowerCase();
+      return '<button onclick="toggleFunnelAssignment(\'' + f + '\',' + deal.id + ')" title="' + (assigned ? 'Remove from ' : 'Add to ') + f + '" style="padding:2px 8px;border-radius:3px;border:1px solid ' + (assigned ? color : 'var(--border)') + ';background:' + (assigned ? 'rgba(0,0,0,0.2)' : 'transparent') + ';color:' + (assigned ? color : 'var(--muted)') + ';font-size:10px;font-weight:700;cursor:pointer;transition:all 0.15s">' + f.substring(0,3) + '</button>';
+    }).join('');
+
+    var isArchived = deal.status === 'archived';
+    var toggleLabel = deal.status === 'active' ? 'Pause' : 'Activate';
+    var archiveLabel = isArchived ? 'Restore' : 'Archive';
+    var rowOpacity = isArchived ? '0.45' : '1';
+
+    return '<tr style="border-bottom:1px solid var(--border);opacity:' + rowOpacity + '">' +
+      '<td style="padding:10px 12px">' + statusBadge(deal.status || 'active') + '</td>' +
+      '<td style="padding:10px 12px"><span style="font-weight:700;font-size:13px">' + escHtml(deal.name) + '</span></td>' +
+      '<td style="padding:10px 12px">' + networkBadge(net) + '</td>' +
+      '<td style="padding:10px 12px">' + dealTypeBadge(deal) + '</td>' +
+      '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + geoArray(deal).length + ' GEOs</td>' +
+      '<td style="padding:10px 12px"><div style="display:flex;gap:4px;flex-wrap:wrap">' + funnelChips + '</div></td>' +
+      '<td style="padding:10px 12px">' +
+        '<div style="display:flex;gap:6px;align-items:center">' +
+          (!isArchived ? '<button onclick="toggleDealStatus(' + deal.id + ')" style="padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:11px;cursor:pointer">' + toggleLabel + '</button>' : '') +
+          '<button onclick="archiveDeal(' + deal.id + ')" style="padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:11px;cursor:pointer">' + archiveLabel + '</button>' +
+          '<button class="btn-icon btn-edit" onclick="openEditModal(' + deal.id + ')" title="Edit" style="color:var(--accent)">' + ICON_EDIT + '</button>' +
+          '<button class="btn-icon" onclick="openPostbackModal(' + deal.id + ')" title="Postback" style="color:var(--muted)">' + ICON_POSTBACK + '</button>' +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  body.innerHTML =
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">' +
+      '<div style="display:flex;gap:6px">' + statusOpts + '</div>' +
+      '<select onchange="dealsFilterFunnel=this.value;renderDealsTable()" style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;margin-left:auto">' + funnelOptsSel + '</select>' +
+      '<button onclick="openModal()" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add Deal</button>' +
+    '</div>' +
+    (filtered.length === 0
+      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No deals match filter.</div>'
+      : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:var(--card2)">' +
+            '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Status</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Casino</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Network</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Deal</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Coverage</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnels</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Actions</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table></div></div>'
+    );
+}
+
+// ── Landing Pages ──────────────────────────────────────────────────────────
+function nextLpId() {
+  return landingPages.length > 0 ? Math.max.apply(null, landingPages.map(function(l) { return l.id; })) + 1 : 1;
+}
+
+function renderLandingPagesTab() {
+  var body = document.getElementById('dealsSubBody');
+  if (!body) return;
+
+  var srcOpts = '<option value="">All Sources</option>' + TRAFFIC_SOURCES.map(function(s){
+    return '<option value="' + s.id + '">' + s.name + '</option>';
+  }).join('');
+  var funnelOpts2 = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){
+    return '<option value="' + f + '">' + f + '</option>';
+  }).join('');
+
+  var rows = landingPages.map(function(lp) {
+    var src = TRAFFIC_SOURCES.find(function(s) { return s.id === lp.source; });
+    var srcColor = src ? src.color : 'var(--muted)';
+    var srcName = src ? src.name : (lp.source || '—');
+    var fcol = FUNNEL_COLORS[lp.funnel] || 'var(--muted)';
+    var statusCol = lp.status === 'live' ? 'var(--green)' : 'var(--yellow)';
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:9px 12px;font-weight:600;font-size:13px">' + escHtml(lp.name) + '</td>' +
+      '<td style="padding:9px 12px"><a href="' + escHtml(lp.url) + '" target="_blank" style="color:var(--accent);font-size:11px;font-family:var(--font-mono);text-decoration:none;max-width:280px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(lp.url) + '</a></td>' +
+      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + fcol + '">' + escHtml(lp.funnel||'—') + '</span></td>' +
+      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + srcColor + '">' + escHtml(srcName) + '</span></td>' +
+      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + statusCol + '">' + (lp.status === 'live' ? '● Live' : '○ Paused') + '</span></td>' +
+      '<td style="padding:9px 12px;font-size:12px;color:var(--muted)">' + escHtml(lp.notes||'') + '</td>' +
+      '<td style="padding:9px 12px"><div style="display:flex;gap:6px">' +
+        '<button onclick="openLpModal(' + lp.id + ')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:3px 9px;color:var(--text);font-size:11px;cursor:pointer">Edit</button>' +
+        '<button onclick="deleteLp(' + lp.id + ')" style="background:none;border:1px solid rgba(217,62,62,0.3);border-radius:4px;padding:3px 9px;color:var(--red);font-size:11px;cursor:pointer">Del</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+
+  body.innerHTML =
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:16px">' +
+      '<button onclick="openLpModal(null)" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add Landing Page</button>' +
+    '</div>' +
+    (landingPages.length === 0
+      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:40px;text-align:center;color:var(--muted);font-size:13px">No landing pages yet. Add your first one to track where traffic lands before converting.</div>'
+      : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:var(--card2)">' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Name</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">URL</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnel</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Status</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Notes</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Actions</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table></div></div>'
+    ) +
+    // LP Modal placeholder
+    '';
+}
+
+function openLpModal(id) {
+  lpEditingId = id;
+  var lp = (id !== null && id !== undefined) ? landingPages.find(function(l) { return l.id === id; }) : null;
+  var v = lp || { name: '', url: '', funnel: '', source: '', status: 'live', notes: '' };
+  var funnelOpts = '<option value="">Select funnel</option>' + FUNNEL_NAMES.map(function(f){
+    return '<option value="' + f + '"' + (v.funnel === f ? ' selected' : '') + '>' + f + '</option>';
+  }).join('');
+  var srcOpts = '<option value="">Select source</option>' + TRAFFIC_SOURCES.map(function(s){
+    return '<option value="' + s.id + '"' + (v.source === s.id ? ' selected' : '') + '>' + s.name + '</option>';
+  }).join('');
+
+  // Remove existing modal if any
+  var existing = document.getElementById('lpModalOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'lpModalOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:center;justify-content:center';
+  overlay.onclick = function(e) { if (e.target === overlay) closeLpModal(); };
+  overlay.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px;width:480px;max-width:95vw">' +
+    '<div style="font-size:16px;font-weight:700;margin-bottom:20px">' + (lp ? 'Edit' : 'Add') + ' Landing Page</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px">' +
+      '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Name *</label>' +
+        '<input id="lp-name" value="' + escHtml(v.name) + '" placeholder="e.g. Dark V1 – Meta" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"></div>' +
+      '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">URL *</label>' +
+        '<input id="lp-url" value="' + escHtml(v.url) + '" placeholder="https://..." style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Funnel</label>' +
+          '<select id="lp-funnel" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px">' + funnelOpts + '</select></div>' +
+        '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Traffic Source</label>' +
+          '<select id="lp-source" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px">' + srcOpts + '</select></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Status</label>' +
+          '<select id="lp-status" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px">' +
+            '<option value="live"' + (v.status === 'live' ? ' selected' : '') + '>Live</option>' +
+            '<option value="paused"' + (v.status === 'paused' ? ' selected' : '') + '>Paused</option>' +
+          '</select></div>' +
+        '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Notes</label>' +
+          '<input id="lp-notes" value="' + escHtml(v.notes||'') + '" placeholder="Optional notes" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">' +
+      '<button onclick="closeLpModal()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:8px 18px;color:var(--muted);font-size:13px;cursor:pointer">Cancel</button>' +
+      '<button onclick="saveLp()" style="background:var(--accent);border:none;border-radius:6px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+}
+
+function closeLpModal() {
+  lpEditingId = null;
+  var overlay = document.getElementById('lpModalOverlay');
+  if (overlay) overlay.remove();
+}
+
+function saveLp() {
+  var name = (document.getElementById('lp-name')||{}).value || '';
+  var url  = (document.getElementById('lp-url')||{}).value || '';
+  if (!name.trim() || !url.trim()) { alert('Name and URL are required.'); return; }
+  var lp = {
+    id: lpEditingId !== null ? lpEditingId : nextLpId(),
+    name: name.trim(),
+    url: url.trim(),
+    funnel: (document.getElementById('lp-funnel')||{}).value || '',
+    source: (document.getElementById('lp-source')||{}).value || '',
+    status: (document.getElementById('lp-status')||{}).value || 'live',
+    notes: (document.getElementById('lp-notes')||{}).value || ''
+  };
+  if (lpEditingId !== null) {
+    var idx = landingPages.findIndex(function(l) { return l.id === lpEditingId; });
+    if (idx !== -1) landingPages[idx] = lp;
+  } else {
+    landingPages.push(lp);
+  }
+  closeLpModal();
+  saveToFirebase();
+  renderDealsPage();
+}
+
+function deleteLp(id) {
+  if (!confirm('Delete this landing page?')) return;
+  landingPages = landingPages.filter(function(l) { return l.id !== id; });
+  saveToFirebase();
+  renderDealsPage();
+}
+
+// ── Funnels Page ───────────────────────────────────────────────────────────
+function renderFunnelsPage() {
+  var container = document.getElementById('funnelsPage');
+  if (!container) return;
+
+  var healthHtml = FUNNEL_NAMES.map(function(f) {
+    var color = FUNNEL_COLORS[f];
+    var assignedDeals = getAssignedDeals(f);
+    var totalWeight = assignedDeals.reduce(function(s, d) { return s + getWeight(f, d.id); }, 0);
+    var hasFallback = !!smartlinkFallbacks[f];
+    var isLive = !!smartlinkHostedUrls[f];
+
+    function check(ok, text) {
+      return '<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px">' +
+        '<span style="color:' + (ok ? 'var(--green)' : 'var(--red)') + ';font-weight:700;font-size:13px">' + (ok ? '✓' : '✗') + '</span>' +
+        '<span style="color:' + (ok ? 'var(--text)' : 'var(--red)') + '">' + text + '</span></div>';
+    }
+    function checkY(ok, text) {
+      return '<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px">' +
+        '<span style="color:' + (ok ? 'var(--green)' : 'var(--yellow)') + ';font-weight:700;font-size:13px">' + (ok ? '✓' : '⚠') + '</span>' +
+        '<span style="color:' + (ok ? 'var(--text)' : 'var(--yellow)') + '">' + text + '</span></div>';
+    }
+
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex:1;min-width:160px">' +
+      '<div style="background:var(--card2);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+        '<span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:' + color + '">' + f + '</span>' +
+        '<button onclick="setFunnel(\'' + f + '\')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 9px;color:var(--muted);font-size:10px;cursor:pointer">Configure →</button>' +
+      '</div>' +
+      '<div style="padding:12px 14px">' +
+        check(assignedDeals.length > 0, assignedDeals.length + ' deal' + (assignedDeals.length !== 1 ? 's' : '') + ' assigned') +
+        checkY(totalWeight === 100, 'Weights = ' + totalWeight + '%') +
+        check(hasFallback, hasFallback ? 'Fallback set' : 'No fallback set') +
+        check(isLive, isLive ? 'Smartlink live' : 'Not live yet') +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  container.innerHTML =
+    '<div style="padding:28px 32px 32px">' +
+      '<div style="margin-bottom:24px">' +
+        '<div style="font-size:18px;font-weight:700;margin-bottom:4px">Funnel Management</div>' +
+        '<div style="font-size:12px;color:var(--muted)">Health checks and smartlink configuration. Click "Configure →" to set up deals and GEO routing for each funnel.</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:14px;flex-wrap:wrap">' + healthHtml + '</div>' +
+    '</div>';
+}
+
+// ── Settings Page ───────────────────────────────────────────────────────────
+function renderSettingsPage() {
+  var container = document.getElementById('settingsPage');
+  if (!container) return;
+
+  var srcRows = TRAFFIC_SOURCES.map(function(s, i) {
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:9px 12px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + s.color + ';margin-right:6px"></span><span style="font-weight:600">' + escHtml(s.name) + '</span></td>' +
+      '<td style="padding:9px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + escHtml(s.id) + '</td>' +
+      '<td style="padding:9px 12px;font-size:12px;color:var(--muted)">' + s.type + '</td>' +
+    '</tr>';
+  }).join('');
+
+  container.innerHTML =
+    '<div style="padding:28px 32px 32px;max-width:720px">' +
+
+      // Meta API section
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Meta Ads API</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:18px">Connect your Meta Ads account to automatically pull spend data for the ROI tab.</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Access Token</label>' +
+            '<input id="settings-meta-token" type="password" value="' + escHtml(metaToken) + '" placeholder="EAAxxxxxxxx..." style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Ad Account ID</label>' +
+            '<input id="settings-meta-account" value="' + escHtml(metaAccountId) + '" placeholder="act_123456789" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
+        '</div>' +
+        '<button onclick="saveMetaSettings()" style="background:var(--accent);border:none;border-radius:6px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save Meta Settings</button>' +
+        '<span id="metaSaveMsg" style="margin-left:12px;font-size:12px;color:var(--green);display:none">Saved ✓</span>' +
+      '</div>' +
+
+      // Postback info
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Postback Endpoint</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Paste this URL into your affiliate platforms to track conversions.</div>' +
+        '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--accent)">' +
+          'https://affdashboard-postback.darkinsidersbusiness.workers.dev/?token=pbkDark2026xZ&amp;funnel=FUNNEL&amp;event=EVENT&amp;sub1=[afp]' +
+        '</div>' +
+      '</div>' +
+
+      // Traffic Sources
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Traffic Sources</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Tag your smartlink URLs with <code style="background:var(--card2);padding:1px 6px;border-radius:3px;font-size:11px">?sub1=SOURCE_ID</code> to track traffic by source.</div>' +
+        '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;overflow:hidden">' +
+          '<table style="width:100%;border-collapse:collapse">' +
+            '<thead><tr style="background:rgba(0,0,0,0.2)">' +
+              '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Name</th>' +
+              '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">ID (use in sub1)</th>' +
+              '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Type</th>' +
+            '</tr></thead>' +
+            '<tbody>' + srcRows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>' +
+
+    '</div>';
+}
+
+function saveMetaSettings() {
+  metaToken = (document.getElementById('settings-meta-token')||{}).value || '';
+  metaAccountId = (document.getElementById('settings-meta-account')||{}).value || '';
+  saveToFirebase();
+  var msg = document.getElementById('metaSaveMsg');
+  if (msg) { msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 2000); }
+}
+
+// ── Analytics: Sources Tab ─────────────────────────────────────────────────
+var sourcesFilterDays = 7;
+var sourcesFilterSource = '';
+
+function renderSourcesTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  var daysOpts = [['1','Today'],['7','Last 7 days'],['30','Last 30 days'],['0','All time']].map(function(o){
+    return '<option value="' + o[0] + '"' + (sourcesFilterDays === +o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+  }).join('');
+  var srcOpts = '<option value="">All Sources</option>' + TRAFFIC_SOURCES.map(function(s){
+    return '<option value="' + s.id + '"' + (sourcesFilterSource === s.id ? ' selected' : '') + '>' + s.name + '</option>';
+  }).join('');
+
+  body.innerHTML =
+    '<div style="padding:24px 32px 0">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+        '<div><div style="font-size:18px;font-weight:700">Traffic Sources</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Clicks broken down by sub1 source tag. Tag your smartlink URLs with ?sub1=SOURCE_ID</div></div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<select onchange="sourcesFilterSource=this.value;loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + srcOpts + '</select>' +
+          '<select onchange="sourcesFilterDays=+this.value;loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
+          '<button onclick="loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div id="sourcesBody" style="padding:0 32px 32px"><div style="font-size:13px;color:var(--muted);padding:20px 0">Loading...</div></div>';
+  loadSourcesData();
+}
+
+function loadSourcesData() {
+  var body = document.getElementById('sourcesBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:20px 0">Loading clicks...</div>';
+  var cutoff = null;
+  if (sourcesFilterDays > 0) {
+    cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - sourcesFilterDays);
+    cutoff.setHours(0,0,0,0);
+  }
+  db.collection('clicks').orderBy('ts', 'desc').limit(2000).get().then(function(snap) {
+    var bySource = {};
+    var total = 0;
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.ts ? new Date(d.ts) : null;
+      if (cutoff && ts && ts < cutoff) return;
+      var src = d.sub1 || 'unknown';
+      if (sourcesFilterSource && src !== sourcesFilterSource) return;
+      if (!bySource[src]) bySource[src] = { clicks: 0, name: src };
+      bySource[src].clicks++;
+      total++;
+    });
+    // Resolve names
+    Object.keys(bySource).forEach(function(sid) {
+      var s = TRAFFIC_SOURCES.find(function(ts) { return ts.id === sid; });
+      if (s) bySource[sid].name = s.name;
+    });
+
+    // Also load conversion data from conversions collection for source breakdown
+    db.collection('conversions').get().then(function(convSnap) {
+      var bySourceConv = {};
+      convSnap.forEach(function(doc) {
+        var d = doc.data();
+        if (cutoff && d.date < cutoff.toISOString().split('T')[0]) return;
+        // Check sources sub-field
+        if (d.sources) {
+          Object.keys(d.sources).forEach(function(sid) {
+            if (sourcesFilterSource && sid !== sourcesFilterSource) return;
+            if (!bySourceConv[sid]) bySourceConv[sid] = { regs: 0, ftds: 0, revenue: 0 };
+            bySourceConv[sid].regs += +(d.sources[sid].regs || 0);
+            bySourceConv[sid].ftds += +(d.sources[sid].ftds || 0);
+            bySourceConv[sid].revenue += +(d.sources[sid].revenue || 0);
+          });
+        }
+      });
+      renderSourcesData(body, bySource, bySourceConv, total);
+    }).catch(function() { renderSourcesData(body, bySource, {}, total); });
+  }).catch(function(err) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0">Failed to load: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function renderSourcesData(container, bySource, bySourceConv, total) {
+  var allSids = {};
+  Object.keys(bySource).forEach(function(k) { allSids[k] = 1; });
+  Object.keys(bySourceConv).forEach(function(k) { allSids[k] = 1; });
+  var sids = Object.keys(allSids).sort(function(a,b) {
+    return ((bySource[b]||{clicks:0}).clicks) - ((bySource[a]||{clicks:0}).clicks);
+  });
+
+  if (sids.length === 0) {
+    container.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No source data yet. Tag your smartlink URLs with ?sub1=meta (or tiktok, spam, etc.) to start tracking.</div>';
+    return;
+  }
+
+  var rows = sids.map(function(sid) {
+    var src = TRAFFIC_SOURCES.find(function(s) { return s.id === sid; });
+    var color = src ? src.color : 'var(--muted)';
+    var name = src ? src.name : sid;
+    var clicks = (bySource[sid]||{}).clicks || 0;
+    var conv = bySourceConv[sid] || { regs: 0, ftds: 0, revenue: 0 };
+    var r2f = conv.regs > 0 ? (conv.ftds / conv.regs * 100).toFixed(0) + '%' : '—';
+    var pct = total > 0 ? Math.round(clicks / total * 100) : 0;
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:10px 12px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + color + ';margin-right:8px"></span><span style="font-weight:700">' + escHtml(name) + '</span><span style="font-size:10px;color:var(--muted);margin-left:6px">' + sid + '</span></td>' +
+      '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--accent);text-align:right">' + clicks + '</td>' +
+      '<td style="padding:10px 12px;font-size:12px;color:var(--muted);text-align:right">' + pct + '%</td>' +
+      '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:13px;text-align:right">' + conv.regs + '</td>' +
+      '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:13px;color:var(--green);text-align:right">' + conv.ftds + '</td>' +
+      '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:13px;color:var(--yellow);text-align:right">' + (conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—') + '</td>' +
+      '<td style="padding:10px 12px;font-size:12px;color:var(--muted);text-align:right">' + r2f + '</td>' +
+    '</tr>';
+  }).join('');
+
+  container.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+      '<div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Source Breakdown — ' + total + ' total clicks</div>' +
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+        '<thead><tr style="background:var(--card2)">' +
+          '<th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Clicks</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Share</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Regs</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">FTDs</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Revenue</th>' +
+          '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">R→FTD</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table></div>' +
+    '</div>';
+}
+
+// ── Analytics: ROI Tab ─────────────────────────────────────────────────────
+var roiFilterDays = 30;
+var roiFilterSource = '';
+var roiFilterFunnel = '';
+
+function renderRoiTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  var daysOpts = [['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days'],['0','All time']].map(function(o){
+    return '<option value="' + o[0] + '"' + (roiFilterDays === +o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+  }).join('');
+  var srcOpts = '<option value="">All Sources</option>' + TRAFFIC_SOURCES.map(function(s){
+    return '<option value="' + s.id + '"' + (roiFilterSource === s.id ? ' selected' : '') + '>' + s.name + '</option>';
+  }).join('');
+  var funnelOpts2 = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){
+    return '<option value="' + f + '"' + (roiFilterFunnel === f ? ' selected' : '') + '>' + f + '</option>';
+  }).join('');
+
+  var hasMetaConfig = !!(metaToken && metaAccountId);
+
+  body.innerHTML =
+    '<div style="padding:24px 32px 0">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">' +
+        '<div><div style="font-size:18px;font-weight:700">ROI &amp; Spend</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Revenue vs. ad spend — profitability per source and funnel</div></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<select onchange="roiFilterSource=this.value;loadRoiData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + srcOpts + '</select>' +
+          '<select onchange="roiFilterFunnel=this.value;loadRoiData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + funnelOpts2 + '</select>' +
+          '<select onchange="roiFilterDays=+this.value;loadRoiData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
+          '<button onclick="loadRoiData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div id="roiBody" style="padding:0 32px">' +
+      // Manual Spend Entry
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px">' +
+        '<div style="font-size:14px;font-weight:700;margin-bottom:14px">Log Spend</div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Date</label>' +
+            '<input type="date" id="roi-date" value="' + new Date().toISOString().split('T')[0] + '" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;outline:none"></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Source</label>' +
+            '<select id="roi-source" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+              TRAFFIC_SOURCES.map(function(s){ return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('') +
+            '</select></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Funnel</label>' +
+            '<select id="roi-funnel" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+              '<option value="">All</option>' + FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '">' + f + '</option>'; }).join('') +
+            '</select></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Amount (€)</label>' +
+            '<input type="number" id="roi-amount" placeholder="0.00" min="0" step="0.01" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;outline:none;width:100px"></div>' +
+          '<button onclick="saveManualSpend()" style="background:var(--accent);border:none;border-radius:5px;padding:7px 16px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Add</button>' +
+        '</div>' +
+      '</div>' +
+      (!hasMetaConfig
+        ? '<div style="background:rgba(61,142,240,0.06);border:1px solid rgba(61,142,240,0.2);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--muted)">' +
+            '💡 <a href="#" onclick="setPage(\'settings\')" style="color:var(--accent)">Configure Meta Ads API in Settings</a> to automatically pull Meta spend data.' +
+          '</div>'
+        : '') +
+      '<div id="roiDataBody"><div style="font-size:13px;color:var(--muted);padding:20px 0">Loading...</div></div>' +
+    '</div>';
+  loadRoiData();
+}
+
+function saveManualSpend() {
+  var date   = (document.getElementById('roi-date')||{}).value || '';
+  var source = (document.getElementById('roi-source')||{}).value || '';
+  var funnel = (document.getElementById('roi-funnel')||{}).value || '';
+  var amount = parseFloat((document.getElementById('roi-amount')||{}).value || '0');
+  if (!date || !source || amount <= 0) { alert('Date, source, and a positive amount are required.'); return; }
+  manualSpendEntries.push({ date: date, source: source, funnel: funnel, amount: amount, id: Date.now() });
+  saveToFirebase();
+  loadRoiData();
+  var amtEl = document.getElementById('roi-amount');
+  if (amtEl) amtEl.value = '';
+}
+
+function loadRoiData() {
+  var body = document.getElementById('roiDataBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:20px 0">Loading...</div>';
+
+  var cutoff = null;
+  if (roiFilterDays > 0) {
+    var cd = new Date();
+    cd.setDate(cd.getDate() - roiFilterDays);
+    cutoff = cd.toISOString().split('T')[0];
+  }
+
+  // Load conversions
+  db.collection('conversions').get().then(function(snap) {
+    var revenue = 0, ftds = 0, regs = 0;
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if (cutoff && d.date < cutoff) return;
+      if (roiFilterFunnel && d.funnel !== roiFilterFunnel) return;
+      revenue += +(d.revenue || 0);
+      ftds += +(d.ftds || 0);
+      regs += +(d.regs || 0);
+    });
+
+    // Manual spend
+    var filteredSpend = manualSpendEntries.filter(function(e) {
+      var dateOk = !cutoff || e.date >= cutoff;
+      var srcOk = !roiFilterSource || e.source === roiFilterSource;
+      var funnelOk = !roiFilterFunnel || !e.funnel || e.funnel === roiFilterFunnel;
+      return dateOk && srcOk && funnelOk;
+    });
+    var manualTotal = filteredSpend.reduce(function(s, e) { return s + e.amount; }, 0);
+
+    // Meta API spend (if configured)
+    var hasMetaConfig = !!(metaToken && metaAccountId);
+    if (hasMetaConfig && (!roiFilterSource || roiFilterSource === 'meta')) {
+      var since = cutoff || new Date(Date.now() - 90*86400000).toISOString().split('T')[0];
+      var until = new Date().toISOString().split('T')[0];
+      var metaUrl = 'https://graph.facebook.com/v21.0/' + encodeURIComponent(metaAccountId) + '/insights?fields=spend,campaign_name,date_start&time_range={"since":"' + since + '","until":"' + until + '"}&time_increment=1&access_token=' + encodeURIComponent(metaToken);
+      fetch(metaUrl).then(function(r) { return r.json(); }).then(function(json) {
+        var metaSpend = 0;
+        if (json.data) {
+          json.data.forEach(function(row) { metaSpend += +(row.spend || 0); });
+        }
+        renderRoiSummary(body, revenue, ftds, regs, manualTotal + metaSpend, metaSpend, manualTotal, filteredSpend, json.error ? json.error.message : null);
+      }).catch(function(err) {
+        renderRoiSummary(body, revenue, ftds, regs, manualTotal, 0, manualTotal, filteredSpend, 'Meta API error: ' + err.message);
+      });
+    } else {
+      renderRoiSummary(body, revenue, ftds, regs, manualTotal, 0, manualTotal, filteredSpend, null);
+    }
+  }).catch(function(err) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0">Failed to load: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function renderRoiSummary(container, revenue, ftds, regs, totalSpend, metaSpend, manualSpend, spendEntries, metaError) {
+  var roi = revenue - totalSpend;
+  var roas = totalSpend > 0 ? (revenue / totalSpend).toFixed(2) : '∞';
+  var cpftd = ftds > 0 && totalSpend > 0 ? '€' + (totalSpend / ftds).toFixed(2) : '—';
+  var cpreg = regs > 0 && totalSpend > 0 ? '€' + (totalSpend / regs).toFixed(2) : '—';
+
+  function kpi(label, value, color) {
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;flex:1;min-width:130px;position:relative;overflow:hidden">' +
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + color + '"></div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:26px;font-weight:700;color:' + color + ';font-family:var(--font-mono)">' + value + '</div>' +
+    '</div>';
+  }
+
+  var spendRows = spendEntries.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).map(function(e) {
+    var src = TRAFFIC_SOURCES.find(function(s) { return s.id === e.source; });
+    var srcName = src ? src.name : e.source;
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:8px 12px;font-size:12px;font-family:var(--font-mono);color:var(--muted)">' + e.date + '</td>' +
+      '<td style="padding:8px 12px;font-size:12px;font-weight:600">' + escHtml(srcName) + '</td>' +
+      '<td style="padding:8px 12px;font-size:12px;color:var(--muted)">' + escHtml(e.funnel||'All') + '</td>' +
+      '<td style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--red);text-align:right">€' + e.amount.toFixed(2) + '</td>' +
+      '<td style="padding:8px 12px;text-align:right"><button onclick="deleteSpendEntry(' + e.id + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px">✕</button></td>' +
+    '</tr>';
+  }).join('');
+
+  container.innerHTML =
+    (metaError ? '<div style="background:rgba(217,62,62,0.08);border:1px solid rgba(217,62,62,0.25);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--red)">Meta API: ' + escHtml(metaError) + '</div>' : '') +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">' +
+      kpi('Revenue', '€' + revenue.toFixed(0), 'var(--green)') +
+      kpi('Total Spend', '€' + totalSpend.toFixed(0), 'var(--red)') +
+      kpi('ROI', (roi >= 0 ? '+' : '') + '€' + roi.toFixed(0), roi >= 0 ? 'var(--green)' : 'var(--red)') +
+      kpi('ROAS', roas + 'x', roi >= 0 ? 'var(--accent)' : 'var(--yellow)') +
+      kpi('Cost/FTD', cpftd, 'var(--purple)') +
+      kpi('Cost/Reg', cpreg, 'var(--muted)') +
+    '</div>' +
+    (metaSpend > 0 ? '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Meta API spend: €' + metaSpend.toFixed(2) + ' &nbsp;|&nbsp; Manual spend: €' + manualSpend.toFixed(2) + '</div>' : '') +
+    (spendEntries.length > 0
+      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px">' +
+          '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Manual Spend Entries</div>' +
+          '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--card2)">' +
+            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Date</th>' +
+            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
+            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnel</th>' +
+            '<th style="padding:8px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Amount</th>' +
+            '<th style="padding:8px 12px"></th>' +
+          '</tr></thead><tbody>' + spendRows + '</tbody></table>' +
+        '</div>'
+      : '') ;
+}
+
+function deleteSpendEntry(id) {
+  manualSpendEntries = manualSpendEntries.filter(function(e) { return e.id !== id; });
+  saveToFirebase();
+  loadRoiData();
+}
+
 </script>
 </body>
 </html>
