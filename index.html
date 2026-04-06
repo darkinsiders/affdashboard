@@ -78,46 +78,171 @@
   ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   * { scrollbar-width: thin; scrollbar-color: var(--border-bright) transparent; }
 
-  /* FUNNEL NAV */
-  .funnel-nav {
-    background: rgba(9,13,24,0.92);
+  /* ── NAV ───────────────────────────────────────────────────────────────── */
+  .top-nav {
+    background: rgba(9,13,24,0.94);
     border-bottom: 1px solid var(--border);
-    padding: 0 32px;
+    padding: 0 28px;
     display: flex;
-    gap: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
+    align-items: center;
+    gap: 4px;
     position: sticky;
     top: 0;
-    z-index: 50;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    height: 48px;
   }
-  .funnel-nav::-webkit-scrollbar { display: none; }
-  .funnel-tab {
-    padding: 14px 22px;
+
+  /* Logo pill */
+  .nav-logo {
+    font-family: var(--font-display);
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-right: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Separator */
+  .nav-sep {
+    width: 1px; height: 22px;
+    background: var(--border);
+    margin: 0 8px;
+    flex-shrink: 0;
+  }
+
+  /* Nav group (dropdown trigger) */
+  .nav-group {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .nav-group-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px;
+    border-radius: 6px;
     font-family: var(--font-display);
     font-size: 11px; font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--muted);
     cursor: pointer;
-    border-bottom: 2px solid transparent;
-    white-space: nowrap;
-    transition: color 0.2s, border-color 0.2s;
     user-select: none;
+    border: 1px solid transparent;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    background: none;
+    outline: none;
   }
-  .funnel-tab:hover { color: var(--text); }
-  .funnel-tab.active-universal { color: var(--purple); border-bottom-color: var(--purple); }
-  .funnel-tab.active-dark    { color: #4a9eff; border-bottom-color: #4a9eff; }
-  .funnel-tab.active-slotio  { color: var(--green); border-bottom-color: var(--green); }
-  .funnel-tab.active-scanio  { color: var(--orange); border-bottom-color: var(--orange); }
-  .funnel-tab.active-spingpt { color: var(--red); border-bottom-color: var(--red); }
-  .funnel-tab.active-shadow  { color: var(--purple); border-bottom-color: var(--purple); }
-  .funnel-tab.active-deals    { color: var(--green); border-bottom-color: var(--green); }
-  .funnel-tab.active-funnels  { color: var(--purple); border-bottom-color: var(--purple); }
-  .funnel-tab.active-settings { color: var(--muted); border-bottom-color: var(--muted); }
-  .funnel-tab.active-analytics { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-group-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .nav-group-btn.active { color: var(--text); background: rgba(255,255,255,0.06); border-color: var(--border-bright); }
+  .nav-group-btn .nav-arrow { font-size: 8px; opacity: 0.5; transition: transform 0.15s; }
+  .nav-group.open .nav-group-btn .nav-arrow { transform: rotate(180deg); }
+  .nav-group-btn .nav-active-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    display: none; flex-shrink: 0;
+  }
+  .nav-group-btn.active .nav-active-dot { display: inline-block; }
+
+  /* Accent colors for each group when active */
+  .nav-group-btn.active.grp-funnels  { color: var(--purple); border-color: rgba(139,92,246,0.3); }
+  .nav-group-btn.active.grp-funnels  .nav-active-dot { background: var(--purple); box-shadow: 0 0 5px var(--purple); }
+  .nav-group-btn.active.grp-manage   { color: var(--green);  border-color: rgba(29,179,104,0.3); }
+  .nav-group-btn.active.grp-manage   .nav-active-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
+  .nav-group-btn.active.grp-analytics{ color: var(--accent); border-color: rgba(61,142,240,0.3); }
+  .nav-group-btn.active.grp-analytics .nav-active-dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  .nav-group-btn.active.grp-settings { color: var(--muted);  border-color: var(--border-bright); }
+  .nav-group-btn.active.grp-settings .nav-active-dot { background: var(--muted); }
+
+  /* Dropdown panel */
+  .nav-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 190px;
+    background: var(--card);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    padding: 6px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    display: none;
+    z-index: 200;
+    animation: dropIn 0.12s ease;
+  }
+  @keyframes dropIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .nav-group.open .nav-dropdown { display: block; }
+
+  /* Dropdown items */
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 11px;
+    border-radius: 6px;
+    font-family: var(--font-body);
+    font-size: 13px; font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, color 0.12s;
+    white-space: nowrap;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-item.active { color: var(--text); background: rgba(255,255,255,0.07); font-weight: 700; }
+  .nav-item .ni-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    flex-shrink: 0; opacity: 0.7;
+  }
+  .nav-item .ni-label { flex: 1; }
+  .nav-item .ni-badge {
+    font-family: var(--font-mono);
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px;
+    background: rgba(217,62,62,0.2); color: var(--red);
+    display: none;
+  }
+  .nav-item .ni-badge.visible { display: inline-block; }
+
+  .nav-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+
+  /* Sub-label inside dropdown */
+  .nav-section-label {
+    padding: 5px 11px 3px;
+    font-family: var(--font-display);
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  /* Breadcrumb strip */
+  .nav-breadcrumb {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .nav-breadcrumb span { color: var(--text); font-weight: 600; }
+
+  /* Conflict badge on tab */
+  .tab-cbadge {
+    font-family: var(--font-mono);
+    font-size: 9px; font-weight: 700;
+    color: var(--red);
+    display: none;
+    margin-left: 4px;
+  }
 
   .funnel-badge {
     display: inline-block;
@@ -1125,18 +1250,116 @@
   </div>
 </div>
 
-<!-- Funnel Nav -->
-<div class="funnel-nav" id="funnelNav">
-  <div class="funnel-tab" id="tab-analytics" onclick="setPage('analytics')">Analytics</div>
-  <div class="funnel-tab" id="tab-deals"     onclick="setPage('deals')">Deals</div>
-  <div class="funnel-tab" id="tab-funnels"   onclick="setPage('funnels')">Funnels</div>
-  <div class="funnel-tab" id="tab-settings"  onclick="setPage('settings')">Settings</div>
-  <div class="funnel-tab" id="tab-universal" onclick="setPage('dashboard')">Universal</div>
-  <div class="funnel-tab" id="tab-dark"      onclick="setFunnel('Dark')">Dark <span class="tab-cbadge" id="cbadge-dark"></span></div>
-  <div class="funnel-tab" id="tab-slotio"    onclick="setFunnel('Slotio')">Slotio <span class="tab-cbadge" id="cbadge-slotio"></span></div>
-  <div class="funnel-tab" id="tab-scanio"    onclick="setFunnel('Scanio')">Scanio <span class="tab-cbadge" id="cbadge-scanio"></span></div>
-  <div class="funnel-tab" id="tab-spingpt"   onclick="setFunnel('SpinGPT')">SpinGPT <span class="tab-cbadge" id="cbadge-spingpt"></span></div>
-  <div class="funnel-tab" id="tab-shadow"    onclick="setFunnel('Shadow')">Shadow <span class="tab-cbadge" id="cbadge-shadow"></span></div>
+<!-- Top Nav -->
+<div class="top-nav" id="topNav">
+  <div class="nav-logo">Dark Intel</div>
+  <div class="nav-sep"></div>
+
+  <!-- Funnels group -->
+  <div class="nav-group" id="navgrp-funnels">
+    <button class="nav-group-btn grp-funnels" onclick="toggleNavGroup('funnels')">
+      <span class="nav-active-dot"></span>
+      Funnels
+      <span id="funnels-conflict-badge" style="display:none;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:8px;background:rgba(217,62,62,0.25);color:var(--red);font-size:9px;font-weight:700;padding:0 4px;font-family:var(--font-mono)"></span>
+      <span class="nav-arrow">▾</span>
+    </button>
+    <div class="nav-dropdown">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item" id="tab-universal" onclick="navGo(function(){setPage('dashboard')})">
+        <span class="ni-dot" style="background:var(--purple)"></span>
+        <span class="ni-label">Universal</span>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-section-label">Per Funnel</div>
+      <div class="nav-item" id="tab-dark"    onclick="navGo(function(){setFunnel('Dark')})">
+        <span class="ni-dot" style="background:#4a9eff"></span>
+        <span class="ni-label">Dark</span>
+        <span class="ni-badge" id="cbadge-dark"></span>
+      </div>
+      <div class="nav-item" id="tab-slotio"  onclick="navGo(function(){setFunnel('Slotio')})">
+        <span class="ni-dot" style="background:var(--green)"></span>
+        <span class="ni-label">Slotio</span>
+        <span class="ni-badge" id="cbadge-slotio"></span>
+      </div>
+      <div class="nav-item" id="tab-scanio"  onclick="navGo(function(){setFunnel('Scanio')})">
+        <span class="ni-dot" style="background:var(--orange)"></span>
+        <span class="ni-label">Scanio</span>
+        <span class="ni-badge" id="cbadge-scanio"></span>
+      </div>
+      <div class="nav-item" id="tab-spingpt" onclick="navGo(function(){setFunnel('SpinGPT')})">
+        <span class="ni-dot" style="background:var(--red)"></span>
+        <span class="ni-label">SpinGPT</span>
+        <span class="ni-badge" id="cbadge-spingpt"></span>
+      </div>
+      <div class="nav-item" id="tab-shadow"  onclick="navGo(function(){setFunnel('Shadow')})">
+        <span class="ni-dot" style="background:var(--purple)"></span>
+        <span class="ni-label">Shadow</span>
+        <span class="ni-badge" id="cbadge-shadow"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage group -->
+  <div class="nav-group" id="navgrp-manage">
+    <button class="nav-group-btn grp-manage" onclick="toggleNavGroup('manage')">
+      <span class="nav-active-dot"></span>
+      Manage
+      <span class="nav-arrow">▾</span>
+    </button>
+    <div class="nav-dropdown">
+      <div class="nav-item" id="tab-deals"   onclick="navGo(function(){setPage('deals')})">
+        <span class="ni-dot" style="background:var(--green)"></span>
+        <span class="ni-label">Casino Deals</span>
+      </div>
+      <div class="nav-item" id="tab-lps"     onclick="navGo(function(){dealsSubTab='lps';setPage('deals')})">
+        <span class="ni-dot" style="background:var(--accent)"></span>
+        <span class="ni-label">Landing Pages</span>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-item" id="tab-funnels" onclick="navGo(function(){setPage('funnels')})">
+        <span class="ni-dot" style="background:var(--purple)"></span>
+        <span class="ni-label">Funnel Config</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analytics group -->
+  <div class="nav-group" id="navgrp-analytics">
+    <button class="nav-group-btn grp-analytics" onclick="toggleNavGroup('analytics')">
+      <span class="nav-active-dot"></span>
+      Analytics
+      <span class="nav-arrow">▾</span>
+    </button>
+    <div class="nav-dropdown">
+      <div class="nav-item" id="tab-clicks"       onclick="navGo(function(){analyticsTab='clicks';setPage('analytics')})">
+        <span class="ni-dot" style="background:var(--accent)"></span>
+        <span class="ni-label">Click Analytics</span>
+      </div>
+      <div class="nav-item" id="tab-performance"  onclick="navGo(function(){analyticsTab='performance';setPage('analytics')})">
+        <span class="ni-dot" style="background:var(--green)"></span>
+        <span class="ni-label">Performance</span>
+      </div>
+      <div class="nav-item" id="tab-sources"      onclick="navGo(function(){analyticsTab='sources';setPage('analytics')})">
+        <span class="ni-dot" style="background:var(--purple)"></span>
+        <span class="ni-label">Sources</span>
+      </div>
+      <div class="nav-item" id="tab-roi"          onclick="navGo(function(){analyticsTab='roi';setPage('analytics')})">
+        <span class="ni-dot" style="background:var(--yellow)"></span>
+        <span class="ni-label">ROI &amp; Spend</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings (standalone) -->
+  <div class="nav-group" id="navgrp-settings">
+    <button class="nav-group-btn grp-settings" id="tab-settings" onclick="navGo(function(){setPage('settings')})">
+      <span class="nav-active-dot"></span>
+      Settings
+    </button>
+  </div>
+
+  <!-- Breadcrumb (right side) -->
+  <div class="nav-breadcrumb" id="navBreadcrumb"></div>
 </div>
 
 <div id="dashboardContent">
@@ -1486,6 +1709,36 @@ function getFunnelUrl(url, funnel) {
   return url;
 }
 
+// ── Nav dropdown ───────────────────────────────────────────────────────────
+var openNavGroup = null;
+
+function toggleNavGroup(name) {
+  if (openNavGroup === name) {
+    closeNavDropdowns();
+  } else {
+    closeNavDropdowns();
+    openNavGroup = name;
+    var grp = document.getElementById('navgrp-' + name);
+    if (grp) grp.classList.add('open');
+  }
+}
+
+function closeNavDropdowns() {
+  openNavGroup = null;
+  document.querySelectorAll('.nav-group.open').forEach(function(el) { el.classList.remove('open'); });
+}
+
+// Click nav item: close dropdown then run action
+function navGo(fn) {
+  closeNavDropdowns();
+  fn();
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.nav-group')) closeNavDropdowns();
+});
+
 function hideAllPages() {
   ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage'].forEach(function(id) {
     var el = document.getElementById(id);
@@ -1496,10 +1749,27 @@ function hideAllPages() {
 }
 
 function clearTabActive() {
-  ['analytics','deals','funnels','settings','universal','dark','slotio','scanio','spingpt','shadow'].forEach(function(key) {
-    var el = document.getElementById('tab-' + key);
-    if (el) el.className = 'funnel-tab';
-  });
+  // Clear all nav-item active states and group button active states
+  document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.nav-group-btn').forEach(function(el) { el.classList.remove('active'); });
+}
+
+function setNavActive(tabId, groupName) {
+  clearTabActive();
+  var item = document.getElementById('tab-' + tabId);
+  if (item) item.classList.add('active');
+  var grpBtn = document.querySelector('#navgrp-' + groupName + ' .nav-group-btn');
+  if (grpBtn) grpBtn.classList.add('active');
+}
+
+function updateBreadcrumb(group, label) {
+  var bc = document.getElementById('navBreadcrumb');
+  if (!bc) return;
+  if (label) {
+    bc.innerHTML = group + ' &rsaquo; <span>' + label + '</span>';
+  } else {
+    bc.innerHTML = '<span>' + group + '</span>';
+  }
 }
 
 function setFunnel(funnel) {
@@ -1508,10 +1778,9 @@ function setFunnel(funnel) {
   hideAllPages();
   var dashboardContent = document.getElementById('dashboardContent');
   if (dashboardContent) dashboardContent.style.display = '';
-  clearTabActive();
   var activeKey = funnel ? funnel.toLowerCase() : 'universal';
-  var activeEl = document.getElementById('tab-' + activeKey);
-  if (activeEl) activeEl.classList.add('active-' + activeKey);
+  setNavActive(activeKey, 'funnels');
+  updateBreadcrumb('Funnels', funnel || 'Universal');
 
   // Update column badge
   var badge = document.getElementById('thFunnelBadge');
@@ -1529,32 +1798,42 @@ function setFunnel(funnel) {
 function setPage(page) {
   currentPage = page;
   hideAllPages();
-  clearTabActive();
-  var tabEl = document.getElementById('tab-' + page);
-  if (tabEl) tabEl.classList.add('active-' + page);
 
   if (page === 'analytics') {
     var el = document.getElementById('analyticsPage');
     if (el) el.style.display = '';
+    var subLabel = {clicks:'Click Analytics',performance:'Performance',sources:'Sources',roi:'ROI & Spend'}[analyticsTab] || 'Analytics';
+    setNavActive(analyticsTab, 'analytics');
+    updateBreadcrumb('Analytics', subLabel);
     renderAnalyticsPage();
   } else if (page === 'deals') {
     var el = document.getElementById('dealsPage');
     if (el) el.style.display = '';
+    var tabId = dealsSubTab === 'lps' ? 'lps' : 'deals';
+    setNavActive(tabId, 'manage');
+    updateBreadcrumb('Manage', dealsSubTab === 'lps' ? 'Landing Pages' : 'Casino Deals');
     renderDealsPage();
   } else if (page === 'funnels') {
     var el = document.getElementById('funnelsPage');
     if (el) el.style.display = '';
+    setNavActive('funnels', 'manage');
+    updateBreadcrumb('Manage', 'Funnel Config');
     renderFunnelsPage();
   } else if (page === 'settings') {
     var el = document.getElementById('settingsPage');
     if (el) el.style.display = '';
+    setNavActive('settings', 'settings');
+    updateBreadcrumb('Settings', '');
     renderSettingsPage();
   } else if (page === 'manage') {
-    var el = document.getElementById('managePage');
+    // legacy — redirect to funnels page
+    var el = document.getElementById('funnelsPage');
     if (el) el.style.display = '';
-    renderManagePage();
+    setNavActive('funnels', 'manage');
+    updateBreadcrumb('Manage', 'Funnel Config');
+    renderFunnelsPage();
   } else {
-    // dashboard
+    // dashboard universal
     var el = document.getElementById('dashboardContent');
     if (el) el.style.display = '';
     setFunnel(null);
@@ -1876,19 +2155,28 @@ function addAssignment(funnel, dealId) {
 }
 
 function renderConflictBadges() {
+  var totalConflicts = 0;
   FUNNEL_NAMES.forEach(function(f) {
     var fkey = f.toLowerCase();
     var span = document.getElementById('cbadge-' + fkey);
-    if (!span) return;
     var count = getConflictCount(f);
-    if (count > 0) {
-      span.textContent = '\u26a0 ' + count;
-      span.style.display = 'inline';
-    } else {
-      span.textContent = '';
-      span.style.display = 'none';
+    totalConflicts += count;
+    if (span) {
+      if (count > 0) {
+        span.textContent = '⚠ ' + count;
+        span.style.display = 'inline-block';
+      } else {
+        span.textContent = '';
+        span.style.display = 'none';
+      }
     }
   });
+  // Show conflict count on Funnels group button
+  var fgrpBadge = document.getElementById('funnels-conflict-badge');
+  if (fgrpBadge) {
+    fgrpBadge.textContent = totalConflicts > 0 ? totalConflicts : '';
+    fgrpBadge.style.display = totalConflicts > 0 ? 'inline-flex' : 'none';
+  }
 }
 
 
