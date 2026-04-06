@@ -1320,6 +1320,11 @@
         <span class="ni-dot" style="background:var(--purple)"></span>
         <span class="ni-label">Funnel Config</span>
       </div>
+      <div class="nav-divider"></div>
+      <div class="nav-item" id="tab-builder" onclick="navGo(function(){setPage('builder')})">
+        <span class="ni-dot" style="background:#f0b429"></span>
+        <span class="ni-label">Link Builder</span>
+      </div>
     </div>
   </div>
 
@@ -1538,6 +1543,7 @@
 <div id="dealsPage" style="display:none"></div>
 <div id="funnelsPage" style="display:none"></div>
 <div id="settingsPage" style="display:none"></div>
+<div id="builderPage" style="display:none"></div>
 
 <!-- GEO tooltip overlay -->
 <div class="geo-tooltip-overlay" id="geoOverlay" onclick="closeGeoTooltip()"></div>
@@ -1740,7 +1746,7 @@ document.addEventListener('click', function(e) {
 });
 
 function hideAllPages() {
-  ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage'].forEach(function(id) {
+  ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage','builderPage'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -1825,6 +1831,12 @@ function setPage(page) {
     setNavActive('settings', 'settings');
     updateBreadcrumb('Settings', '');
     renderSettingsPage();
+  } else if (page === 'builder') {
+    var el = document.getElementById('builderPage');
+    if (el) el.style.display = '';
+    setNavActive('builder', 'manage');
+    updateBreadcrumb('Manage', 'Link Builder');
+    renderBuilderPage();
   } else if (page === 'manage') {
     // legacy — redirect to funnels page
     var el = document.getElementById('funnelsPage');
@@ -2056,12 +2068,31 @@ var FUNNEL_COLORS = {
   Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', SpinGPT: '#f85149', Shadow: '#bc8cff'
 };
 var TRAFFIC_SOURCES = [
-  { id: 'meta',      name: 'Meta Ads',    type: 'paid',    color: '#1877F2' },
-  { id: 'tiktok',    name: 'TikTok',      type: 'paid',    color: '#69C9D0' },
-  { id: 'organic',   name: 'Organic/SEO', type: 'organic', color: '#3fb950' },
-  { id: 'spam',      name: 'Spam/DM',     type: 'spam',    color: '#f0883e' },
-  { id: 'phonefarm', name: 'Phone Farm',  type: 'content', color: '#bc8cff' }
+  { id: 'meta',      name: 'Meta Ads',          type: 'paid',    color: '#1877F2' },
+  { id: 'tiktok',    name: 'TikTok',             type: 'paid',    color: '#69C9D0' },
+  { id: 'organic',   name: 'Organic/SEO',        type: 'organic', color: '#3fb950' },
+  { id: 'spam',      name: 'Spam/DM',            type: 'spam',    color: '#f0883e' },
+  { id: 'phonefarm', name: 'Phone Farm',         type: 'content', color: '#bc8cff' },
+  { id: 'tg',        name: 'Telegram (organic)', type: 'content', color: '#229ED9' }
 ];
+
+var FUNNEL_TO_BOT = {
+  Dark:    { username: 'darkbot',     tme: 'https://t.me/darkbot' },
+  Slotio:  { username: 'slotiobot',   tme: 'https://t.me/slotiobot' },
+  Scanio:  { username: 'scanioaibot', tme: 'https://t.me/scanioaibot' },
+  SpinGPT: { username: 'darkbot',     tme: 'https://t.me/darkbot' },
+  Shadow:  { username: 'darkbot',     tme: 'https://t.me/darkbot' }
+};
+
+var FUNNEL_SMARTLINK_DOMAIN = {
+  Dark:    'dark.selectcasino.link',
+  Slotio:  'slotio.selectcasino.link',
+  Scanio:  'scanio.selectcasino.link',
+  SpinGPT: 'spingpt.selectcasino.link',
+  Shadow:  'shadow.selectcasino.link'
+};
+
+var linkHistory = JSON.parse(localStorage.getItem('linkHistory') || '[]');
 
 function saveAssignments() {
   saveToFirebase();
@@ -2494,7 +2525,15 @@ function detectNetwork(url) {
 }
 
 function buildPostbackUrls(network) {
-  var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + '&funnel=[trackingcode]&offer=' + network.name;
+  // Source/campaign macros vary by network
+  var srcParams;
+  if (network.name === 'ftdgallery') {
+    srcParams = '&source=[s1]&campaign=[s2]';
+  } else {
+    // CellXpert and Padrino both use afp2/afp3
+    srcParams = '&source=[afp2]&campaign=[afp3]';
+  }
+  var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=[trackingcode]&offer=' + network.name;
   return {
     reg:  base + '&status=Registration&type=Registration&sum=0',
     ftd:  base + '&status=FTD&type=FTD&sum=0',
@@ -2537,7 +2576,8 @@ function openPostbackModal(dealId) {
     row('Registration', urls.reg) +
     row('FTD', urls.ftd) +
     row('Qualified CPA', urls.qftd) +
-    '<p style="font-size:.7rem;color:var(--muted);margin-top:.5rem">Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically.</p>';
+    '<div style="margin-top:1rem;padding:.6rem .75rem;background:rgba(255,180,0,.07);border:1px solid rgba(255,180,0,.25);border-radius:6px;font-size:.7rem;color:#f0b429">&#9888; These URLs now include source tracking (<code>[afp2]</code>/<code>[s1]</code>). If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.</div>' +
+    '<p style="font-size:.7rem;color:var(--muted);margin-top:.75rem">Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically.</p>';
 
   document.getElementById('postbackModalOverlay').classList.add('open');
 }
@@ -4338,6 +4378,166 @@ function saveMetaSettings() {
   saveToFirebase();
   var msg = document.getElementById('metaSaveMsg');
   if (msg) { msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 2000); }
+}
+
+// ── Link Builder ────────────────────────────────────────────────────────────
+var builderFunnel   = 'Dark';
+var builderSource   = 'meta';
+var builderCampaign = '';
+var builderType     = 'direct'; // 'direct' | 'tg'
+
+function saveLinkHistory(entry) {
+  linkHistory.unshift(entry);
+  if (linkHistory.length > 50) linkHistory.length = 50;
+  localStorage.setItem('linkHistory', JSON.stringify(linkHistory));
+}
+
+function clearLinkHistory() {
+  linkHistory = [];
+  localStorage.removeItem('linkHistory');
+  renderBuilderPage();
+}
+
+function builderGetDirectUrl() {
+  var base = smartlinkHostedUrls[builderFunnel] || (FUNNEL_SMARTLINK_DOMAIN[builderFunnel] ? 'https://' + FUNNEL_SMARTLINK_DOMAIN[builderFunnel] : '');
+  if (!base) return '';
+  var sep = base.indexOf('?') !== -1 ? '&' : '?';
+  var u = base + sep + 'src=' + encodeURIComponent(builderSource);
+  if (builderCampaign) u += '&c=' + encodeURIComponent(builderCampaign);
+  return u;
+}
+
+function builderGetTgUrl() {
+  var bot = FUNNEL_TO_BOT[builderFunnel];
+  if (!bot) return '';
+  var param = builderSource;
+  if (builderCampaign) param += '_' + builderCampaign.replace(/\s+/g, '_');
+  if (param.length > 50) param = param.substring(0, 50);
+  return bot.tme + '?start=' + encodeURIComponent(param);
+}
+
+function builderGenerate() {
+  builderFunnel   = document.getElementById('bl-funnel').value;
+  builderSource   = document.getElementById('bl-source').value;
+  builderCampaign = document.getElementById('bl-campaign').value.trim().replace(/\s+/g, '_');
+  builderType     = document.querySelector('input[name="bl-type"]:checked').value;
+  var directUrl = builderGetDirectUrl();
+  var tgUrl     = builderType === 'tg' ? builderGetTgUrl() : '';
+  if (directUrl) {
+    saveLinkHistory({ src: builderSource, campaign: builderCampaign, funnel: builderFunnel, type: builderType, url: directUrl, tgUrl: tgUrl, ts: new Date().toISOString() });
+  }
+  renderBuilderPage();
+}
+
+function renderBuilderPage() {
+  var container = document.getElementById('builderPage');
+  if (!container) return;
+
+  var srcLabel = (TRAFFIC_SOURCES.find(function(s){ return s.id === builderSource; }) || {}).name || builderSource;
+  var bot      = FUNNEL_TO_BOT[builderFunnel];
+  var directUrl = builderGetDirectUrl();
+  var tgUrl     = builderType === 'tg' ? builderGetTgUrl() : '';
+  var noSmartlink = !smartlinkHostedUrls[builderFunnel] && !FUNNEL_SMARTLINK_DOMAIN[builderFunnel];
+
+  function copyBtn(id) {
+    return '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + id + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--accent);flex-shrink:0">&#128203;</button>';
+  }
+
+  var histRows = linkHistory.length === 0
+    ? '<div style="color:var(--muted);font-size:12px;padding:12px 0">No links generated yet.</div>'
+    : linkHistory.slice(0, 20).map(function(h, i) {
+        var srcN = (TRAFFIC_SOURCES.find(function(s){ return s.id === h.src; }) || {}).name || h.src;
+        var dt = h.ts ? h.ts.substring(0, 16).replace('T', ' ') : '';
+        var hid = 'hist-url-' + i;
+        return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+          '<input id="' + hid + '" type="text" readonly value="' + escHtml(h.url) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:11px;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+          '<span style="font-size:11px;color:var(--muted);white-space:nowrap">' + escHtml(srcN) + ' / ' + escHtml(h.funnel) + (h.campaign ? ' / ' + escHtml(h.campaign) : '') + '</span>' +
+          '<span style="font-size:10px;color:var(--muted);white-space:nowrap">' + dt + '</span>' +
+          copyBtn(hid) +
+        '</div>';
+      }).join('');
+
+  container.innerHTML =
+    '<div style="padding:28px 32px 40px;max-width:820px">' +
+      '<div style="font-size:20px;font-weight:800;margin-bottom:4px">Link Builder</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Generate tracking links. Every click is logged to Firestore and source attribution flows through to postbacks.</div>' +
+
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px">' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Funnel</label>' +
+            '<select id="bl-funnel" onchange="builderFunnel=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
+            FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (builderFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
+            '</select></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Traffic Source</label>' +
+            '<select id="bl-source" onchange="builderSource=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
+            TRAFFIC_SOURCES.map(function(s){ return '<option value="' + s.id + '"' + (builderSource === s.id ? ' selected' : '') + '>' + s.name + '</option>'; }).join('') +
+            '</select></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Campaign Name</label>' +
+            '<input id="bl-campaign" type="text" value="' + escHtml(builderCampaign) + '" placeholder="summer_de_promo" oninput="builderCampaign=this.value.trim().replace(/\\s+/g,\'_\')" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
+        '</div>' +
+
+        '<div style="margin-bottom:20px">' +
+          '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Funnel Type</label>' +
+          '<div style="display:flex;gap:20px">' +
+            '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">' +
+              '<input type="radio" name="bl-type" value="direct"' + (builderType === 'direct' ? ' checked' : '') + ' onchange="builderType=this.value;renderBuilderPage()">' +
+              'Direct (Traffic &#8594; LP &#8594; Casino)</label>' +
+            '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">' +
+              '<input type="radio" name="bl-type" value="tg"' + (builderType === 'tg' ? ' checked' : '') + ' onchange="builderType=this.value;renderBuilderPage()">' +
+              'Telegram (Traffic &#8594; LP &#8594; Bot &#8594; Casino)</label>' +
+          '</div>' +
+        '</div>' +
+
+        '<div style="border-top:1px solid var(--border);padding-top:20px">' +
+
+          (noSmartlink
+            ? '<div style="color:#f0b429;font-size:12px;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px;margin-bottom:14px">&#9888; No smartlink URL configured for ' + escHtml(builderFunnel) + '. Add it in Manage &#8594; Funnel Config.</div>'
+            : '') +
+
+          '<div style="margin-bottom:16px">' +
+            '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Direct Link <span style="color:var(--muted);font-weight:400">(share in ads / bio / posts)</span></div>' +
+            '<div style="display:flex;gap:8px;align-items:center">' +
+              '<input id="bl-direct-url" type="text" readonly value="' + escHtml(directUrl) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.45rem .7rem;font-size:.72rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+              copyBtn('bl-direct-url') +
+            '</div>' +
+          '</div>' +
+
+          (builderType === 'tg' && bot
+            ? '<div style="margin-bottom:16px">' +
+                '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Telegram Deep Link <span style="color:var(--muted);font-weight:400">(for Telegram traffic — bot reads the source param)</span></div>' +
+                '<div style="display:flex;gap:8px;align-items:center">' +
+                  '<input id="bl-tg-url" type="text" readonly value="' + escHtml(tgUrl) + '" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.45rem .7rem;font-size:.72rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+                  copyBtn('bl-tg-url') +
+                '</div>' +
+              '</div>'
+            : '') +
+
+          '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:12px">' +
+            '<div style="font-weight:700;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Tracking Preview</div>' +
+            '<div style="color:var(--fg)">Source: <span style="color:var(--accent);font-weight:600">' + escHtml(srcLabel) + ' (' + escHtml(builderSource) + ')</span>' +
+            ' &#8594; Funnel: <span style="color:var(--accent);font-weight:600">' + escHtml(builderFunnel) + '</span>' +
+            (builderType === 'tg' && bot ? ' &#8594; Bot: <span style="color:var(--accent);font-weight:600">@' + escHtml(bot.username) + '</span>' : '') + '</div>' +
+            (builderCampaign ? '<div style="color:var(--muted);margin-top:4px">Campaign: <span style="color:var(--fg)">' + escHtml(builderCampaign) + '</span></div>' : '') +
+            '<div style="color:var(--muted);margin-top:4px">Postback will record: <code style="background:var(--border);padding:1px 5px;border-radius:3px;font-size:11px">source=' + escHtml(builderSource) + (builderCampaign ? ', campaign=' + escHtml(builderCampaign) : '') + '</code></div>' +
+          '</div>' +
+
+          '<div style="margin-top:16px;display:flex;gap:10px">' +
+            '<button onclick="builderGenerate()" style="background:var(--accent);border:none;border-radius:6px;padding:9px 22px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Generate &amp; Save to History</button>' +
+          '</div>' +
+
+        '</div>' +
+      '</div>' +
+
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 24px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+          '<div style="font-size:14px;font-weight:700">Recently Generated</div>' +
+          (linkHistory.length > 0 ? '<button onclick="clearLinkHistory()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:4px 10px;color:var(--muted);font-size:11px;cursor:pointer">Clear</button>' : '') +
+        '</div>' +
+        histRows +
+      '</div>' +
+
+    '</div>';
 }
 
 // ── Analytics: Sources Tab ─────────────────────────────────────────────────
