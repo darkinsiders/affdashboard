@@ -2976,19 +2976,27 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '    }\n\n' +
     '    function injectTracking(url) {\n' +
     '      if (!url || !src) return url;\n' +
-    '      var sep = url.indexOf(\'?\') !== -1 ? \'&\' : \'?\';\n' +
+    '      var isCellXpert = /7ladies|cosmobetpartners|rollettoaffiliate|velobetpartners|cellxpert|ftdgallery|padrino|needforslots/.test(url);\n' +
+    '      var p1 = isCellXpert ? \'afp2\' : \'sub1\';\n' +
+    '      var p2 = isCellXpert ? \'afp3\' : \'sub2\';\n' +
     '      var u = url;\n' +
-    '      var isCellXpert = /7ladies|cosmobetpartners|rollettoaffiliate|velobetpartners|cellxpert|ftdgallery|padrino|needforslots/.test(u);\n' +
-    '      if (isCellXpert) {\n' +
-    '        u += sep + \'afp2=\' + encodeURIComponent(src);\n' +
-    '        if (campaign) u += \'&afp3=\' + encodeURIComponent(campaign);\n' +
+    '      var re1 = new RegExp(\'([?&])\' + p1 + \'=[^&#]*\');\n' +
+    '      if (re1.test(u)) {\n' +
+    '        u = u.replace(re1, \'$1\' + p1 + \'=\' + encodeURIComponent(src));\n' +
     '      } else {\n' +
-    '        u += sep + \'sub1=\' + encodeURIComponent(src);\n' +
-    '        if (campaign) u += \'&sub2=\' + encodeURIComponent(campaign);\n' +
+    '        u += (u.indexOf(\'?\') !== -1 ? \'&\' : \'?\') + p1 + \'=\' + encodeURIComponent(src);\n' +
+    '      }\n' +
+    '      if (campaign) {\n' +
+    '        var re2 = new RegExp(\'([?&])\' + p2 + \'=[^&#]*\');\n' +
+    '        if (re2.test(u)) {\n' +
+    '          u = u.replace(re2, \'$1\' + p2 + \'=\' + encodeURIComponent(campaign));\n' +
+    '        } else {\n' +
+    '          u += \'&\' + p2 + \'=\' + encodeURIComponent(campaign);\n' +
+    '        }\n' +
     '      }\n' +
     '      return u;\n' +
     '    }\n\n' +
-    '    function redirect(routes, fallback, code, ip) {\n' +
+    '    function redirect(routes, fallback, code, ip, utc) {\n' +
     '      var url, casino;\n' +
     '      var options = routes[code];\n' +
     '      if (!options || !options.length) {\n' +
@@ -3005,20 +3013,20 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '            if (h < cum) { url = options[i][0]; break; }\n' +
     '          }\n' +
     '          if (!url) url = options[options.length - 1][0];\n' +
-    '          casino = URL_TO_CASINO[url] || \'unknown\';\n' +
+    '          casino = (utc || URL_TO_CASINO)[url] || \'unknown\';\n' +
     '        }\n' +
     '      }\n' +
     '      logClick(code, casino);\n' +
     '      window.location.replace(injectTracking(url));\n' +
     '    }\n\n' +
-    '    function doRedirect(routes, fallback) {\n' +
+    '    function doRedirect(routes, fallback, utc) {\n' +
     '      fetch(\'https://ipapi.co/json/\')\n' +
     '        .then(function(r){ return r.json(); })\n' +
-    '        .then(function(d){ redirect(routes, fallback, d.country_code || d.country, d.ip || \'\'); })\n' +
+    '        .then(function(d){ redirect(routes, fallback, d.country_code || d.country, d.ip || \'\', utc); })\n' +
     '        .catch(function(){\n' +
     '          fetch(\'https://freeipapi.com/api/json\')\n' +
     '            .then(function(r){ return r.json(); })\n' +
-    '            .then(function(d){ redirect(routes, fallback, d.countryCode, d.ipAddress || \'\'); })\n' +
+    '            .then(function(d){ redirect(routes, fallback, d.countryCode, d.ipAddress || \'\', utc); })\n' +
     '            .catch(function(){\n' +
     '              logClick(\'unknown\', \'fallback\');\n' +
     '              window.location.replace(fallback);\n' +
@@ -3030,7 +3038,8 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '      .then(function(doc) {\n' +
     '        var routes = JSON.parse(doc.fields.routes.stringValue);\n' +
     '        var fallback = doc.fields.fallback.stringValue || HARDCODED_FALLBACK;\n' +
-    '        doRedirect(routes, fallback);\n' +
+    '        var utc = doc.fields.urlToCasino ? JSON.parse(doc.fields.urlToCasino.stringValue) : URL_TO_CASINO;\n' +
+    '        doRedirect(routes, fallback, utc);\n' +
     '      })\n' +
     '      .catch(function() {\n' +
     '        logClick(\'unknown\', \'fallback\');\n' +
@@ -3527,9 +3536,12 @@ function saveRoutesToFirebase() {
   FUNNEL_NAMES.forEach(function(f) {
     var multiMap = buildMultiRouteMap(f);
     var fallback = smartlinkFallbacks[f] || '';
+    var urlToCasino = {};
+    getAssignedDeals(f).forEach(function(d) { urlToCasino[getFunnelUrl(d.url, f)] = d.name; });
     db.collection('routes').doc(f.toLowerCase()).set({
       routes: JSON.stringify(multiMap),
       fallback: fallback,
+      urlToCasino: JSON.stringify(urlToCasino),
       funnel: f,
       updated: new Date().toISOString()
     }).catch(function(e) { console.error('Routes save error:', e); });
