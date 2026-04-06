@@ -4393,7 +4393,32 @@ var builderSource     = 'meta';
 var builderCampaign   = '';
 var builderType       = 'direct'; // 'direct' | 'tg'
 var builderCasinoUrl  = '';
+var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | 'affilika' | 'ftdgallery' | 'padrino'
 var builderGenerated  = false;
+
+var BUILDER_NETWORKS = [
+  { id: '',           label: 'Auto-detect from URL' },
+  { id: 'cellxpert',  label: 'CellXpert',            clickMacro: '[afp]',      src1: 'afp2', src2: 'afp3' },
+  { id: 'affilika',   label: 'Affilika',             clickMacro: '{visit_id}', src1: 'sub1', src2: 'sub2' },
+  { id: 'ftdgallery', label: 'FTDGallery',           clickMacro: '[afp]',      src1: 's1',   src2: 's2'   },
+  { id: 'padrino',    label: 'Padrino Partners',     clickMacro: '[afp]',      src1: 'afp2', src2: 'afp3' }
+];
+
+function builderGetNetwork() {
+  if (builderNetwork) {
+    var def = BUILDER_NETWORKS.find(function(n){ return n.id === builderNetwork; });
+    return def ? { name: def.id, clickMacro: def.clickMacro, src1: def.src1, src2: def.src2 } : null;
+  }
+  var auto = detectNetwork(builderCasinoUrl);
+  if (auto) {
+    // Enrich with src param names
+    var src1 = 'afp2', src2 = 'afp3';
+    if (auto.name === 'ftdgallery') { src1 = 's1'; src2 = 's2'; }
+    if (auto.name === 'affilika')   { src1 = 'sub1'; src2 = 'sub2'; }
+    auto.src1 = src1; auto.src2 = src2;
+  }
+  return auto;
+}
 
 function saveLinkHistory(entry) {
   linkHistory.unshift(entry);
@@ -4425,23 +4450,11 @@ function builderGetTgUrl() {
   return bot.tme + '?start=' + encodeURIComponent(param);
 }
 
-function builderTagCasinoUrl(rawUrl, source, campaign) {
-  if (!rawUrl) return '';
-  var net = detectNetwork(rawUrl);
-  if (!net) return rawUrl;
+function builderTagCasinoUrl(rawUrl, net, source, campaign) {
+  if (!rawUrl || !net) return rawUrl || '';
   var sep = rawUrl.indexOf('?') !== -1 ? '&' : '?';
-  var params;
-  if (net.name === 'ftdgallery') {
-    params = 's1=' + encodeURIComponent(source);
-    if (campaign) params += '&s2=' + encodeURIComponent(campaign);
-  } else if (net.name === 'affilika') {
-    params = 'sub1=' + encodeURIComponent(source);
-    if (campaign) params += '&sub2=' + encodeURIComponent(campaign);
-  } else {
-    // cellxpert, padrino
-    params = 'afp2=' + encodeURIComponent(source);
-    if (campaign) params += '&afp3=' + encodeURIComponent(campaign);
-  }
+  var params = net.src1 + '=' + encodeURIComponent(source);
+  if (campaign) params += '&' + net.src2 + '=' + encodeURIComponent(campaign);
   return rawUrl + sep + params;
 }
 
@@ -4451,6 +4464,7 @@ function builderGenerate() {
   builderCampaign   = document.getElementById('bl-campaign').value.trim().replace(/\s+/g, '_');
   builderType       = document.querySelector('input[name="bl-type"]:checked').value;
   builderCasinoUrl  = document.getElementById('bl-casino-url').value.trim();
+  builderNetwork    = document.getElementById('bl-network').value;
   builderGenerated  = true;
   var directUrl = builderGetDirectUrl();
   var tgUrl     = builderType === 'tg' ? builderGetTgUrl() : '';
@@ -4469,8 +4483,8 @@ function renderBuilderPage() {
   var directUrl   = builderGetDirectUrl();
   var tgUrl       = builderType === 'tg' ? builderGetTgUrl() : '';
   var noSmartlink = !smartlinkHostedUrls[builderFunnel] && !FUNNEL_SMARTLINK_DOMAIN[builderFunnel];
-  var detectedNet = detectNetwork(builderCasinoUrl);
-  var taggedCasino = builderGenerated && builderCasinoUrl ? builderTagCasinoUrl(builderCasinoUrl, builderSource, builderCampaign) : '';
+  var resolvedNet  = builderGetNetwork();
+  var taggedCasino = builderGenerated && builderCasinoUrl && resolvedNet ? builderTagCasinoUrl(builderCasinoUrl, resolvedNet, builderSource, builderCampaign) : '';
 
   function copyBtn(id) {
     return '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + id + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--accent);flex-shrink:0">&#128203;</button>';
@@ -4490,10 +4504,10 @@ function renderBuilderPage() {
   var outputHtml = '';
   if (builderGenerated) {
     var postbackSection = '';
-    if (builderCasinoUrl && detectedNet) {
-      var pbUrls = buildPostbackUrls(detectedNet, builderFunnel);
-      var netBadge = networkBadge(detectedNet.name);
-      var netNote  = detectedNet.name === 'affilika' ? '<span style="font-size:10px;color:#f0b429;margin-left:8px">&#9888; Source tracking in postbacks not confirmed — re-paste URLs after verifying Affilika sub macros</span>' : '';
+    if (resolvedNet) {
+      var pbUrls = buildPostbackUrls(resolvedNet, builderFunnel);
+      var netBadge = networkBadge(resolvedNet.name);
+      var netNote  = resolvedNet.name === 'affilika' ? '<span style="font-size:10px;color:#f0b429;margin-left:8px">&#9888; Confirm {sub1}/{sub2} are available in Affilika postback variables</span>' : '';
       postbackSection =
         '<div style="border-top:1px solid var(--border);padding-top:18px;margin-top:18px">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
@@ -4507,11 +4521,11 @@ function renderBuilderPage() {
             '&#9888; If you previously set postback URLs for this deal, re-paste the updated versions above.' +
           '</div>' +
         '</div>';
-    } else if (builderCasinoUrl && !detectedNet) {
+    } else {
       postbackSection =
         '<div style="border-top:1px solid var(--border);padding-top:18px;margin-top:18px">' +
           '<div style="font-size:12px;color:#f0b429;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px">' +
-            '&#9888; Could not auto-detect affiliate network from this URL. Check postback-urls.txt for manual templates.' +
+            '&#9888; No network selected and could not auto-detect from URL. Select a platform above and regenerate.' +
           '</div>' +
         '</div>';
     }
@@ -4524,14 +4538,16 @@ function renderBuilderPage() {
             'Tagged Casino CTA Link',
             taggedCasino || builderCasinoUrl,
             'bl-casino-tagged',
-            detectedNet ? '(' + detectedNet.name + ' params injected)' : '(network unknown — raw URL)'
+            resolvedNet ? '(' + resolvedNet.src1 + '/' + resolvedNet.src2 + ' injected)' : '(select a platform to inject params)'
           ) +
         '</div>';
     }
 
     var lpDomain = FUNNEL_SMARTLINK_DOMAIN[builderFunnel] ? FUNNEL_SMARTLINK_DOMAIN[builderFunnel].replace(/^https?:\/\//, '').split('/')[0] : builderFunnel.toLowerCase() + ' LP';
     var lpSnippetId = 'bl-lp-snippet';
-    var lpSnippet = "// Add to your LP's casino CTA button click handler:\nvar src = new URLSearchParams(window.location.search).get('src') || '';\nvar c   = new URLSearchParams(window.location.search).get('c')   || '';\nvar url = '" + escHtml(builderCasinoUrl || 'CASINO_URL') + "';\nif (src) url += (url.indexOf('?') >= 0 ? '&' : '?') + '" + (detectedNet && detectedNet.name === 'ftdgallery' ? 's1' : detectedNet && detectedNet.name === 'affilika' ? 'sub1' : 'afp2') + "=' + encodeURIComponent(src);\nif (c)   url += '&" + (detectedNet && detectedNet.name === 'ftdgallery' ? 's2' : detectedNet && detectedNet.name === 'affilika' ? 'sub2' : 'afp3') + "=' + encodeURIComponent(c);\nwindow.location.href = url;";
+    var p1 = resolvedNet ? resolvedNet.src1 : 'afp2';
+    var p2 = resolvedNet ? resolvedNet.src2 : 'afp3';
+    var lpSnippet = "// Add to your LP's casino CTA button click handler:\nvar src = new URLSearchParams(window.location.search).get('src') || '';\nvar c   = new URLSearchParams(window.location.search).get('c')   || '';\nvar url = '" + escHtml(builderCasinoUrl || 'CASINO_URL') + "';\nif (src) url += (url.indexOf('?') >= 0 ? '&' : '?') + '" + p1 + "=' + encodeURIComponent(src);\nif (c)   url += '&" + p2 + "=' + encodeURIComponent(c);\nwindow.location.href = url;";
 
     outputHtml =
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
@@ -4584,16 +4600,22 @@ function renderBuilderPage() {
       // ── INPUT CARD ──
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
 
-        // Casino URL input
-        '<div style="margin-bottom:18px">' +
-          '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Casino Affiliate Link <span style="font-weight:400;text-transform:none;letter-spacing:0">(paste raw tracking URL from affiliate platform)</span></label>' +
-          '<div style="display:flex;gap:8px;align-items:center">' +
-            '<input id="bl-casino-url" type="text" value="' + escHtml(builderCasinoUrl) + '" placeholder="https://track.7ladies.com/visit/?bta=..." oninput="builderCasinoUrl=this.value.trim();builderGenerated=false;renderBuilderPage()" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:13px;font-family:var(--font-mono);box-sizing:border-box">' +
-            (builderCasinoUrl && detectedNet
-              ? '<span style="white-space:nowrap">' + networkBadge(detectedNet.name) + '</span>'
-              : (builderCasinoUrl ? '<span style="font-size:11px;color:#f0b429;white-space:nowrap">&#9888; unknown network</span>' : '')) +
+        // Casino URL + Platform selector
+        '<div style="display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:18px;align-items:end">' +
+          '<div>' +
+            '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Casino Affiliate Link <span style="font-weight:400;text-transform:none;letter-spacing:0">(paste raw tracking URL — optional)</span></label>' +
+            '<input id="bl-casino-url" type="text" value="' + escHtml(builderCasinoUrl) + '" placeholder="https://clickspinorhino.com/abc123  or  https://track.7ladies.com/visit/?bta=..." oninput="builderCasinoUrl=this.value.trim();builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:12px;font-family:var(--font-mono);box-sizing:border-box">' +
+          '</div>' +
+          '<div>' +
+            '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Platform</label>' +
+            '<select id="bl-network" onchange="builderNetwork=this.value;builderGenerated=false;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 10px;color:var(--text);font-size:13px;white-space:nowrap">' +
+            BUILDER_NETWORKS.map(function(n){ return '<option value="' + n.id + '"' + (builderNetwork === n.id ? ' selected' : '') + '>' + n.label + '</option>'; }).join('') +
+            '</select>' +
           '</div>' +
         '</div>' +
+        (!builderNetwork && builderCasinoUrl && !resolvedNet
+          ? '<div style="font-size:11px;color:#f0b429;padding:6px 10px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.2);border-radius:6px;margin-bottom:12px">&#9888; Could not auto-detect platform from URL — select manually above.</div>'
+          : '') +
 
         // Funnel / Source / Campaign
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px">' +
