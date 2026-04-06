@@ -2092,6 +2092,14 @@ var FUNNEL_SMARTLINK_DOMAIN = {
   Shadow:  'shadow.selectcasino.link'
 };
 
+var FUNNEL_LP_DOMAIN = {
+  Dark:    'darkspins.com',
+  Slotio:  'slotioai.com',
+  Scanio:  'scanioai.com',
+  SpinGPT: '',
+  Shadow:  ''
+};
+
 var linkHistory = JSON.parse(localStorage.getItem('linkHistory') || '[]');
 
 function saveAssignments() {
@@ -4453,6 +4461,15 @@ function builderGetDirectUrl() {
   return u;
 }
 
+function builderGetLpAdUrl() {
+  var lpd = FUNNEL_LP_DOMAIN[builderFunnel];
+  if (!lpd) return '';
+  var base = 'https://' + lpd;
+  var u = base + '/?src=' + encodeURIComponent(builderSource);
+  if (builderCampaign) u += '&c=' + encodeURIComponent(builderCampaign);
+  return u;
+}
+
 function builderGetTgUrl() {
   var bot = FUNNEL_TO_BOT[builderFunnel];
   if (!bot) return '';
@@ -4492,7 +4509,8 @@ function renderBuilderPage() {
 
   var srcLabel    = (TRAFFIC_SOURCES.find(function(s){ return s.id === builderSource; }) || {}).name || builderSource;
   var bot         = FUNNEL_TO_BOT[builderFunnel];
-  var directUrl   = builderGetDirectUrl();
+  var smartlinkUrl = builderGetDirectUrl();
+  var lpAdUrl     = builderGetLpAdUrl();
   var tgUrl       = builderType === 'tg' ? builderGetTgUrl() : '';
   var noSmartlink = !smartlinkHostedUrls[builderFunnel] && !FUNNEL_SMARTLINK_DOMAIN[builderFunnel];
   var resolvedNet  = builderGetNetwork();
@@ -4542,32 +4560,34 @@ function renderBuilderPage() {
         '</div>';
     }
 
-    var casinoSection = '';
+    var casinoRefSection = '';
     if (builderCasinoUrl) {
-      casinoSection =
-        '<div style="margin-bottom:16px">' +
-          urlRow(
-            'Tagged Casino CTA Link',
-            taggedCasino || builderCasinoUrl,
-            'bl-casino-tagged',
-            resolvedNet ? '(' + resolvedNet.src1 + '/' + resolvedNet.src2 + ' injected)' : '(select a platform to inject params)'
-          ) +
-        '</div>';
+      casinoRefSection =
+        urlRow(
+          'Casino Affiliate Link',
+          taggedCasino || builderCasinoUrl,
+          'bl-casino-tagged',
+          resolvedNet ? '(' + resolvedNet.src1 + '/' + resolvedNet.src2 + ' injected — for postback config reference)' : '(select a platform to inject params)'
+        );
     }
 
-    var lpDomain = FUNNEL_SMARTLINK_DOMAIN[builderFunnel] ? FUNNEL_SMARTLINK_DOMAIN[builderFunnel].replace(/^https?:\/\//, '').split('/')[0] : builderFunnel.toLowerCase() + ' LP';
-    var lpSnippetId = 'bl-lp-snippet';
-    var p1 = resolvedNet ? resolvedNet.src1 : 'afp2';
-    var p2 = resolvedNet ? resolvedNet.src2 : 'afp3';
-    var lpSnippet = "// Add to your LP's casino CTA button click handler:\nvar src = new URLSearchParams(window.location.search).get('src') || '';\nvar c   = new URLSearchParams(window.location.search).get('c')   || '';\nvar url = '" + escHtml(builderCasinoUrl || 'CASINO_URL') + "';\nif (src) url += (url.indexOf('?') >= 0 ? '&' : '?') + '" + p1 + "=' + encodeURIComponent(src);\nif (c)   url += '&" + p2 + "=' + encodeURIComponent(c);\nwindow.location.href = url;";
+    var integratedLps = ['darkspins.com', 'scanioai.com', 'slotioai.com'].filter(function(d){ return FUNNEL_LP_DOMAIN[builderFunnel] === d; });
+    var lpIntegratedNote = integratedLps.length > 0
+      ? '<div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">' +
+          '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">LP Tracking Integration</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#4ade80;padding:8px 12px;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2);border-radius:6px">' +
+            '&#10003; Already integrated in <strong>' + escHtml(FUNNEL_LP_DOMAIN[builderFunnel]) + '</strong> via SmartlinkProvider — ?src= and ?c= are automatically forwarded to the Telegram bot deep link.' +
+          '</div>' +
+        '</div>'
+      : '';
 
     outputHtml =
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
         '<div style="font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px">&#9654; Output Package <span style="font-size:11px;font-weight:400;color:var(--muted)">' + escHtml(srcLabel) + ' / ' + escHtml(builderFunnel) + (builderCampaign ? ' / ' + escHtml(builderCampaign) : '') + '</span></div>' +
 
-        casinoSection +
+        (lpAdUrl ? urlRow('LP Ad Link', lpAdUrl, 'bl-out-lp', '(put in Meta / TikTok ad — sends traffic to landing page)') : '') +
 
-        urlRow('LP Ad Link', directUrl, 'bl-out-direct', '(put in Meta / TikTok ad — drives traffic to LP)') +
+        (smartlinkUrl ? urlRow('Smartlink CTA Link', smartlinkUrl, 'bl-out-direct', '(LP CTA button points here — geo-routes visitor to casino)') : '') +
 
         (builderType === 'tg' && bot
           ? urlRow('Telegram Deep Link', tgUrl, 'bl-out-tg', '(for Telegram traffic → LP → bot)')
@@ -4575,16 +4595,12 @@ function renderBuilderPage() {
 
         postbackSection +
 
-        '<div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">' +
-          '<details>' +
-            '<summary style="font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;text-transform:uppercase;letter-spacing:.07em">&#9881; LP Code Snippet — pass tracking params through casino CTA</summary>' +
-            '<div style="margin-top:10px;font-size:11px;color:var(--muted);margin-bottom:8px">Add to <strong style="color:var(--fg)">' + escHtml(lpDomain) + '</strong> so source/campaign are forwarded when visitor clicks Play Now.</div>' +
-            '<div style="display:flex;gap:8px;align-items:flex-start">' +
-              '<textarea id="' + lpSnippetId + '" readonly rows="7" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:.6rem .75rem;font-size:.68rem;font-family:var(--font-mono);color:var(--fg);resize:none;line-height:1.5">' + escHtml(lpSnippet) + '</textarea>' +
-              '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + lpSnippetId + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--accent);flex-shrink:0;margin-top:4px">&#128203;</button>' +
-            '</div>' +
-          '</details>' +
+        '<div style="border-top:1px solid var(--border);padding-top:18px;margin-top:18px">' +
+          casinoRefSection +
         '</div>' +
+
+        lpIntegratedNote +
+
       '</div>';
   }
 
