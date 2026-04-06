@@ -2939,7 +2939,9 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '    var CLICKS_URL = ' + JSON.stringify(clicksUrl) + ';\n' +
     '    var HARDCODED_FALLBACK = ' + JSON.stringify(fallbackVal) + ';\n' +
     '    var URL_TO_CASINO = ' + casinoMapJson + ';\n' +
-    '    var sub1 = new URLSearchParams(window.location.search).get(\'sub1\') || \'\';\n\n' +
+    '    var src      = new URLSearchParams(window.location.search).get(\'src\') || \'\';\n' +
+    '    var campaign = new URLSearchParams(window.location.search).get(\'c\') || \'\';\n' +
+    '    var sub1     = new URLSearchParams(window.location.search).get(\'sub1\') || \'\';\n\n' +
     '    function hashIP(ip) {\n' +
     '      var h = 0;\n' +
     '      for (var i = 0; i < ip.length; i++) {\n' +
@@ -2953,14 +2955,30 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '          method: \'POST\',\n' +
     '          headers: { \'Content-Type\': \'application/json\' },\n' +
     '          body: JSON.stringify({ fields: {\n' +
-    '            ts:     { stringValue: new Date().toISOString() },\n' +
-    '            funnel: { stringValue: FUNNEL },\n' +
-    '            geo:    { stringValue: geo || \'\' },\n' +
-    '            casino: { stringValue: casino || \'unknown\' },\n' +
-    '            sub1:   { stringValue: sub1 }\n' +
+    '            ts:       { stringValue: new Date().toISOString() },\n' +
+    '            funnel:   { stringValue: FUNNEL },\n' +
+    '            geo:      { stringValue: geo || \'\' },\n' +
+    '            casino:   { stringValue: casino || \'unknown\' },\n' +
+    '            src:      { stringValue: src },\n' +
+    '            campaign: { stringValue: campaign },\n' +
+    '            sub1:     { stringValue: sub1 }\n' +
     '          }})\n' +
     '        });\n' +
     '      } catch(e) {}\n' +
+    '    }\n\n' +
+    '    function injectTracking(url) {\n' +
+    '      if (!url || !src) return url;\n' +
+    '      var sep = url.indexOf(\'?\') !== -1 ? \'&\' : \'?\';\n' +
+    '      var u = url;\n' +
+    '      var isCellXpert = /7ladies|cosmobetpartners|rollettoaffiliate|velobetpartners|cellxpert|ftdgallery|padrino|needforslots/.test(u);\n' +
+    '      if (isCellXpert) {\n' +
+    '        u += sep + \'afp2=\' + encodeURIComponent(src);\n' +
+    '        if (campaign) u += \'&afp3=\' + encodeURIComponent(campaign);\n' +
+    '      } else {\n' +
+    '        u += sep + \'sub1=\' + encodeURIComponent(src);\n' +
+    '        if (campaign) u += \'&sub2=\' + encodeURIComponent(campaign);\n' +
+    '      }\n' +
+    '      return u;\n' +
     '    }\n\n' +
     '    function redirect(routes, fallback, code, ip) {\n' +
     '      var url, casino;\n' +
@@ -2983,8 +3001,7 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '        }\n' +
     '      }\n' +
     '      logClick(code, casino);\n' +
-    '      var finalUrl = sub1 ? url + (url.indexOf(\'?\') >= 0 ? \'&\' : \'?\') + \'sub1=\' + encodeURIComponent(sub1) : url;\n' +
-    '      window.location.replace(finalUrl);\n' +
+    '      window.location.replace(injectTracking(url));\n' +
     '    }\n\n' +
     '    function doRedirect(routes, fallback) {\n' +
     '      fetch(\'https://ipapi.co/json/\')\n' +
