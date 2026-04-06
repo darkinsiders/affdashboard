@@ -4322,45 +4322,133 @@ function renderFunnelsPage() {
   var container = document.getElementById('funnelsPage');
   if (!container) return;
 
-  var healthHtml = FUNNEL_NAMES.map(function(f) {
-    var color = FUNNEL_COLORS[f];
+  function urlChip(label, url, color) {
+    if (!url) return '<span style="font-size:11px;color:var(--muted);font-style:italic">not set</span>';
+    return '<a href="' + escHtml(url) + '" target="_blank" rel="noopener" style="font-size:11px;font-family:var(--font-mono);color:' + (color||'var(--accent)') + ';text-decoration:none;word-break:break-all">' + escHtml(url) + '</a>';
+  }
+  function pill(text, bg, col) {
+    return '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:' + bg + ';color:' + col + ';margin-right:3px">' + escHtml(text) + '</span>';
+  }
+  function ok(yes, msg) {
+    return '<span style="color:' + (yes ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' + (yes ? '✓' : '✗') + '</span> <span style="font-size:12px;color:' + (yes ? 'var(--text)' : 'var(--red)') + '">' + msg + '</span>';
+  }
+  function warn(yes, msg) {
+    return '<span style="color:' + (yes ? 'var(--green)' : 'var(--yellow)') + ';font-weight:700">' + (yes ? '✓' : '⚠') + '</span> <span style="font-size:12px;color:' + (yes ? 'var(--text)' : 'var(--yellow)') + '">' + msg + '</span>';
+  }
+
+  var funnelCards = FUNNEL_NAMES.map(function(f) {
+    var color        = FUNNEL_COLORS[f] || 'var(--accent)';
+    var lpDomain     = FUNNEL_LP_DOMAIN[f] || '';
+    var slDomain     = smartlinkHostedUrls[f] || (FUNNEL_SMARTLINK_DOMAIN[f] ? 'https://' + FUNNEL_SMARTLINK_DOMAIN[f] : '');
+    var bot          = FUNNEL_TO_BOT[f] || {};
+    var haslp        = !!lpDomain;
     var assignedDeals = getAssignedDeals(f);
-    var totalWeight = assignedDeals.reduce(function(s, d) { return s + getWeight(f, d.id); }, 0);
-    var hasFallback = !!smartlinkFallbacks[f];
-    var isLive = !!smartlinkHostedUrls[f];
+    var totalW       = assignedDeals.reduce(function(s, d) { return s + getWeight(f, d.id); }, 0);
+    var fallbackUrl  = smartlinkFallbacks[f] || '';
 
-    function check(ok, text) {
-      return '<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px">' +
-        '<span style="color:' + (ok ? 'var(--green)' : 'var(--red)') + ';font-weight:700;font-size:13px">' + (ok ? '✓' : '✗') + '</span>' +
-        '<span style="color:' + (ok ? 'var(--text)' : 'var(--red)') + '">' + text + '</span></div>';
+    // Flow diagram
+    var flowSteps = [];
+    flowSteps.push('<span style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600">Ad</span>');
+    if (haslp) {
+      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
+      flowSteps.push('<span style="background:rgba(99,179,237,0.1);border:1px solid rgba(99,179,237,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#63b3ed">' + escHtml(lpDomain) + '</span>');
+      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
+      flowSteps.push('<span style="background:rgba(41,182,246,0.1);border:1px solid rgba(41,182,246,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#29b6f6">t.me/' + escHtml(bot.username||'bot') + '</span>');
+      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
+      flowSteps.push('<span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#a855f7">' + escHtml(FUNNEL_SMARTLINK_DOMAIN[f]||'smartlink') + '</span>');
+    } else {
+      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
+      flowSteps.push('<span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#a855f7">' + escHtml(FUNNEL_SMARTLINK_DOMAIN[f]||'smartlink') + '</span>');
     }
-    function checkY(ok, text) {
-      return '<div style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:5px">' +
-        '<span style="color:' + (ok ? 'var(--green)' : 'var(--yellow)') + ';font-weight:700;font-size:13px">' + (ok ? '✓' : '⚠') + '</span>' +
-        '<span style="color:' + (ok ? 'var(--text)' : 'var(--yellow)') + '">' + text + '</span></div>';
-    }
+    flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
+    flowSteps.push('<span style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#4ade80">Casino</span>');
+    var flowHtml = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 0 14px">' + flowSteps.join('') + '</div>';
 
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex:1;min-width:160px">' +
-      '<div style="background:var(--card2);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
-        '<span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:' + color + '">' + f + '</span>' +
-        '<button onclick="setFunnel(\'' + f + '\')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 9px;color:var(--muted);font-size:10px;cursor:pointer">Configure →</button>' +
+    // Deals table
+    var dealsHtml = assignedDeals.length === 0
+      ? '<div style="font-size:12px;color:var(--red);padding:6px 0">No deals assigned</div>'
+      : '<table style="width:100%;border-collapse:collapse;margin-top:4px">' +
+          assignedDeals.map(function(d) {
+            var w = getWeight(f, d.id);
+            var netStyle = NETWORK_COLORS[d.network] || { bg: 'rgba(100,100,100,0.12)', color: '#aaa', border: 'rgba(100,100,100,0.2)' };
+            var geoList  = (d.geos || '').split(/[\s,]+/).filter(Boolean);
+            return '<tr style="border-top:1px solid var(--border)">' +
+              '<td style="padding:7px 8px 7px 0;width:38px;vertical-align:top">' +
+                '<span style="display:inline-block;width:34px;text-align:center;padding:2px 0;border-radius:4px;font-size:11px;font-weight:700;background:rgba(99,179,237,0.12);color:#63b3ed">' + w + '%</span>' +
+              '</td>' +
+              '<td style="padding:7px 6px;vertical-align:top">' +
+                '<div style="font-size:12px;font-weight:700;margin-bottom:2px">' + escHtml(d.name) + '</div>' +
+                '<div><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:' + netStyle.bg + ';color:' + netStyle.color + ';border:1px solid ' + netStyle.border + '">' + escHtml(d.network||'?') + '</span></div>' +
+              '</td>' +
+              '<td style="padding:7px 0 7px 6px;vertical-align:top;font-size:11px;color:var(--muted);max-width:220px">' +
+                geoList.join(' ') +
+              '</td>' +
+            '</tr>';
+          }).join('') +
+        '</table>';
+
+    // Health checks
+    var checks = [
+      ok(assignedDeals.length > 0, assignedDeals.length + ' deal' + (assignedDeals.length !== 1 ? 's' : '') + ' in rotation'),
+      warn(totalW === 100, 'Weights total ' + totalW + '%'),
+      ok(!!fallbackUrl, fallbackUrl ? 'Fallback: ' + (fallbackUrl.replace('https://','').split('/')[0]) : 'No fallback set'),
+    ].map(function(h){ return '<div style="margin-bottom:4px">' + h + '</div>'; }).join('');
+
+    // URL reference row
+    var urlRows = [
+      haslp ? ['Landing Page', 'https://' + lpDomain, '#63b3ed'] : null,
+      haslp ? ['Telegram Bot', (bot.tme||''), '#29b6f6'] : null,
+      ['Casino Smartlink', slDomain, '#a855f7'],
+      fallbackUrl ? ['Fallback', fallbackUrl, 'var(--muted)'] : null,
+    ].filter(Boolean).map(function(r){
+      return '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:5px">' +
+        '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap;min-width:90px">' + r[0] + '</span>' +
+        urlChip(r[1], r[1], r[2]) +
+      '</div>';
+    }).join('');
+
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px">' +
+
+      // Header
+      '<div style="background:var(--card2);padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:' + color + '">' + f + '</span>' +
+          (haslp ? pill('LP + Bot + Smartlink','rgba(99,179,237,0.1)','#63b3ed') : pill('Smartlink only','rgba(168,85,247,0.1)','#a855f7')) +
+        '</div>' +
+        '<button onclick="setFunnel(\'' + f + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 10px;color:var(--muted);font-size:11px;cursor:pointer">Configure →</button>' +
       '</div>' +
-      '<div style="padding:12px 14px">' +
-        check(assignedDeals.length > 0, assignedDeals.length + ' deal' + (assignedDeals.length !== 1 ? 's' : '') + ' assigned') +
-        checkY(totalWeight === 100, 'Weights = ' + totalWeight + '%') +
-        check(hasFallback, hasFallback ? 'Fallback set' : 'No fallback set') +
-        check(isLive, isLive ? 'Smartlink live' : 'Not live yet') +
+
+      '<div style="padding:14px 18px 18px;display:grid;grid-template-columns:1fr 1fr;gap:20px">' +
+
+        // Left: flow + deals
+        '<div>' +
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:2px">Visitor Flow</div>' +
+          flowHtml +
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:4px">Deal Rotation</div>' +
+          dealsHtml +
+        '</div>' +
+
+        // Right: health + URLs
+        '<div>' +
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Health</div>' +
+          '<div style="margin-bottom:16px">' + checks + '</div>' +
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">URLs</div>' +
+          urlRows +
+        '</div>' +
+
       '</div>' +
     '</div>';
   }).join('');
 
   container.innerHTML =
     '<div style="padding:28px 32px 32px">' +
-      '<div style="margin-bottom:24px">' +
-        '<div style="font-size:18px;font-weight:700;margin-bottom:4px">Funnel Management</div>' +
-        '<div style="font-size:12px;color:var(--muted)">Health checks and smartlink configuration. Click "Configure →" to set up deals and GEO routing for each funnel.</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">' +
+        '<div>' +
+          '<div style="font-size:20px;font-weight:800;margin-bottom:4px">Funnel Overview</div>' +
+          '<div style="font-size:12px;color:var(--muted)">Visitor flow, deal rotation, and live URLs for each funnel. CasinoBet is fallback for GEOs not covered by any deal.</div>' +
+        '</div>' +
       '</div>' +
-      '<div style="display:flex;gap:14px;flex-wrap:wrap">' + healthHtml + '</div>' +
+      funnelCards +
     '</div>';
 }
 
@@ -4434,10 +4522,13 @@ function saveMetaSettings() {
 var builderFunnel     = 'Dark';
 var builderSource     = 'meta';
 var builderCampaign   = '';
-var builderType       = 'direct'; // 'direct' | 'tg'
 var builderCasinoUrl  = '';
 var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | 'affilika' | 'ftdgallery' | 'padrino'
 var builderGenerated  = false;
+
+// Funnels with a landing page use the LP → Bot → Casino flow;
+// funnels without go Ad → Smartlink → Casino directly.
+function funnelHasLp(f) { return !!(FUNNEL_LP_DOMAIN[f !== undefined ? f : builderFunnel]); }
 
 // FTDGallery and Padrino run on CellXpert platform — same macro format
 var BUILDER_NETWORKS = [
@@ -4513,14 +4604,13 @@ function builderGenerate() {
   builderFunnel     = document.getElementById('bl-funnel').value;
   builderSource     = document.getElementById('bl-source').value;
   builderCampaign   = document.getElementById('bl-campaign').value.trim().replace(/\s+/g, '_');
-  builderType       = document.querySelector('input[name="bl-type"]:checked').value;
   builderCasinoUrl  = document.getElementById('bl-casino-url').value.trim();
   builderNetwork    = document.getElementById('bl-network').value;
   builderGenerated  = true;
   var directUrl = builderGetDirectUrl();
-  var tgUrl     = builderType === 'tg' ? builderGetTgUrl() : '';
+  var tgUrl = funnelHasLp() ? builderGetTgUrl() : '';
   if (directUrl || builderCasinoUrl) {
-    saveLinkHistory({ src: builderSource, campaign: builderCampaign, funnel: builderFunnel, type: builderType, url: directUrl, casinoUrl: builderCasinoUrl, tgUrl: tgUrl, ts: new Date().toISOString() });
+    saveLinkHistory({ src: builderSource, campaign: builderCampaign, funnel: builderFunnel, url: directUrl, casinoUrl: builderCasinoUrl, tgUrl: tgUrl, ts: new Date().toISOString() });
   }
   renderBuilderPage();
 }
@@ -4533,7 +4623,8 @@ function renderBuilderPage() {
   var bot         = FUNNEL_TO_BOT[builderFunnel];
   var smartlinkUrl = builderGetDirectUrl();
   var lpAdUrl     = builderGetLpAdUrl();
-  var tgUrl       = builderType === 'tg' ? builderGetTgUrl() : '';
+  var hasLp       = funnelHasLp();
+  var tgUrl       = hasLp ? builderGetTgUrl() : '';
   var noSmartlink = !smartlinkHostedUrls[builderFunnel] && !FUNNEL_SMARTLINK_DOMAIN[builderFunnel];
   var resolvedNet  = builderGetNetwork();
   var taggedCasino = builderGenerated && builderCasinoUrl && resolvedNet ? builderTagCasinoUrl(builderCasinoUrl, resolvedNet, builderSource, builderCampaign) : '';
@@ -4586,13 +4677,14 @@ function renderBuilderPage() {
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
         '<div style="font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px">&#9654; Output Package <span style="font-size:11px;font-weight:400;color:var(--muted)">' + escHtml(srcLabel) + ' / ' + escHtml(builderFunnel) + (builderCampaign ? ' / ' + escHtml(builderCampaign) : '') + '</span></div>' +
 
-        (lpAdUrl ? urlRow('LP Ad Link', lpAdUrl, 'bl-out-lp', '(put in Meta / TikTok ad — sends traffic to landing page)') : '') +
+        (lpAdUrl ? urlRow('LP Ad Link', lpAdUrl, 'bl-out-lp', '(put in Meta / TikTok ad — drives traffic to landing page)') : '') +
 
-        (smartlinkUrl ? urlRow('Smartlink CTA Link', smartlinkUrl, 'bl-out-direct', '(LP CTA button points here — geo-routes visitor to casino)') : '') +
-
-        (builderType === 'tg' && bot
-          ? urlRow('Telegram Deep Link', tgUrl, 'bl-out-tg', '(for Telegram traffic → LP → bot)')
+        (hasLp && bot && tgUrl
+          ? urlRow('Bot CTA Link', tgUrl, 'bl-out-tg', '(LP CTA button links here — opens Telegram bot for visitor)')
           : '') +
+
+        (smartlinkUrl ? urlRow(hasLp ? 'Casino Smartlink' : 'Ad Smartlink', smartlinkUrl, 'bl-out-direct',
+            hasLp ? '(bot sends this to users — geo-routes them to correct casino)' : '(put directly in ad — geo-routes visitor to casino)') : '') +
 
         postbackSection +
 
@@ -4654,18 +4746,18 @@ function renderBuilderPage() {
             '<input id="bl-campaign" type="text" value="' + escHtml(builderCampaign) + '" placeholder="summer_de_promo" oninput="builderCampaign=this.value.trim().replace(/\\s+/g,\'_\');builderGenerated=false" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
         '</div>' +
 
-        // Type radio
-        '<div style="margin-bottom:20px">' +
-          '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Funnel Type</label>' +
-          '<div style="display:flex;gap:20px">' +
-            '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">' +
-              '<input type="radio" name="bl-type" value="direct"' + (builderType === 'direct' ? ' checked' : '') + ' onchange="builderType=this.value;builderGenerated=false;renderBuilderPage()">' +
-              'Direct (Traffic &#8594; LP &#8594; Casino)</label>' +
-            '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">' +
-              '<input type="radio" name="bl-type" value="tg"' + (builderType === 'tg' ? ' checked' : '') + ' onchange="builderType=this.value;builderGenerated=false;renderBuilderPage()">' +
-              'Telegram (Traffic &#8594; LP &#8594; Bot &#8594; Casino)</label>' +
-          '</div>' +
-        '</div>' +
+        // Flow indicator (auto-derived from funnel)
+        (function(){
+          var lpd = FUNNEL_LP_DOMAIN[builderFunnel];
+          var botU = (FUNNEL_TO_BOT[builderFunnel] || {}).username || '';
+          var sld  = FUNNEL_SMARTLINK_DOMAIN[builderFunnel] || 'smartlink';
+          var flowStr = lpd
+            ? 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; t.me/' + escHtml(botU) + ' &#8594; ' + escHtml(sld)
+            : 'Ad &#8594; <strong>' + escHtml(sld) + '</strong> &#8594; Casino';
+          return '<div style="margin-bottom:20px;padding:9px 13px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-radius:7px;font-size:12px;color:var(--muted)">' +
+            '<span style="color:var(--text);font-weight:600;margin-right:6px">Flow:</span>' + flowStr +
+          '</div>';
+        })() +
 
         (noSmartlink
           ? '<div style="color:#f0b429;font-size:12px;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px;margin-bottom:14px">&#9888; No smartlink URL configured for ' + escHtml(builderFunnel) + '. Add it in Manage &#8594; Funnel Config.</div>'
