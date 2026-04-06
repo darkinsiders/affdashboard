@@ -2099,11 +2099,11 @@ var TRAFFIC_SOURCES = [
 ];
 
 var FUNNEL_TO_BOT = {
-  Dark:    { username: 'darkcasinos_bot', tme: 'https://t.me/darkcasinos_bot' },
-  Slotio:  { username: 'slotiobot',      tme: 'https://t.me/slotiobot' },
-  Scanio:  { username: 'scanioaibot',    tme: 'https://t.me/scanioaibot' },
-  SpinGPT: { username: 'darkcasinos_bot', tme: 'https://t.me/darkcasinos_bot' },
-  Shadow:  { username: 'darkcasinos_bot', tme: 'https://t.me/darkcasinos_bot' }
+  Dark:    { username: 'darkrtpbot',    tme: 'https://t.me/darkrtpbot' },
+  Slotio:  { username: 'slotiobot',    tme: 'https://t.me/slotiobot' },
+  Scanio:  { username: 'scanioaibot',  tme: 'https://t.me/scanioaibot' },
+  SpinGPT: { username: 'darkrtpbot',   tme: 'https://t.me/darkrtpbot' },
+  Shadow:  { username: 'darkrtpbot',   tme: 'https://t.me/darkrtpbot' }
 };
 
 var FUNNEL_SMARTLINK_DOMAIN = {
@@ -4625,10 +4625,8 @@ function builderGetLpAdUrl() {
 function builderGetTgUrl() {
   var bot = FUNNEL_TO_BOT[builderFunnel];
   if (!bot) return '';
-  var param = builderSource;
-  if (builderCampaign) param += '_' + builderCampaign.replace(/\s+/g, '_');
-  if (param.length > 50) param = param.substring(0, 50);
-  return bot.tme + '?start=' + encodeURIComponent(param);
+  var param = builderSource.substring(0, 50);
+  return param ? bot.tme + '?start=' + encodeURIComponent(param) : bot.tme;
 }
 
 function builderTagCasinoUrl(rawUrl, net, source, campaign) {
