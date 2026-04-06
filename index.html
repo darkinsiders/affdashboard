@@ -1320,6 +1320,10 @@
         <span class="ni-dot" style="background:var(--purple)"></span>
         <span class="ni-label">Funnel Config</span>
       </div>
+      <div class="nav-item" id="tab-tools" onclick="navGo(function(){setPage('tools')})">
+        <span class="ni-dot" style="background:#f0883e"></span>
+        <span class="ni-label">Bot Content</span>
+      </div>
       <div class="nav-divider"></div>
       <div class="nav-item" id="tab-builder" onclick="navGo(function(){setPage('builder')})">
         <span class="ni-dot" style="background:#f0b429"></span>
@@ -1421,66 +1425,6 @@
   </div>
 </div>
 
-<!-- Glitch Templates -->
-<div class="glitch-section main" style="padding-top:0">
-  <div class="glitch-header">
-    <div class="glitch-title">
-      <span>Glitch Templates</span>
-      <span class="glitch-title-tag">Reference</span>
-      <span class="glitch-count" id="glitchCount"></span>
-    </div>
-    <button class="btn-toggle-glitch" id="btnToggleGlitch" onclick="toggleGlitch()">
-      <svg width="12" height="12" id="glitchChevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
-      Hide
-    </button>
-  </div>
-  <div class="glitch-wrap" id="glitchWrap">
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Slot</th>
-          <th>Spin Value</th>
-          <th>Return / Spin</th>
-          <th>Time Window</th>
-          <th>Scan Accuracy</th>
-          <th>Optimal Spins</th>
-        </tr>
-      </thead>
-      <tbody id="glitchBody"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Slot Values Reference -->
-<div class="slot-values-section main" style="padding-top:0">
-  <div class="slot-values-header">
-    <div class="slot-values-title">
-      <span>Slot Values</span>
-      <span class="glitch-title-tag" style="background:rgba(63,185,80,0.12);color:var(--green);border-color:rgba(63,185,80,0.3)">Reference</span>
-      <span class="glitch-count" id="slotValuesCount"></span>
-    </div>
-    <button class="btn-toggle-glitch" id="btnToggleSlotValues" onclick="toggleSlotValues()">
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
-      Hide
-    </button>
-  </div>
-  <div id="slotValuesWrap">
-    <div class="sv-provider-tabs" id="svProviderTabs"></div>
-    <div class="glitch-wrap">
-      <table style="min-width:500px">
-        <thead>
-          <tr>
-            <th>Game</th>
-            <th>Spin Values (EUR)</th>
-            <th>Bonus Buy (EUR)</th>
-          </tr>
-        </thead>
-        <tbody id="slotValuesBody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
 
 <!-- Smartlinks Generator -->
 <div class="smartlinks-section main" style="padding-top:0">
@@ -1544,6 +1488,77 @@
 <div id="funnelsPage" style="display:none"></div>
 <div id="settingsPage" style="display:none"></div>
 <div id="builderPage" style="display:none"></div>
+
+<!-- Bot Content Page -->
+<div id="toolsPage" style="display:none">
+  <div style="padding:28px 32px 32px;max-width:1800px;margin:0 auto">
+    <div style="margin-bottom:24px">
+      <div style="font-size:20px;font-weight:800;margin-bottom:4px">Bot Content</div>
+      <div style="font-size:12px;color:var(--muted)">Reference data used by Telegram bots to generate slot predictions — glitch templates and spin value tables.</div>
+    </div>
+
+    <!-- Glitch Templates -->
+    <div class="glitch-section" style="margin-bottom:28px">
+      <div class="glitch-header">
+        <div class="glitch-title">
+          <span>Glitch Templates</span>
+          <span class="glitch-title-tag">Reference</span>
+          <span class="glitch-count" id="glitchCount"></span>
+        </div>
+        <button class="btn-toggle-glitch" id="btnToggleGlitch" onclick="toggleGlitch()">
+          <svg width="12" height="12" id="glitchChevron" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+          Hide
+        </button>
+      </div>
+      <div class="glitch-wrap" id="glitchWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Slot</th>
+              <th>Spin Value</th>
+              <th>Return / Spin</th>
+              <th>Time Window</th>
+              <th>Scan Accuracy</th>
+              <th>Optimal Spins</th>
+            </tr>
+          </thead>
+          <tbody id="glitchBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Slot Values Reference -->
+    <div class="slot-values-section">
+      <div class="slot-values-header">
+        <div class="slot-values-title">
+          <span>Slot Values</span>
+          <span class="glitch-title-tag" style="background:rgba(63,185,80,0.12);color:var(--green);border-color:rgba(63,185,80,0.3)">Reference</span>
+          <span class="glitch-count" id="slotValuesCount"></span>
+        </div>
+        <button class="btn-toggle-glitch" id="btnToggleSlotValues" onclick="toggleSlotValues()">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+          Hide
+        </button>
+      </div>
+      <div id="slotValuesWrap">
+        <div class="sv-provider-tabs" id="svProviderTabs"></div>
+        <div class="glitch-wrap">
+          <table style="min-width:500px">
+            <thead>
+              <tr>
+                <th>Game</th>
+                <th>Spin Values (EUR)</th>
+                <th>Bonus Buy (EUR)</th>
+              </tr>
+            </thead>
+            <tbody id="slotValuesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- GEO tooltip overlay -->
 <div class="geo-tooltip-overlay" id="geoOverlay" onclick="closeGeoTooltip()"></div>
@@ -1746,7 +1761,7 @@ document.addEventListener('click', function(e) {
 });
 
 function hideAllPages() {
-  ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage','builderPage'].forEach(function(id) {
+  ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage','builderPage','toolsPage'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -1837,6 +1852,13 @@ function setPage(page) {
     setNavActive('builder', 'manage');
     updateBreadcrumb('Manage', 'Link Builder');
     renderBuilderPage();
+  } else if (page === 'tools') {
+    var el = document.getElementById('toolsPage');
+    if (el) el.style.display = '';
+    setNavActive('tools', 'manage');
+    updateBreadcrumb('Manage', 'Bot Content');
+    renderGlitch();
+    renderSlotValues();
   } else if (page === 'manage') {
     // legacy — redirect to funnels page
     var el = document.getElementById('funnelsPage');
