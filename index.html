@@ -2100,6 +2100,16 @@ var FUNNEL_LP_DOMAIN = {
   Shadow:  ''
 };
 
+// 'tg' = LP CTA opens Telegram bot, bot sends casino smartlink
+// 'direct' = LP CTA goes straight to casino smartlink (or no LP at all)
+var FUNNEL_CTA = {
+  Dark:    'tg',
+  Slotio:  'direct',
+  Scanio:  'tg',
+  SpinGPT: 'direct',
+  Shadow:  'direct'
+};
+
 var linkHistory = JSON.parse(localStorage.getItem('linkHistory') || '[]');
 
 function saveAssignments() {
@@ -4342,26 +4352,30 @@ function renderFunnelsPage() {
     var slDomain     = smartlinkHostedUrls[f] || (FUNNEL_SMARTLINK_DOMAIN[f] ? 'https://' + FUNNEL_SMARTLINK_DOMAIN[f] : '');
     var bot          = FUNNEL_TO_BOT[f] || {};
     var haslp        = !!lpDomain;
+    var hastg        = FUNNEL_CTA[f] === 'tg';
     var assignedDeals = getAssignedDeals(f);
     var totalW       = assignedDeals.reduce(function(s, d) { return s + getWeight(f, d.id); }, 0);
     var fallbackUrl  = smartlinkFallbacks[f] || '';
 
     // Flow diagram
     var flowSteps = [];
-    flowSteps.push('<span style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600">Ad</span>');
-    if (haslp) {
-      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
-      flowSteps.push('<span style="background:rgba(99,179,237,0.1);border:1px solid rgba(99,179,237,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#63b3ed">' + escHtml(lpDomain) + '</span>');
-      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
-      flowSteps.push('<span style="background:rgba(41,182,246,0.1);border:1px solid rgba(41,182,246,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#29b6f6">t.me/' + escHtml(bot.username||'bot') + '</span>');
-      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
-      flowSteps.push('<span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#a855f7">' + escHtml(FUNNEL_SMARTLINK_DOMAIN[f]||'smartlink') + '</span>');
-    } else {
-      flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
-      flowSteps.push('<span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#a855f7">' + escHtml(FUNNEL_SMARTLINK_DOMAIN[f]||'smartlink') + '</span>');
+    function fstep(label, bg, border, color) {
+      return '<span style="background:' + bg + ';border:1px solid ' + border + ';border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600' + (color ? ';color:' + color : '') + '">' + escHtml(label) + '</span>';
     }
-    flowSteps.push('<span style="color:var(--muted)">&#8594;</span>');
-    flowSteps.push('<span style="background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:600;color:#4ade80">Casino</span>');
+    var arrow = '<span style="color:var(--muted)">&#8594;</span>';
+    flowSteps.push(fstep('Ad', 'rgba(255,255,255,0.06)', 'var(--border)', ''));
+    if (haslp) {
+      flowSteps.push(arrow);
+      flowSteps.push(fstep(lpDomain, 'rgba(99,179,237,0.1)', 'rgba(99,179,237,0.25)', '#63b3ed'));
+      if (hastg) {
+        flowSteps.push(arrow);
+        flowSteps.push(fstep('t.me/' + (bot.username||'bot'), 'rgba(41,182,246,0.1)', 'rgba(41,182,246,0.25)', '#29b6f6'));
+      }
+    }
+    flowSteps.push(arrow);
+    flowSteps.push(fstep(FUNNEL_SMARTLINK_DOMAIN[f]||'smartlink', 'rgba(168,85,247,0.1)', 'rgba(168,85,247,0.25)', '#a855f7'));
+    flowSteps.push(arrow);
+    flowSteps.push(fstep('Casino', 'rgba(74,222,128,0.08)', 'rgba(74,222,128,0.2)', '#4ade80'));
     var flowHtml = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 0 14px">' + flowSteps.join('') + '</div>';
 
     // Deals table
@@ -4397,7 +4411,7 @@ function renderFunnelsPage() {
     // URL reference row
     var urlRows = [
       haslp ? ['Landing Page', 'https://' + lpDomain, '#63b3ed'] : null,
-      haslp ? ['Telegram Bot', (bot.tme||''), '#29b6f6'] : null,
+      hastg ? ['Bot CTA', (bot.tme||''), '#29b6f6'] : null,
       ['Casino Smartlink', slDomain, '#a855f7'],
       fallbackUrl ? ['Fallback', fallbackUrl, 'var(--muted)'] : null,
     ].filter(Boolean).map(function(r){
@@ -4413,7 +4427,9 @@ function renderFunnelsPage() {
       '<div style="background:var(--card2);padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
         '<div style="display:flex;align-items:center;gap:10px">' +
           '<span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:' + color + '">' + f + '</span>' +
-          (haslp ? pill('LP + Bot + Smartlink','rgba(99,179,237,0.1)','#63b3ed') : pill('Smartlink only','rgba(168,85,247,0.1)','#a855f7')) +
+          (haslp && hastg ? pill('LP → Bot → Smartlink','rgba(99,179,237,0.1)','#63b3ed')
+                         : haslp ? pill('LP → Smartlink','rgba(74,222,128,0.1)','#4ade80')
+                         : pill('Smartlink only','rgba(168,85,247,0.1)','#a855f7')) +
         '</div>' +
         '<button onclick="setFunnel(\'' + f + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 10px;color:var(--muted);font-size:11px;cursor:pointer">Configure →</button>' +
       '</div>' +
@@ -4526,9 +4542,10 @@ var builderCasinoUrl  = '';
 var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | 'affilika' | 'ftdgallery' | 'padrino'
 var builderGenerated  = false;
 
-// Funnels with a landing page use the LP → Bot → Casino flow;
-// funnels without go Ad → Smartlink → Casino directly.
+// Funnels with a landing page (Dark/Slotio/Scanio have LPs; SpinGPT/Shadow go direct)
 function funnelHasLp(f) { return !!(FUNNEL_LP_DOMAIN[f !== undefined ? f : builderFunnel]); }
+// Funnels whose LP CTA opens Telegram (Dark/Scanio); Slotio LP CTA goes direct to smartlink
+function funnelHasTg(f) { return FUNNEL_CTA[f !== undefined ? f : builderFunnel] === 'tg'; }
 
 // FTDGallery and Padrino run on CellXpert platform — same macro format
 var BUILDER_NETWORKS = [
@@ -4608,7 +4625,7 @@ function builderGenerate() {
   builderNetwork    = document.getElementById('bl-network').value;
   builderGenerated  = true;
   var directUrl = builderGetDirectUrl();
-  var tgUrl = funnelHasLp() ? builderGetTgUrl() : '';
+  var tgUrl = funnelHasTg() ? builderGetTgUrl() : '';
   if (directUrl || builderCasinoUrl) {
     saveLinkHistory({ src: builderSource, campaign: builderCampaign, funnel: builderFunnel, url: directUrl, casinoUrl: builderCasinoUrl, tgUrl: tgUrl, ts: new Date().toISOString() });
   }
@@ -4624,7 +4641,8 @@ function renderBuilderPage() {
   var smartlinkUrl = builderGetDirectUrl();
   var lpAdUrl     = builderGetLpAdUrl();
   var hasLp       = funnelHasLp();
-  var tgUrl       = hasLp ? builderGetTgUrl() : '';
+  var hasTg       = funnelHasTg();
+  var tgUrl       = hasTg ? builderGetTgUrl() : '';
   var noSmartlink = !smartlinkHostedUrls[builderFunnel] && !FUNNEL_SMARTLINK_DOMAIN[builderFunnel];
   var resolvedNet  = builderGetNetwork();
   var taggedCasino = builderGenerated && builderCasinoUrl && resolvedNet ? builderTagCasinoUrl(builderCasinoUrl, resolvedNet, builderSource, builderCampaign) : '';
@@ -4679,12 +4697,14 @@ function renderBuilderPage() {
 
         (lpAdUrl ? urlRow('LP Ad Link', lpAdUrl, 'bl-out-lp', '(put in Meta / TikTok ad — drives traffic to landing page)') : '') +
 
-        (hasLp && bot && tgUrl
+        (hasTg && bot && tgUrl
           ? urlRow('Bot CTA Link', tgUrl, 'bl-out-tg', '(LP CTA button links here — opens Telegram bot for visitor)')
           : '') +
 
-        (smartlinkUrl ? urlRow(hasLp ? 'Casino Smartlink' : 'Ad Smartlink', smartlinkUrl, 'bl-out-direct',
-            hasLp ? '(bot sends this to users — geo-routes them to correct casino)' : '(put directly in ad — geo-routes visitor to casino)') : '') +
+        (smartlinkUrl ? urlRow(hasTg ? 'Casino Smartlink' : (hasLp ? 'LP CTA Link' : 'Ad Smartlink'), smartlinkUrl, 'bl-out-direct',
+            hasTg ? '(bot sends this to users — geo-routes them to correct casino)'
+                  : hasLp ? '(LP CTA button links here — geo-routes visitor to casino)'
+                           : '(put directly in ad — geo-routes visitor to casino)') : '') +
 
         postbackSection +
 
@@ -4748,12 +4768,18 @@ function renderBuilderPage() {
 
         // Flow indicator (auto-derived from funnel)
         (function(){
-          var lpd = FUNNEL_LP_DOMAIN[builderFunnel];
+          var lpd  = FUNNEL_LP_DOMAIN[builderFunnel];
           var botU = (FUNNEL_TO_BOT[builderFunnel] || {}).username || '';
           var sld  = FUNNEL_SMARTLINK_DOMAIN[builderFunnel] || 'smartlink';
-          var flowStr = lpd
-            ? 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; t.me/' + escHtml(botU) + ' &#8594; ' + escHtml(sld)
-            : 'Ad &#8594; <strong>' + escHtml(sld) + '</strong> &#8594; Casino';
+          var hasTgLocal = FUNNEL_CTA[builderFunnel] === 'tg';
+          var flowStr;
+          if (!lpd) {
+            flowStr = 'Ad &#8594; <strong>' + escHtml(sld) + '</strong> &#8594; Casino';
+          } else if (hasTgLocal) {
+            flowStr = 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; t.me/' + escHtml(botU) + ' &#8594; ' + escHtml(sld) + ' &#8594; Casino';
+          } else {
+            flowStr = 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; ' + escHtml(sld) + ' &#8594; Casino';
+          }
           return '<div style="margin-bottom:20px;padding:9px 13px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-radius:7px;font-size:12px;color:var(--muted)">' +
             '<span style="color:var(--text);font-weight:600;margin-right:6px">Flow:</span>' + flowStr +
           '</div>';
