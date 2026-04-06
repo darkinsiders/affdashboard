@@ -2528,12 +2528,10 @@ function detectNetwork(url) {
 function buildPostbackUrls(network, funnelOverride) {
   // Source/campaign macros vary by network
   var srcParams;
-  if (network.name === 'ftdgallery') {
-    srcParams = '&source=[s1]&campaign=[s2]';
-  } else if (network.name === 'affilika') {
+  if (network.name === 'affilika') {
     srcParams = ''; // Affilika sub-param postback macros not confirmed
   } else {
-    // CellXpert and Padrino both use afp2/afp3
+    // All CellXpert-platform networks (CellXpert, FTDGallery, Padrino) use afp2/afp3
     srcParams = '&source=[afp2]&campaign=[afp3]';
   }
   var funnelParam = funnelOverride ? encodeURIComponent(funnelOverride) : '[trackingcode]';
@@ -4396,12 +4394,11 @@ var builderCasinoUrl  = '';
 var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | 'affilika' | 'ftdgallery' | 'padrino'
 var builderGenerated  = false;
 
+// FTDGallery and Padrino run on CellXpert platform — same macro format
 var BUILDER_NETWORKS = [
-  { id: '',           label: 'Auto-detect from URL' },
-  { id: 'cellxpert',  label: 'CellXpert',            clickMacro: '[afp]',      src1: 'afp2', src2: 'afp3' },
-  { id: 'affilika',   label: 'Affilika',             clickMacro: '{visit_id}', src1: 'sub1', src2: 'sub2' },
-  { id: 'ftdgallery', label: 'FTDGallery',           clickMacro: '[afp]',      src1: 's1',   src2: 's2'   },
-  { id: 'padrino',    label: 'Padrino Partners',     clickMacro: '[afp]',      src1: 'afp2', src2: 'afp3' }
+  { id: '',          label: 'Auto-detect from URL' },
+  { id: 'cellxpert', label: 'CellXpert',  clickMacro: '[afp]',      src1: 'afp2', src2: 'afp3' },
+  { id: 'affilika',  label: 'Affilika',   clickMacro: '{visit_id}', src1: 'sub1', src2: 'sub2' }
 ];
 
 function builderGetNetwork() {
@@ -4411,11 +4408,9 @@ function builderGetNetwork() {
   }
   var auto = detectNetwork(builderCasinoUrl);
   if (auto) {
-    // Enrich with src param names
-    var src1 = 'afp2', src2 = 'afp3';
-    if (auto.name === 'ftdgallery') { src1 = 's1'; src2 = 's2'; }
-    if (auto.name === 'affilika')   { src1 = 'sub1'; src2 = 'sub2'; }
-    auto.src1 = src1; auto.src2 = src2;
+    // All CellXpert-platform networks (incl. FTDGallery, Padrino) use afp2/afp3
+    auto.src1 = auto.name === 'affilika' ? 'sub1' : 'afp2';
+    auto.src2 = auto.name === 'affilika' ? 'sub2' : 'afp3';
   }
   return auto;
 }
