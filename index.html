@@ -2064,6 +2064,7 @@ var deals = [];
 var landingPages = [];
 var dealsFilterStatus = 'active'; // 'active' | 'paused' | 'archived' | 'all'
 var dealsFilterFunnel = '';
+var dealsFilterSearch = '';
 var lpEditingId = null;
 var editingId = null;
 var filterBgaming = false;
@@ -2576,13 +2577,22 @@ function buildPostbackUrls(network, funnelOverride) {
     // All CellXpert-platform networks (CellXpert, FTDGallery, Padrino) use afp2/afp3
     srcParams = '&source=[afp2]&campaign=[afp3]';
   }
-  var funnelParam = funnelOverride ? encodeURIComponent(funnelOverride) : '[trackingcode]';
-  var sumMacro    = (network.name === 'affilika' || network.name === 'casinobet') ? '{deposits_sum}' : '[commissionamount]';
+  var funnelParam;
+  if (funnelOverride) {
+    funnelParam = encodeURIComponent(funnelOverride);
+  } else if (network.name === 'affilika') {
+    funnelParam = '{campaign_id}';
+  } else {
+    funnelParam = '[trackingcode]';
+  }
+  var qftdSumMacro = network.name === 'affilika'
+    ? '{payout}'
+    : (network.name === 'casinobet' ? '{deposits_sum}' : '[commissionamount]');
   var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=' + funnelParam + '&offer=' + network.name;
   return {
     reg:  base + '&status=Registration&type=Registration&sum=0',
-    ftd:  base + '&status=FTD&type=FTD&sum=0',
-    qftd: base + '&status=QFTD&type=QFTD&sum=' + sumMacro
+    ftd:  base + '&status=FTD&type=FTD&sum=' + (network.name === 'affilika' ? '{first_deposit}' : '0'),
+    qftd: base + '&status=QFTD&type=QFTD&sum=' + qftdSumMacro
   };
 }
 
@@ -2601,6 +2611,12 @@ function openPostbackModal(dealId) {
   var urls = buildPostbackUrls(net);
   var networkLabel = net.name.toUpperCase();
   if (net.clickMacro === '[afp1]') networkLabel += ' (uses [afp1])';
+  var trackingNote = (net.name === 'cellxpert' || net.name === 'ftdgallery' || net.name === 'padrino')
+    ? 'These URLs now include source tracking (<code>[afp2]</code>/<code>[afp3]</code>). If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.'
+    : 'These URLs use the current network macros shown above. If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.';
+  var macroNote = net.name === 'affilika'
+    ? 'Paste these in your affiliate platform\'s postback settings. For Affilika, <code style="color:var(--accent)">{campaign_id}</code> maps the funnel, <code style="color:var(--accent)">{first_deposit}</code> is used for FTD value, and <code style="color:var(--accent)">{payout}</code> is used for Qualified CPA.'
+    : 'Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically.';
 
   function row(label, url) {
     var id = 'pburl-' + label.toLowerCase().replace(/ /g, '-') + '-' + dealId;
@@ -2621,8 +2637,8 @@ function openPostbackModal(dealId) {
     row('Registration', urls.reg) +
     row('FTD', urls.ftd) +
     row('Qualified CPA', urls.qftd) +
-    '<div style="margin-top:1rem;padding:.6rem .75rem;background:rgba(255,180,0,.07);border:1px solid rgba(255,180,0,.25);border-radius:6px;font-size:.7rem;color:#f0b429">&#9888; These URLs now include source tracking (<code>[afp2]</code>/<code>[s1]</code>). If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.</div>' +
-    '<p style="font-size:.7rem;color:var(--muted);margin-top:.75rem">Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically.</p>';
+    '<div style="margin-top:1rem;padding:.6rem .75rem;background:rgba(255,180,0,.07);border:1px solid rgba(255,180,0,.25);border-radius:6px;font-size:.7rem;color:#f0b429">&#9888; ' + trackingNote + '</div>' +
+    '<p style="font-size:.7rem;color:var(--muted);margin-top:.75rem">' + macroNote + '</p>';
 
   document.getElementById('postbackModalOverlay').classList.add('open');
 }
@@ -2896,6 +2912,7 @@ var SMARTLINKS_KEY = 'funnel_smartlinks';
 var SMARTLINK_URLS_KEY = 'funnel_hosted_urls';
 var DEAL_WEIGHTS_KEY = 'deal_weights';
 var dealWeights = {}; // { Dark: { '1': 70, '2': 30 }, ... }
+var CASINOBET_FALLBACK = 'https://casinobet.com/?a=5d9946';
 var smartlinkFallbacks = {};
 var smartlinkHostedUrls = {};
 var smartlinksVisible = true;
@@ -2962,7 +2979,7 @@ function generateRedirectHtml(funnel, urlToCasino) {
   var apiKey = 'AIzaSyCVegt6HxRbJAe1Es_SHEMPH1P3e9YvOvU';
   var firestoreUrl = 'https://firestore.googleapis.com/v1/projects/' + projectId + '/databases/(default)/documents/routes/' + funnel.toLowerCase();
   var clicksUrl = 'https://firestore.googleapis.com/v1/projects/' + projectId + '/databases/(default)/documents/clicks?key=' + apiKey;
-  var fallbackVal = smartlinkFallbacks[funnel] || '';
+  var fallbackVal = smartlinkFallbacks[funnel] || CASINOBET_FALLBACK;
   var casinoMapJson = JSON.stringify(urlToCasino || {});
 
   return '<!DOCTYPE html>\n' +
@@ -3572,7 +3589,7 @@ var debouncedSaveToFirebase = debounce(saveToFirebase, 600);
 function saveRoutesToFirebase() {
   FUNNEL_NAMES.forEach(function(f) {
     var multiMap = buildMultiRouteMap(f);
-    var fallback = smartlinkFallbacks[f] || '';
+    var fallback = smartlinkFallbacks[f] || CASINOBET_FALLBACK;
     var urlToCasino = {};
     getAssignedDeals(f).forEach(function(d) { urlToCasino[getFunnelUrl(d.url, f)] = d.name; });
     db.collection('routes').doc(f.toLowerCase()).set({
@@ -3654,6 +3671,7 @@ DOC_REF.onSnapshot(function(doc) {
       assignments = JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
       dealWeights = {};
       smartlinkFallbacks = {};
+      FUNNEL_NAMES.forEach(function(f) { smartlinkFallbacks[f] = CASINOBET_FALLBACK; });
       smartlinkHostedUrls = {};
       dataLoaded = true;
       FUNNEL_NAMES.forEach(function(f) { equalizeWeights(f); });
@@ -3741,7 +3759,7 @@ function renderClicksTab() {
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
         '<div>' +
           '<div style="font-size:18px;font-weight:700">Click Analytics</div>' +
-          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Tracked smartlink clicks stored in Firestore</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Tracked smartlink clicks stored in Firestore. Recent table shows the latest 1,000 clicks.</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;align-items:center">' +
           '<select id="analyticsFilterFunnel" onchange="analyticsFilterFunnel=this.value;loadAnalyticsClicks()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
@@ -3782,7 +3800,7 @@ function loadAnalyticsClicks() {
       var ts = d.ts ? new Date(d.ts) : null;
       if (cutoff && ts && ts < cutoff) return;
       if (analyticsFilterFunnel && d.funnel !== analyticsFilterFunnel) return;
-      clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', sub1: d.sub1 || '' });
+      clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', src: d.src || d.sub1 || '' });
     });
     renderClicksData(body, clicks);
   }).catch(function(err) {
@@ -3887,7 +3905,7 @@ function renderClicksData(container, clicks) {
       '<td style="padding:7px 10px"><span style="font-size:11px;font-weight:700;color:' + fc + '">' + escHtml(funnel || '—') + '</span></td>' +
       '<td style="padding:7px 10px;font-size:12px;font-weight:600">' + escHtml(casino || '—') + '</td>' +
       '<td style="padding:7px 10px"><span style="background:var(--badge-geo);color:var(--badge-geo-text);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">' + escHtml(c.geo || '??') + '</span></td>' +
-      '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(c.sub1 || '—') + '</td>' +
+      '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(c.src || '—') + '</td>' +
     '</tr>';
   }).join('');
 
@@ -3912,7 +3930,7 @@ function renderClicksData(container, clicks) {
               '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnel</th>' +
               '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Casino</th>' +
               '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">GEO</th>' +
-              '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Sub1</th>' +
+              '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
             '</tr></thead>' +
             '<tbody>' + recentRows + '</tbody>' +
           '</table></div>' +
@@ -4077,7 +4095,8 @@ function dealTypeBadge(deal) {
 function toggleDealStatus(id) {
   var deal = deals.find(function(d) { return d.id === id; });
   if (!deal) return;
-  deal.status = deal.status === 'active' ? 'paused' : 'active';
+  var currentStatus = deal.status || 'active';
+  deal.status = currentStatus === 'active' ? 'paused' : 'active';
   saveDeals();
   renderDealsPage();
 }
@@ -4085,9 +4104,18 @@ function toggleDealStatus(id) {
 function archiveDeal(id) {
   var deal = deals.find(function(d) { return d.id === id; });
   if (!deal) return;
-  deal.status = deal.status === 'archived' ? 'active' : 'archived';
+  var currentStatus = deal.status || 'active';
+  deal.status = currentStatus === 'archived' ? 'active' : 'archived';
   saveDeals();
   renderDealsPage();
+}
+
+function clearDealsFilters() {
+  dealsFilterStatus = 'all';
+  dealsFilterFunnel = '';
+  dealsFilterSearch = '';
+  if (currentPage === 'manage') renderManagePage();
+  if (currentPage === 'deals') renderDealsTable();
 }
 
 function toggleFunnelAssignment(funnel, dealId) {
@@ -4142,10 +4170,28 @@ function renderDealsTable() {
   var filtered = deals.filter(function(d) {
     var statusOk = dealsFilterStatus === 'all' || d.status === dealsFilterStatus;
     var funnelOk = !dealsFilterFunnel || (assignments[dealsFilterFunnel] || []).indexOf(d.id) !== -1;
-    return statusOk && funnelOk;
+    var searchOk = !dealsFilterSearch;
+    if (!searchOk) {
+      var q = dealsFilterSearch.toLowerCase();
+      var net = (d.network || getNetworkId(d.url) || '').toLowerCase();
+      var assignedFunnels = FUNNEL_NAMES.filter(function(f) {
+        return (assignments[f] || []).indexOf(d.id) !== -1;
+      }).join(' ').toLowerCase();
+      searchOk = (d.name || '').toLowerCase().indexOf(q) !== -1 ||
+        (d.url || '').toLowerCase().indexOf(q) !== -1 ||
+        net.indexOf(q) !== -1 ||
+        assignedFunnels.indexOf(q) !== -1;
+    }
+    return statusOk && funnelOk && searchOk;
   });
 
+  var needsReset = dealsFilterStatus !== 'all' || !!dealsFilterFunnel || !!dealsFilterSearch;
+  var activeCount = filtered.filter(function(d) { return (d.status || 'active') === 'active'; }).length;
+  var pausedCount = filtered.filter(function(d) { return d.status === 'paused'; }).length;
+  var archivedCount = filtered.filter(function(d) { return d.status === 'archived'; }).length;
+
   var rows = filtered.map(function(deal) {
+    var currentStatus = deal.status || 'active';
     var net = deal.network || getNetworkId(deal.url);
     var assignedFunnels = FUNNEL_NAMES.filter(function(f) {
       return (assignments[f] || []).indexOf(deal.id) !== -1;
@@ -4157,13 +4203,13 @@ function renderDealsTable() {
       return '<button onclick="toggleFunnelAssignment(\'' + f + '\',' + deal.id + ')" title="' + (assigned ? 'Remove from ' : 'Add to ') + f + '" style="padding:2px 8px;border-radius:3px;border:1px solid ' + (assigned ? color : 'var(--border)') + ';background:' + (assigned ? 'rgba(0,0,0,0.2)' : 'transparent') + ';color:' + (assigned ? color : 'var(--muted)') + ';font-size:10px;font-weight:700;cursor:pointer;transition:all 0.15s">' + f.substring(0,3) + '</button>';
     }).join('');
 
-    var isArchived = deal.status === 'archived';
-    var toggleLabel = deal.status === 'active' ? 'Pause' : 'Activate';
+    var isArchived = currentStatus === 'archived';
+    var toggleLabel = currentStatus === 'active' ? 'Pause' : 'Activate';
     var archiveLabel = isArchived ? 'Restore' : 'Archive';
     var rowOpacity = isArchived ? '0.45' : '1';
 
     return '<tr style="border-bottom:1px solid var(--border);opacity:' + rowOpacity + '">' +
-      '<td style="padding:10px 12px">' + statusBadge(deal.status || 'active') + '</td>' +
+      '<td style="padding:10px 12px">' + statusBadge(currentStatus) + '</td>' +
       '<td style="padding:10px 12px"><span style="font-weight:700;font-size:13px">' + escHtml(deal.name) + '</span></td>' +
       '<td style="padding:10px 12px">' + networkBadge(net) + '</td>' +
       '<td style="padding:10px 12px">' + dealTypeBadge(deal) + '</td>' +
@@ -4183,8 +4229,16 @@ function renderDealsTable() {
   body.innerHTML =
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">' +
       '<div style="display:flex;gap:6px">' + statusOpts + '</div>' +
+      '<input type="text" placeholder="Search deals..." value="' + escHtml(dealsFilterSearch) + '" oninput="dealsFilterSearch=this.value;renderDealsTable()" style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;min-width:220px;outline:none">' +
       '<select onchange="dealsFilterFunnel=this.value;renderDealsTable()" style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;margin-left:auto">' + funnelOptsSel + '</select>' +
+      (needsReset ? '<button onclick="clearDealsFilters()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:6px 12px;color:var(--muted);font-size:12px;cursor:pointer">Clear Filters</button>' : '') +
       '<button onclick="openModal()" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add Deal</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">' +
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--muted)"><strong style="color:var(--text)">' + filtered.length + '</strong> shown</div>' +
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--muted)"><strong style="color:var(--green)">' + activeCount + '</strong> active</div>' +
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--muted)"><strong style="color:var(--yellow)">' + pausedCount + '</strong> paused</div>' +
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--muted)"><strong style="color:var(--muted)">' + archivedCount + '</strong> archived</div>' +
     '</div>' +
     (filtered.length === 0
       ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No deals match filter.</div>'
@@ -4522,22 +4576,23 @@ function renderSettingsPage() {
 
       // Postback info
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
-        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Postback Endpoint</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Paste this URL into your affiliate platforms to track conversions.</div>' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Postback Setup</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Use the per-deal postback generator from Casino Deals so each network gets the right macros.</div>' +
         '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--accent)">' +
-          'https://affdashboard-postback.darkinsidersbusiness.workers.dev/?token=pbkDark2026xZ&amp;funnel=FUNNEL&amp;event=EVENT&amp;sub1=[afp]' +
+          'Affiliate Dashboard > Casino Deals > Postback URLs' +
         '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:12px">The worker endpoint stays the same, but the macros differ by network. Using the deal-level generator avoids broken partner setups.</div>' +
       '</div>' +
 
       // Traffic Sources
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px">' +
         '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Traffic Sources</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Tag your smartlink URLs with <code style="background:var(--card2);padding:1px 6px;border-radius:3px;font-size:11px">?sub1=SOURCE_ID</code> to track traffic by source.</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Tag your smartlink URLs with <code style="background:var(--card2);padding:1px 6px;border-radius:3px;font-size:11px">?src=SOURCE_ID</code> to track traffic by source.</div>' +
         '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;overflow:hidden">' +
           '<table style="width:100%;border-collapse:collapse">' +
             '<thead><tr style="background:rgba(0,0,0,0.2)">' +
               '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Name</th>' +
-              '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">ID (use in sub1)</th>' +
+              '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">ID (use in src)</th>' +
               '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Type</th>' +
             '</tr></thead>' +
             '<tbody>' + srcRows + '</tbody>' +
@@ -4688,7 +4743,7 @@ function renderBuilderPage() {
     if (resolvedNet) {
       var pbUrls = buildPostbackUrls(resolvedNet, builderFunnel);
       var netBadge = networkBadge(resolvedNet.name);
-      var netNote  = resolvedNet.name === 'affilika' ? '<span style="font-size:10px;color:#f0b429;margin-left:8px">&#9888; Confirm {sub1}/{sub2} are available in Affilika postback variables</span>' : '';
+      var netNote  = resolvedNet.name === 'affilika' ? '<span style="font-size:10px;color:#f0b429;margin-left:8px">&#9888; Funnel uses {campaign_id}; source/campaign macros still need confirmation if you want source-level Affilika reporting</span>' : '';
       postbackSection =
         '<div style="border-top:1px solid var(--border);padding-top:18px;margin-top:18px">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
@@ -4846,7 +4901,7 @@ function renderSourcesTab() {
     '<div style="padding:24px 32px 0">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
         '<div><div style="font-size:18px;font-weight:700">Traffic Sources</div>' +
-          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Clicks broken down by sub1 source tag. Tag your smartlink URLs with ?sub1=SOURCE_ID</div></div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Clicks broken down by source tag. Tag your smartlink URLs with ?src=SOURCE_ID</div></div>' +
         '<div style="display:flex;gap:8px">' +
           '<select onchange="sourcesFilterSource=this.value;loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + srcOpts + '</select>' +
           '<select onchange="sourcesFilterDays=+this.value;loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
@@ -4875,7 +4930,7 @@ function loadSourcesData() {
       var d = doc.data();
       var ts = d.ts ? new Date(d.ts) : null;
       if (cutoff && ts && ts < cutoff) return;
-      var src = d.sub1 || 'unknown';
+      var src = d.src || d.sub1 || 'unknown';
       if (sourcesFilterSource && src !== sourcesFilterSource) return;
       if (!bySource[src]) bySource[src] = { clicks: 0, name: src };
       bySource[src].clicks++;
@@ -4920,7 +4975,7 @@ function renderSourcesData(container, bySource, bySourceConv, total) {
   });
 
   if (sids.length === 0) {
-    container.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No source data yet. Tag your smartlink URLs with ?sub1=meta (or tiktok, spam, etc.) to start tracking.</div>';
+    container.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No source data yet. Tag your smartlink URLs with ?src=meta (or tiktok, spam, etc.) to start tracking.</div>';
     return;
   }
 
@@ -5056,9 +5111,17 @@ function loadRoiData() {
       var d = doc.data();
       if (cutoff && d.date < cutoff) return;
       if (roiFilterFunnel && d.funnel !== roiFilterFunnel) return;
-      revenue += +(d.revenue || 0);
-      ftds += +(d.ftds || 0);
-      regs += +(d.regs || 0);
+      if (roiFilterSource) {
+        var srcData = d.sources && d.sources[roiFilterSource];
+        if (!srcData) return;
+        revenue += +(srcData.revenue || 0);
+        ftds += +(srcData.ftds || 0);
+        regs += +(srcData.regs || 0);
+      } else {
+        revenue += +(d.revenue || 0);
+        ftds += +(d.ftds || 0);
+        regs += +(d.regs || 0);
+      }
     });
 
     // Manual spend
