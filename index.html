@@ -2585,9 +2585,9 @@ function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   } else {
     funnelParam = '[trackingcode]';
   }
-  // Revenue hardcoded from deal's CPA amount so every FTD/QFTD records the correct commission
+  // Revenue only on QFTD (qualified CPA event) — FTD just records the deposit, no revenue, to avoid double-counting
   var cpa = (cpaAmount && cpaAmount > 0) ? cpaAmount : 0;
-  var ftdRevenue  = network.name === 'affilika' ? '{first_deposit}' : cpa;
+  var ftdRevenue  = network.name === 'affilika' ? '{first_deposit}' : 0;
   var qftdRevenue = network.name === 'affilika' ? '{payout}' : (network.name === 'casinobet' ? '{deposits_sum}' : cpa);
   var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=' + funnelParam + '&offer=' + network.name;
   return {
