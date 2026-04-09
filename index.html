@@ -1340,6 +1340,10 @@
       <span class="nav-arrow">▾</span>
     </button>
     <div class="nav-dropdown">
+      <div class="nav-item" id="tab-overview"     onclick="navGo(function(){analyticsTab='overview';setPage('analytics')})">
+        <span class="ni-dot" style="background:var(--accent)"></span>
+        <span class="ni-label">Overview</span>
+      </div>
       <div class="nav-item" id="tab-clicks"       onclick="navGo(function(){analyticsTab='clicks';setPage('analytics')})">
         <span class="ni-dot" style="background:var(--accent)"></span>
         <span class="ni-label">Click Analytics</span>
@@ -3729,7 +3733,8 @@ DOC_REF.onSnapshot(function(doc) {
 // ── Analytics ───────────────────────────────────────────────────────────────
 var analyticsFilterFunnel = '';
 var analyticsFilterDays = 7;
-var analyticsTab = 'clicks';
+var analyticsTab = 'overview';
+var overviewFilterDays = 7;
 var perfFilterDays = 7;
 var perfFilterFunnel = '';
 
@@ -3743,6 +3748,7 @@ function renderAnalyticsPage() {
   container.innerHTML =
     '<div style="padding:32px 32px 0;border-bottom:1px solid var(--border)">' +
       '<div style="display:flex;gap:0">' +
+        tabBtn('overview', 'Overview') +
         tabBtn('clicks', 'Click Analytics') +
         tabBtn('performance', 'Performance') +
         tabBtn('sources', 'Sources') +
@@ -3750,10 +3756,269 @@ function renderAnalyticsPage() {
       '</div>' +
     '</div>' +
     '<div id="analyticsTabBody"></div>';
-  if (analyticsTab === 'clicks') renderClicksTab();
+  if (analyticsTab === 'overview') renderOverviewTab();
+  else if (analyticsTab === 'clicks') renderClicksTab();
   else if (analyticsTab === 'performance') renderPerformanceTab();
   else if (analyticsTab === 'sources') renderSourcesTab();
   else if (analyticsTab === 'roi') renderRoiTab();
+}
+
+// ── Analytics: Overview Tab ──────────────────────────────────────────────────
+var FUNNEL_COLORS = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: '#f97316', SpinGPT: 'var(--red)', Shadow: 'var(--purple)' };
+
+function renderOverviewTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  var daysOpts = [1,7,30,0].map(function(d) {
+    var label = d === 0 ? 'All time' : d === 1 ? 'Today' : 'Last ' + d + ' days';
+    return '<option value="' + d + '"' + (overviewFilterDays === d ? ' selected' : '') + '>' + label + '</option>';
+  }).join('');
+  body.innerHTML =
+    '<div style="padding:28px 32px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">' +
+      '<div>' +
+        '<div style="font-size:18px;font-weight:700">Overview</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:3px">All funnels · clicks + conversions + revenue at a glance</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<select onchange="overviewFilterDays=+this.value;loadOverviewData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
+        '<button onclick="loadOverviewData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="overviewBody" style="padding:0 32px 40px"><div style="color:var(--muted);font-size:13px">Loading...</div></div>';
+  loadOverviewData();
+}
+
+function loadOverviewData() {
+  var body = document.getElementById('overviewBody');
+  if (!body) return;
+  body.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">Loading data...</div>';
+
+  var cutoffDate = null;
+  var cutoffTs = null;
+  if (overviewFilterDays > 0) {
+    var cd = new Date();
+    cd.setDate(cd.getDate() - overviewFilterDays);
+    cutoffDate = cd.toISOString().split('T')[0];
+    cutoffTs = new Date(cutoffDate + 'T00:00:00Z');
+  }
+
+  Promise.all([
+    db.collection('clicks').orderBy('ts', 'desc').limit(2000).get(),
+    db.collection('conversions').get(),
+    db.collection('postbacks').orderBy('ts', 'desc').limit(30).get()
+  ]).then(function(results) {
+    var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
+
+    // ── Clicks ──
+    var totalClicks = 0;
+    var clicksByFunnel = {}, clicksBySrc = {};
+    clickSnap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.ts ? new Date(d.ts) : null;
+      if (cutoffTs && ts && ts < cutoffTs) return;
+      totalClicks++;
+      var f = d.funnel || 'Unknown';
+      clicksByFunnel[f] = (clicksByFunnel[f] || 0) + 1;
+      var src = d.src || 'NoSource';
+      clicksBySrc[src] = (clicksBySrc[src] || 0) + 1;
+    });
+
+    // ── Conversions ──
+    var totalRegs = 0, totalFtds = 0, totalRevenue = 0;
+    var byFunnel = {};
+    var bySrcConv = {};
+    convSnap.forEach(function(doc) {
+      var d = doc.data();
+      if (cutoffDate && d.date < cutoffDate) return;
+      var f = d.funnel || 'Unknown';
+      if (!byFunnel[f]) byFunnel[f] = { regs: 0, ftds: 0, revenue: 0 };
+      byFunnel[f].regs += +(d.regs || 0);
+      byFunnel[f].ftds += +(d.ftds || 0);
+      byFunnel[f].revenue += +(d.revenue || 0);
+      totalRegs += +(d.regs || 0);
+      totalFtds += +(d.ftds || 0);
+      totalRevenue += +(d.revenue || 0);
+      if (d.sources) {
+        Object.keys(d.sources).forEach(function(sid) {
+          if (!bySrcConv[sid]) bySrcConv[sid] = { regs: 0, ftds: 0, revenue: 0 };
+          bySrcConv[sid].regs += +(d.sources[sid].regs || 0);
+          bySrcConv[sid].ftds += +(d.sources[sid].ftds || 0);
+          bySrcConv[sid].revenue += +(d.sources[sid].revenue || 0);
+        });
+      }
+    });
+
+    // ── Recent postbacks ──
+    var recentEvents = [];
+    pbSnap.forEach(function(doc) {
+      var d = doc.data();
+      if (recentEvents.length < 15) recentEvents.push(d);
+    });
+
+    renderOverviewData(body, {
+      totalClicks, totalRegs, totalFtds, totalRevenue,
+      clicksByFunnel, byFunnel, clicksBySrc, bySrcConv, recentEvents
+    });
+  }).catch(function(err) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:12px 0">Failed to load: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function renderOverviewData(container, data) {
+  var totalClicks = data.totalClicks, totalRegs = data.totalRegs,
+      totalFtds = data.totalFtds, totalRevenue = data.totalRevenue;
+  var cr = totalClicks > 0 ? (totalFtds / totalClicks * 100).toFixed(2) + '%' : '—';
+  var epc = totalClicks > 0 && totalRevenue > 0 ? '€' + (totalRevenue / totalClicks).toFixed(2) : '—';
+  var r2f = totalRegs > 0 ? (totalFtds / totalRegs * 100).toFixed(1) + '%' : '—';
+
+  function kpi(label, val, sub, color, icon) {
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;flex:1;min-width:120px;position:relative;overflow:hidden">' +
+      '<div style="position:absolute;inset:0;background:' + color + ';opacity:0.04;pointer-events:none"></div>' +
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + color + ';border-radius:3px 0 0 3px"></div>' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">' + label + '</div>' +
+      '<div style="font-size:26px;font-weight:800;color:' + color + ';font-family:var(--font-mono);line-height:1">' + val + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:5px">' + sub + '</div>' +
+    '</div>';
+  }
+
+  // Funnels
+  var allFunnels = FUNNEL_NAMES;
+  var funnelRows = allFunnels.map(function(f) {
+    var conv = data.byFunnel[f] || { regs: 0, ftds: 0, revenue: 0 };
+    var clicks = data.clicksByFunnel[f] || 0;
+    var cr = clicks > 0 ? (conv.ftds / clicks * 100).toFixed(1) + '%' : '—';
+    var color = FUNNEL_COLORS[f] || 'var(--muted)';
+    var hasData = clicks > 0 || conv.regs > 0 || conv.ftds > 0 || conv.revenue > 0;
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)' + (!hasData ? ';opacity:0.4' : '') + '">' +
+      '<td style="padding:10px 14px;white-space:nowrap">' +
+        '<span style="display:inline-flex;align-items:center;gap:7px">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0;box-shadow:0 0 6px ' + color + '"></span>' +
+          '<span style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(f) + '</span>' +
+        '</span>' +
+      '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--muted)">' + clicks + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--text)">' + conv.regs + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--green);font-weight:700">' + conv.ftds + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--yellow);font-weight:700">' + (conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—') + '</td>' +
+      '<td style="padding:10px 14px;font-size:12px;text-align:right;color:var(--muted)">' + cr + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // Sources
+  var allSrcIds = {};
+  Object.keys(data.clicksBySrc).forEach(function(k) { allSrcIds[k] = 1; });
+  Object.keys(data.bySrcConv).forEach(function(k) { allSrcIds[k] = 1; });
+  var srcList = Object.keys(allSrcIds).sort(function(a, b) {
+    return (data.clicksBySrc[b] || 0) - (data.clicksBySrc[a] || 0);
+  }).slice(0, 8);
+  var maxClicks = srcList.reduce(function(m, s) { return Math.max(m, data.clicksBySrc[s] || 0); }, 1);
+
+  var srcRows = srcList.map(function(sid) {
+    var sc = TRAFFIC_SOURCES.find(function(ts) { return ts.id === sid; });
+    var label = sc ? sc.name : sid;
+    var clicks = data.clicksBySrc[sid] || 0;
+    var conv = data.bySrcConv[sid] || { regs: 0, ftds: 0, revenue: 0 };
+    var barPct = Math.round(clicks / maxClicks * 100);
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<td style="padding:10px 14px;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;min-width:100px">' + escHtml(label) + '</td>' +
+      '<td style="padding:10px 14px;min-width:160px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">' +
+            '<div style="width:' + barPct + '%;height:100%;background:var(--accent);border-radius:3px;transition:width 0.4s ease"></div>' +
+          '</div>' +
+          '<span style="font-size:12px;font-family:var(--font-mono);color:var(--muted);min-width:28px;text-align:right">' + clicks + '</span>' +
+        '</div>' +
+      '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--green);font-weight:700">' + conv.ftds + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--yellow)">' + (conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // Recent events
+  var eventRows = data.recentEvents.map(function(d) {
+    var isReg = d.eventType === 'reg';
+    var isFtd = d.eventType === 'ftd';
+    var badgeColor = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
+    var badgeLabel = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType || d.rawEvent || '?').toUpperCase();
+    var ts = d.ts ? new Date(d.ts) : null;
+    var timeStr = ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + ts.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—';
+    var funnel = d.funnelKey || d.funnel || '?';
+    var fColor = FUNNEL_COLORS[funnel] || 'var(--muted)';
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<td style="padding:8px 14px;font-size:11px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap">' + timeStr + '</td>' +
+      '<td style="padding:8px 14px"><span style="font-size:11px;font-weight:700;color:' + fColor + '">' + escHtml(funnel) + '</span></td>' +
+      '<td style="padding:8px 14px"><span style="font-size:10px;font-weight:800;letter-spacing:0.5px;color:' + badgeColor + ';background:' + badgeColor + '1a;padding:2px 7px;border-radius:4px;border:1px solid ' + badgeColor + '44">' + badgeLabel + '</span></td>' +
+      '<td style="padding:8px 14px;font-size:11px;color:var(--muted)">' + escHtml(d.source || d.src || 'NoSource') + '</td>' +
+      '<td style="padding:8px 14px;font-size:12px;font-family:var(--font-mono);color:var(--yellow);text-align:right">' + (d.revenue > 0 ? '€' + (+d.revenue).toFixed(0) : '—') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var thStyle = 'padding:8px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);text-align:right;white-space:nowrap';
+  var thL = thStyle + ';text-align:left';
+
+  container.innerHTML =
+    // ── KPI Row ──
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px">' +
+      kpi('Clicks', totalClicks, 'smartlink visits', 'var(--accent)', '↗') +
+      kpi('Regs', totalRegs, 'registrations', '#818cf8', '✓') +
+      kpi('FTDs', totalFtds, 'first deposits', 'var(--green)', '💰') +
+      kpi('Revenue', totalRevenue > 0 ? '€' + totalRevenue.toFixed(0) : '€0', 'from FTDs', 'var(--yellow)', '€') +
+      kpi('Click→FTD', cr, 'conversion rate', 'var(--purple)', '%') +
+      kpi('Reg→FTD', r2f, 'deposit rate', '#06b6d4', '→') +
+      kpi('EPC', epc, 'earnings per click', '#f97316', '⚡') +
+    '</div>' +
+
+    // ── Two columns: Funnels + Recent ──
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+
+      // Funnels
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
+        '<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+          '<div style="font-size:13px;font-weight:700">Funnel Breakdown</div>' +
+        '</div>' +
+        '<table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="border-bottom:1px solid var(--border)">' +
+            '<th style="' + thL + '">Funnel</th>' +
+            '<th style="' + thStyle + '">Clicks</th>' +
+            '<th style="' + thStyle + '">Regs</th>' +
+            '<th style="' + thStyle + '">FTDs</th>' +
+            '<th style="' + thStyle + '">Revenue</th>' +
+            '<th style="' + thStyle + '">CR%</th>' +
+          '</tr></thead>' +
+          '<tbody>' + funnelRows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+
+      // Recent events
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
+        '<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+          '<div style="font-size:13px;font-weight:700">Recent Events</div>' +
+          '<span style="font-size:11px;color:var(--muted)">latest 15 postbacks</span>' +
+        '</div>' +
+        (eventRows
+          ? '<table style="width:100%;border-collapse:collapse"><tbody>' + eventRows + '</tbody></table>'
+          : '<div style="padding:24px;font-size:13px;color:var(--muted);text-align:center">No events yet</div>') +
+      '</div>' +
+
+    '</div>' +
+
+    // ── Sources ──
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--border)">' +
+        '<div style="font-size:13px;font-weight:700">Traffic Sources</div>' +
+      '</div>' +
+      (srcRows
+        ? '<table style="width:100%;border-collapse:collapse">' +
+            '<thead><tr style="border-bottom:1px solid var(--border)">' +
+              '<th style="' + thL + '">Source</th>' +
+              '<th style="' + thL + ';min-width:200px">Clicks</th>' +
+              '<th style="' + thStyle + '">FTDs</th>' +
+              '<th style="' + thStyle + '">Revenue</th>' +
+            '</tr></thead>' +
+            '<tbody>' + srcRows + '</tbody>' +
+          '</table>'
+        : '<div style="padding:24px;font-size:13px;color:var(--muted);text-align:center">No click data yet</div>') +
+    '</div>';
 }
 
 function renderClicksTab() {
