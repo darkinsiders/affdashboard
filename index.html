@@ -152,7 +152,11 @@
     margin-right: 12px;
     white-space: nowrap;
     flex-shrink: 0;
+    transition: color 0.15s;
+    padding: 4px 0;
   }
+  .nav-logo:hover { color: var(--text); }
+  .nav-logo.active { color: rgba(255,255,255,0.8); }
 
   /* Separator */
   .nav-sep {
@@ -1319,7 +1323,7 @@
 
 <!-- Top Nav -->
 <div class="top-nav" id="topNav">
-  <div class="nav-logo">Dark Intel</div>
+  <div class="nav-logo" onclick="setPage('home')" style="cursor:pointer" id="tab-home">Dark Intel</div>
   <div class="nav-sep"></div>
 
   <!-- Funnels group -->
@@ -1407,9 +1411,9 @@
       <span class="nav-arrow">▾</span>
     </button>
     <div class="nav-dropdown">
-      <div class="nav-item" id="tab-overview"     onclick="navGo(function(){analyticsTab='overview';setPage('analytics')})">
-        <span class="ni-dot" style="background:var(--accent)"></span>
-        <span class="ni-label">Overview</span>
+      <div class="nav-item" id="tab-overview"     onclick="navGo(function(){setPage('home')})">
+        <span class="ni-dot" style="background:rgba(255,255,255,0.5)"></span>
+        <span class="ni-label">Home / Overview</span>
       </div>
       <div class="nav-item" id="tab-clicks"       onclick="navGo(function(){analyticsTab='clicks';setPage('analytics')})">
         <span class="ni-dot" style="background:var(--accent)"></span>
@@ -1553,6 +1557,7 @@
 
 </div><!-- end dashboardContent -->
 
+<div id="homePage" style="display:none"></div>
 <div id="analyticsPage" style="display:none"></div>
 <div id="managePage" style="display:none"></div>
 <div id="dealsPage" style="display:none"></div>
@@ -1832,7 +1837,7 @@ document.addEventListener('click', function(e) {
 });
 
 function hideAllPages() {
-  ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage','builderPage','toolsPage'].forEach(function(id) {
+  ['homePage','managePage','analyticsPage','dealsPage','funnelsPage','settingsPage','builderPage','toolsPage'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -1891,7 +1896,13 @@ function setPage(page) {
   currentPage = page;
   hideAllPages();
 
-  if (page === 'analytics') {
+  if (page === 'home') {
+    var el = document.getElementById('homePage');
+    if (el) el.style.display = '';
+    setNavActive('home', 'home');
+    updateBreadcrumb('Home', '');
+    renderHomePage();
+  } else if (page === 'analytics') {
     var el = document.getElementById('analyticsPage');
     if (el) el.style.display = '';
     var subLabel = {clicks:'Click Analytics',performance:'Performance',sources:'Sources',roi:'ROI & Spend'}[analyticsTab] || 'Analytics';
@@ -2130,7 +2141,7 @@ function renderFunnelGeoBar() {
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
-var currentPage = 'dashboard'; // 'dashboard' | 'deals' | 'funnels' | 'analytics' | 'settings'
+var currentPage = 'home'; // 'home' | 'dashboard' | 'deals' | 'funnels' | 'analytics' | 'settings'
 var deals = [];
 var landingPages = [];
 var dealsFilterStatus = 'active'; // 'active' | 'paused' | 'archived' | 'all'
@@ -3761,7 +3772,7 @@ DOC_REF.onSnapshot(function(doc) {
     var overlay = document.getElementById('loadingOverlay');
     if (overlay) overlay.remove();
     render();
-    setFunnel(null);
+    setPage('home');
     renderGlitch();
     renderSlotValues();
     renderConflictBadges();
@@ -3832,6 +3843,266 @@ function renderAnalyticsPage() {
 
 // ── Analytics: Overview Tab ──────────────────────────────────────────────────
 var FUNNEL_COLORS = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: '#f97316', SpinGPT: 'var(--red)', Shadow: 'var(--purple)' };
+
+// ── HOME PAGE ─────────────────────────────────────────────────────────────────
+function renderHomePage() {
+  var el = document.getElementById('homePage');
+  if (!el) return;
+  var now = new Date();
+  var hour = now.getHours();
+  var greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  var dateStr = now.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+
+  // Count active deals
+  var activeDeals = (deals || []).filter(function(d){ return d.status === 'active'; });
+  var activeDealCount = activeDeals.length;
+
+  // Quick actions definition
+  var actions = [
+    { icon:'🔗', label:'Link Builder',   sub:'Campaign + postback URLs', fn:"setPage('builder')", color:'var(--yellow)' },
+    { icon:'🎰', label:'Casino Deals',    sub:activeDealCount + ' active deals',  fn:"setPage('deals')",   color:'var(--green)' },
+    { icon:'📊', label:'Analytics',       sub:'Clicks, FTDs, revenue',   fn:"analyticsTab='clicks';setPage('analytics')", color:'var(--accent)' },
+    { icon:'⚙️', label:'Funnel Config',   sub:'Routes & smartlinks',     fn:"setPage('funnels')",  color:'var(--purple)' },
+    { icon:'🤖', label:'Bot Content',     sub:'Glitch templates',         fn:"setPage('tools')",   color:'var(--orange)' },
+    { icon:'🌐', label:'All Deals Table', sub:'Universal view',           fn:"setFunnel(null)",    color:'var(--muted)' },
+  ];
+
+  var actionCards = actions.map(function(a) {
+    return '<div onclick="' + a.fn + '" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden" ' +
+      'onmouseover="this.style.borderColor=\'' + a.color + '\';this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'\'">' +
+      '<div style="font-size:20px;line-height:1">' + a.icon + '</div>' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text)">' + a.label + '</div>' +
+      '<div style="font-size:11px;color:var(--muted)">' + a.sub + '</div>' +
+    '</div>';
+  }).join('');
+
+  // Funnel cards (will be populated after data loads)
+  var funnelCardsHtml = FUNNEL_NAMES.map(function(f) {
+    var color = FUNNEL_COLORS[f] || 'var(--muted)';
+    var fAssigned = (dealWeights[f] && dealWeights[f].length > 0);
+    return '<div id="hfc-' + f + '" onclick="setFunnel(\'' + escHtml(f) + '\')" style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + color + ';border-radius:10px;padding:16px 18px;cursor:pointer;transition:all 0.15s;position:relative;overflow:hidden" ' +
+      'onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'var(--card)\'">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';box-shadow:0 0 6px ' + color + '"></span>' +
+          '<span style="font-family:var(--font-display);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">' + escHtml(f) + '</span>' +
+        '</div>' +
+        '<span style="font-size:9px;font-family:var(--font-mono);color:' + (fAssigned ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' + (fAssigned ? 'LIVE' : 'NO DEALS') + '</span>' +
+      '</div>' +
+      '<div id="hfc-data-' + f + '" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' +
+        '<div style="text-align:center"><div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--text)" id="hfc-clicks-' + f + '">—</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">Clicks</div></div>' +
+        '<div style="text-align:center"><div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--green)" id="hfc-ftds-' + f + '">—</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">FTDs</div></div>' +
+        '<div style="text-align:center"><div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--yellow)" id="hfc-rev-' + f + '">—</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">Revenue</div></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  el.innerHTML =
+    '<div style="padding:28px 32px 40px;max-width:1800px;margin:0 auto;position:relative;z-index:1">' +
+
+      // ── Page header
+      '<div style="margin-bottom:28px">' +
+        '<div style="font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:6px">' + greeting + ' · ' + escHtml(dateStr) + '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
+          '<h1 style="font-family:var(--font-display);font-size:26px;font-weight:800;letter-spacing:-0.01em;color:rgba(255,255,255,0.85)">Command Center</h1>' +
+          '<div style="display:flex;gap:8px;align-items:center">' +
+            '<select id="homeFilterDays" onchange="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer;font-family:var(--font-body)">' +
+              '<option value="1">Today</option>' +
+              '<option value="7" selected>Last 7 days</option>' +
+              '<option value="30">Last 30 days</option>' +
+              '<option value="0">All time</option>' +
+            '</select>' +
+            '<button onclick="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;color:var(--muted);font-size:12px;cursor:pointer;transition:color 0.15s" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">↻ Refresh</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      // ── KPI strip
+      '<div id="homeKpis" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px">' +
+        homeKpiCard('homeKpi-clicks', 'Clicks', '—', 'smartlink visits','var(--accent)') +
+        homeKpiCard('homeKpi-regs',   'Regs',   '—', 'registrations',  'var(--purple)') +
+        homeKpiCard('homeKpi-ftds',   'FTDs',   '—', 'first deposits', 'var(--green)') +
+        homeKpiCard('homeKpi-rev',    'Revenue','—', 'from FTDs',      'var(--yellow)') +
+        homeKpiCard('homeKpi-cr',     'CR%',    '—', 'click→FTD rate', 'var(--orange)') +
+      '</div>' +
+
+      // ── Main grid: Funnels + Quick Actions
+      '<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;margin-bottom:16px">' +
+
+        // Funnels grid
+        '<div>' +
+          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:10px">Funnels (7d)</div>' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px" id="homeFunnelCards">' +
+            funnelCardsHtml +
+          '</div>' +
+        '</div>' +
+
+        // Quick actions
+        '<div>' +
+          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:10px">Quick Access</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + actionCards + '</div>' +
+        '</div>' +
+
+      '</div>' +
+
+      // ── Bottom grid: Sources + Recent Events
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+
+        // Traffic sources
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+          '<div style="padding:14px 18px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">Traffic Sources</div>' +
+          '<div id="homeSources" style="padding:14px 18px"><div style="color:var(--muted);font-size:12px">Loading...</div></div>' +
+        '</div>' +
+
+        // Recent events
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+          '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+            '<span style="font-family:var(--font-display);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">Live Events</span>' +
+            '<span style="font-size:10px;color:var(--muted);font-family:var(--font-mono)">latest 12</span>' +
+          '</div>' +
+          '<div id="homeEvents" style="padding:0"><div style="padding:14px 18px;color:var(--muted);font-size:12px">Loading...</div></div>' +
+        '</div>' +
+
+      '</div>' +
+    '</div>';
+
+  loadHomeData();
+}
+
+function homeKpiCard(id, label, val, sub, color) {
+  return '<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + color + ';border-radius:10px;padding:16px 18px;position:relative;overflow:hidden">' +
+    '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:8px">' + label + '</div>' +
+    '<div id="' + id + '" style="font-family:var(--font-mono);font-size:24px;font-weight:800;color:' + color + ';line-height:1">' + val + '</div>' +
+    '<div style="font-size:10px;color:var(--muted);margin-top:4px">' + sub + '</div>' +
+  '</div>';
+}
+
+function loadHomeData() {
+  var daysSel = document.getElementById('homeFilterDays');
+  var days = daysSel ? +daysSel.value : 7;
+  var cutoffTs = null, cutoffDate = null;
+  if (days > 0) {
+    var cd = new Date(); cd.setDate(cd.getDate() - days);
+    cutoffDate = cd.toISOString().split('T')[0];
+    cutoffTs = new Date(cutoffDate + 'T00:00:00Z');
+  }
+
+  Promise.all([
+    db.collection('clicks').orderBy('ts','desc').limit(2000).get(),
+    db.collection('conversions').get(),
+    db.collection('postbacks').orderBy('ts','desc').limit(12).get()
+  ]).then(function(results) {
+    var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
+
+    // Clicks
+    var totalClicks = 0;
+    var clicksByFunnel = {}, clicksBySrc = {};
+    clickSnap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.ts ? new Date(d.ts) : null;
+      if (cutoffTs && ts && ts < cutoffTs) return;
+      totalClicks++;
+      var f = d.funnel || 'Unknown';
+      clicksByFunnel[f] = (clicksByFunnel[f] || 0) + 1;
+      var src = d.src || 'NoSource';
+      clicksBySrc[src] = (clicksBySrc[src] || 0) + 1;
+    });
+
+    // Conversions
+    var totalRegs = 0, totalFtds = 0, totalRevenue = 0;
+    var byFunnel = {};
+    convSnap.forEach(function(doc) {
+      var d = doc.data();
+      if (cutoffDate && d.date < cutoffDate) return;
+      var f = d.funnel || 'Unknown';
+      if (!byFunnel[f]) byFunnel[f] = { regs:0, ftds:0, revenue:0 };
+      byFunnel[f].regs += +(d.regs || 0);
+      byFunnel[f].ftds += +(d.ftds || 0);
+      byFunnel[f].revenue += +(d.revenue || 0);
+      totalRegs += +(d.regs || 0);
+      totalFtds += +(d.ftds || 0);
+      totalRevenue += +(d.revenue || 0);
+    });
+
+    // Update KPIs
+    var cr = totalClicks > 0 ? (totalFtds / totalClicks * 100).toFixed(1) + '%' : '0%';
+    function setKpi(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    setKpi('homeKpi-clicks', totalClicks);
+    setKpi('homeKpi-regs',   totalRegs);
+    setKpi('homeKpi-ftds',   totalFtds);
+    setKpi('homeKpi-rev',    totalRevenue > 0 ? '€' + totalRevenue.toFixed(0) : '€0');
+    setKpi('homeKpi-cr',     cr);
+
+    // Update funnel cards
+    FUNNEL_NAMES.forEach(function(f) {
+      var clicks = clicksByFunnel[f] || 0;
+      var conv = byFunnel[f] || { regs:0, ftds:0, revenue:0 };
+      function setEl(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+      setEl('hfc-clicks-' + f, clicks);
+      setEl('hfc-ftds-' + f, conv.ftds);
+      setEl('hfc-rev-' + f, conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—');
+    });
+
+    // Traffic sources
+    var srcList = Object.keys(clicksBySrc).sort(function(a,b){ return clicksBySrc[b]-clicksBySrc[a]; }).slice(0,6);
+    var maxC = srcList.reduce(function(m,s){ return Math.max(m, clicksBySrc[s]); }, 1);
+    var sourcesEl = document.getElementById('homeSources');
+    if (sourcesEl) {
+      if (!srcList.length) {
+        sourcesEl.innerHTML = '<div style="color:var(--muted);font-size:12px">No click data yet</div>';
+      } else {
+        sourcesEl.innerHTML = srcList.map(function(sid) {
+          var sc = TRAFFIC_SOURCES.find(function(ts){ return ts.id === sid; });
+          var label = sc ? sc.name : sid;
+          var clicks = clicksBySrc[sid];
+          var pct = Math.round(clicks / maxC * 100);
+          return '<div style="margin-bottom:12px">' +
+            '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
+              '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(label) + '</span>' +
+              '<span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">' + clicks + '</span>' +
+            '</div>' +
+            '<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">' +
+              '<div style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:3px;transition:width 0.5s ease"></div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+    }
+
+    // Live events
+    var eventsEl = document.getElementById('homeEvents');
+    if (eventsEl) {
+      var evs = [];
+      pbSnap.forEach(function(doc) { evs.push(doc.data()); });
+      if (!evs.length) {
+        eventsEl.innerHTML = '<div style="padding:14px 18px;color:var(--muted);font-size:12px;text-align:center">No events yet</div>';
+      } else {
+        eventsEl.innerHTML = evs.map(function(d) {
+          var isFtd = d.eventType === 'ftd';
+          var isReg = d.eventType === 'reg';
+          var badgeColor = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
+          var badgeLabel = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType || '?').toUpperCase();
+          var ts = d.ts ? new Date(d.ts) : null;
+          var timeStr = ts ? ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + ' ' + ts.toLocaleDateString([],{month:'short',day:'numeric'}) : '—';
+          var funnel = d.funnelKey || d.funnel || '?';
+          var fColor = FUNNEL_COLORS[funnel] || 'var(--muted)';
+          var src = d.source || d.src || 'NoSource';
+          return '<div style="display:flex;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+            '<div style="font-size:9px;font-family:var(--font-mono);color:var(--muted);white-space:nowrap;min-width:80px">' + timeStr + '</div>' +
+            '<span style="font-size:10px;font-weight:800;letter-spacing:0.5px;color:' + badgeColor + ';background:' + badgeColor + '1a;padding:2px 7px;border-radius:4px;border:1px solid ' + badgeColor + '44;white-space:nowrap">' + badgeLabel + '</span>' +
+            '<span style="font-size:11px;font-weight:700;color:' + fColor + ';min-width:52px">' + escHtml(funnel) + '</span>' +
+            '<span style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(src) + '</span>' +
+            (d.revenue > 0 ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--yellow);white-space:nowrap">€' + (+d.revenue).toFixed(0) + '</span>' : '') +
+          '</div>';
+        }).join('');
+      }
+    }
+
+  }).catch(function(err) {
+    var sourcesEl = document.getElementById('homeSources');
+    if (sourcesEl) sourcesEl.innerHTML = '<div style="color:var(--red);font-size:12px">Error: ' + escHtml(err.message) + '</div>';
+  });
+}
 
 function renderOverviewTab() {
   var body = document.getElementById('analyticsTabBody');
