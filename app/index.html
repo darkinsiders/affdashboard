@@ -7712,12 +7712,16 @@ function renderMetaCampaignsPage() {
 
 
 // ── PHONE_FARM ────────────────────────────────────────────────────────
-// Phone Farm Management — redesigned around real phone/account data
+// Phone Farm Management v3 — card grid + detail panel
 
 var phoneFarmPhones = [];
 var phoneFarmProxies = [];
 var phoneFarmTab = 'phones';
 var phoneFarmLoaded = false;
+var pfView = 'grid'; // 'grid' | 'table'
+var pfSelectedId = null;
+var pfSearchTerm = '';
+var pfFilterActive = 'all';
 
 // ── Default seed data ─────────────────────────────────────────────────────────
 var PHONE_FARM_DEFAULT = [
@@ -7755,177 +7759,187 @@ var PHONE_FARM_DEFAULT = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function pfGenId() {
-  return 'pf_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+function pfGenId() { return 'pf_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+
+function pfLines(str) { return (str||'').split('\n').filter(function(s){ return s.trim(); }); }
+
+function pfCopyBtn(text, tooltip) {
+  var safe = escHtml(text).replace(/'/g,'&#39;');
+  return '<button onclick="copyToClipboard(\'' + safe.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\');event.stopPropagation()" title="Copy ' + (tooltip||'') + '" style="background:transparent;border:none;cursor:pointer;padding:3px 5px;border-radius:4px;color:var(--muted);font-size:11px;transition:color 0.15s;vertical-align:middle" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#x2398;</button>';
 }
 
-function pfBoolBadge(val, yesLabel, noLabel) {
-  if (val) return '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:rgba(126,191,154,0.12);color:var(--green);border:1px solid rgba(126,191,154,0.25);white-space:nowrap">' + (yesLabel||'YES') + '</span>';
-  return '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1);white-space:nowrap">' + (noLabel||'NO') + '</span>';
+function pfIs(val) {
+  return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(126,191,154,0.12);color:var(--green);border:1px solid rgba(126,191,154,0.25)">YES</span>';
+}
+function pfNo() {
+  return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid rgba(255,255,255,0.08)">NO</span>';
 }
 
-function pfInputStyle() {
-  return 'width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none;transition:border-color 0.15s;box-sizing:border-box';
-}
-function pfSelectStyle() { return pfInputStyle() + ';appearance:none;-webkit-appearance:none;cursor:pointer'; }
+function pfInputStyle() { return 'width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none;transition:border-color 0.15s;box-sizing:border-box'; }
+function pfSelectStyle() { return pfInputStyle()+';appearance:none;cursor:pointer'; }
 function pfLabelStyle() { return 'display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:5px'; }
-function pfFieldStyle() { return 'display:flex;flex-direction:column;gap:0'; }
 
-function pfActionBtn(label, color, onclick) {
-  return '<button onclick="' + onclick + '" style="background:transparent;border:1px solid ' + color + ';color:' + color + ';border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-body);white-space:nowrap;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'transparent\'">' + label + '</button>';
-}
-
-// ── Firebase Load / Save ───────────────────────────────────────────────────────
+// ── Firebase ──────────────────────────────────────────────────────────────────
 function loadPhoneFarmData(callback) {
   if (phoneFarmLoaded) { if (callback) callback(); return; }
-  var loaded = { phones: false, proxies: false };
-  function checkDone() {
-    if (loaded.phones && loaded.proxies) {
-      phoneFarmLoaded = true;
-      if (callback) callback();
-    }
-  }
+  var done = { phones:false, proxies:false };
+  function check() { if (done.phones && done.proxies) { phoneFarmLoaded = true; if (callback) callback(); } }
   db.collection('phone_farm').doc('phones').get().then(function(doc) {
-    if (doc.exists && doc.data().phones && doc.data().phones.length > 0) {
-      phoneFarmPhones = doc.data().phones;
-    } else {
-      phoneFarmPhones = PHONE_FARM_DEFAULT.map(function(p) { return Object.assign({}, p); });
-    }
-    loaded.phones = true; checkDone();
+    phoneFarmPhones = (doc.exists && doc.data().phones && doc.data().phones.length > 0)
+      ? doc.data().phones
+      : PHONE_FARM_DEFAULT.map(function(p){ return Object.assign({},p); });
+    done.phones = true; check();
   }).catch(function() {
-    phoneFarmPhones = PHONE_FARM_DEFAULT.map(function(p) { return Object.assign({}, p); });
-    loaded.phones = true; checkDone();
+    phoneFarmPhones = PHONE_FARM_DEFAULT.map(function(p){ return Object.assign({},p); });
+    done.phones = true; check();
   });
   db.collection('phone_farm').doc('proxies').get().then(function(doc) {
     if (doc.exists) phoneFarmProxies = doc.data().proxies || [];
-    loaded.proxies = true; checkDone();
-  }).catch(function() { loaded.proxies = true; checkDone(); });
+    done.proxies = true; check();
+  }).catch(function() { done.proxies = true; check(); });
 }
 
-function savePhoneFarmData(docId, field, data, toast) {
+function pfSave(docId, field, data, msg) {
   var obj = {}; obj[field] = data;
-  db.collection('phone_farm').doc(docId).set(obj, { merge: true }).then(function() {
-    if (toast) showToast(toast, 'ok', 2000);
-  }).catch(function(e) { showToast('Save failed: ' + e.message, 'alert', 3000); });
+  db.collection('phone_farm').doc(docId).set(obj, {merge:true})
+    .then(function(){ if (msg) showToast(msg,'ok',2000); })
+    .catch(function(e){ showToast('Save error: '+e.message,'alert',3000); });
 }
 
-// ── Modal helper ──────────────────────────────────────────────────────────────
-var _pfModalClose = null;
-function pfOpenModal(title, body, onSave) {
-  var overlay = document.getElementById('pfModalOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'pfModalOverlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px)';
-    document.body.appendChild(overlay);
-  }
-  overlay.innerHTML =
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative">' +
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function pfOpenModal(title, body, onSave, saveLabel) {
+  var ov = document.getElementById('pfModalOverlay');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'pfModalOverlay'; document.body.appendChild(ov); }
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px)';
+  ov.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:640px;max-width:96vw;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 24px 80px rgba(0,0,0,0.6)">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">' +
         '<span style="font-size:16px;font-weight:700;color:var(--text)">' + title + '</span>' +
-        '<button onclick="pfCloseModal()" style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#x2715;</button>' +
+        '<button onclick="pfCloseModal()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#x2715;</button>' +
       '</div>' +
-      '<div id="pfModalBody">' + body + '</div>' +
-      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:16px;border-top:1px solid var(--border)">' +
+      '<div>' + body + '</div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px;padding-top:18px;border-top:1px solid var(--border)">' +
         '<button onclick="pfCloseModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:var(--font-body)">Cancel</button>' +
-        '<button onclick="pfSaveFromModal()" style="background:rgba(126,191,154,0.15);border:1px solid rgba(126,191,154,0.3);color:var(--green);border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">Save</button>' +
+        '<button onclick="window._pfOnSave&&window._pfOnSave()" style="background:rgba(126,191,154,0.15);border:1px solid rgba(126,191,154,0.3);color:var(--green);border-radius:8px;padding:9px 22px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">' + (saveLabel||'Save') + '</button>' +
       '</div>' +
     '</div>';
-  overlay.style.display = 'flex';
-  _pfModalClose = null;
   window._pfOnSave = onSave;
 }
+function pfCloseModal() { var ov = document.getElementById('pfModalOverlay'); if (ov) ov.style.display = 'none'; }
 
-function pfSaveFromModal() { if (window._pfOnSave) window._pfOnSave(); }
-function pfCloseModal() {
-  var overlay = document.getElementById('pfModalOverlay');
-  if (overlay) overlay.style.display = 'none';
-}
-
-// ── Main render ───────────────────────────────────────────────────────────────
+// ── Main Page ─────────────────────────────────────────────────────────────────
 function renderPhoneFarmPage() {
   var page = document.getElementById('phoneFarmPage');
   if (!page) return;
-  page.innerHTML = '<div style="max-width:1400px;margin:0 auto;padding:28px 24px"><div id="pfShell"></div></div>';
-  loadPhoneFarmData(function() { pfRenderShell(); });
+  page.innerHTML = '<div id="pfRoot" style="display:flex;height:calc(100vh - 56px);overflow:hidden"></div>';
+  loadPhoneFarmData(pfBuild);
 }
 
-function pfRenderShell() {
-  var shell = document.getElementById('pfShell');
-  if (!shell) return;
+function pfBuild() {
+  var root = document.getElementById('pfRoot');
+  if (!root) return;
 
-  var active = phoneFarmPhones.filter(function(p){ return p.active; }).length;
-  var totalIG = 0, totalTT = 0;
-  phoneFarmPhones.forEach(function(p) {
-    if (p.igAccounts) totalIG += p.igAccounts.split('\n').filter(function(s){return s.trim();}).length;
-    if (p.ttAccounts) totalTT += p.ttAccounts.split('\n').filter(function(s){return s.trim();}).length;
-  });
+  // Inject panel CSS once
+  if (!document.getElementById('pfPanelStyle')) {
+    var st = document.createElement('style');
+    st.id = 'pfPanelStyle';
+    st.textContent = [
+      '#pfDetailPanel{transition:width 0.25s cubic-bezier(0.4,0,0.2,1),opacity 0.2s}',
+      '#pfDetailPanel.pf-open{width:360px;opacity:1;pointer-events:all}',
+      '#pfDetailPanel.pf-closed{width:0;opacity:0;pointer-events:none}',
+      '.pf-card{cursor:pointer;transition:border-color 0.15s,background 0.15s,transform 0.1s}',
+      '.pf-card:hover{border-color:var(--border-bright)!important;background:rgba(255,255,255,0.04)!important}',
+      '.pf-card.pf-selected{border-color:rgba(112,112,240,0.5)!important;background:rgba(112,112,240,0.05)!important}',
+      '.pf-copy-btn{opacity:0;transition:opacity 0.15s}',
+      '.pf-cred-row:hover .pf-copy-btn{opacity:1}',
+      '.pf-tab-btn{transition:all 0.15s}',
+      '.pf-acct-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-family:var(--font-mono);margin:2px;white-space:nowrap}',
+    ].join('\n');
+    document.head.appendChild(st);
+  }
 
-  shell.innerHTML =
-    // Header
-    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px">' +
-      '<div>' +
-        '<div style="font-size:22px;font-weight:800;color:var(--text);letter-spacing:-0.5px">Phone Farm</div>' +
-        '<div style="font-size:13px;color:var(--muted);margin-top:3px">Manage farm phones, SIM cards, and social accounts</div>' +
+  root.innerHTML =
+    // LEFT: main panel
+    '<div id="pfMain" style="flex:1;overflow-y:auto;padding:28px 24px;display:flex;flex-direction:column;gap:0;min-width:0">' +
+      pfBuildHeader() +
+      pfBuildStats() +
+      pfBuildToolbar() +
+      '<div id="pfBody"></div>' +
+    '</div>' +
+    // RIGHT: detail panel
+    '<div id="pfDetailPanel" class="pf-closed" style="overflow-y:auto;border-left:1px solid var(--border);background:var(--card2);flex-shrink:0"></div>';
+
+  pfRenderBody();
+  if (pfSelectedId) pfOpenDetail(pfSelectedId, false);
+}
+
+function pfBuildHeader() {
+  return '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
+    '<div>' +
+      '<div style="font-size:22px;font-weight:800;color:var(--text);letter-spacing:-0.5px">Phone Farm</div>' +
+      '<div style="font-size:13px;color:var(--muted);margin-top:3px">' + phoneFarmPhones.length + ' devices &nbsp;·&nbsp; ' +
+        phoneFarmPhones.filter(function(p){return p.active;}).length + ' active' +
       '</div>' +
-      '<button onclick="openPhoneModal(null)" style="background:rgba(126,191,154,0.12);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Phone</button>' +
     '</div>' +
-    // Stats row
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">' +
-      pfStatCard(phoneFarmPhones.length, 'Total Phones', 'var(--text)') +
-      pfStatCard(active, 'Active', 'var(--green)') +
-      pfStatCard(totalIG, 'IG Accounts', 'var(--orange)') +
-      pfStatCard(totalTT, 'TT Accounts', 'var(--purple)') +
+    '<div style="display:flex;gap:8px">' +
+      '<button onclick="pfSwitchMainTab(\'proxies\')" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 15px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">Proxies</button>' +
+      '<button onclick="openPhoneModal(null)" style="background:rgba(126,191,154,0.12);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Phone</button>' +
     '</div>' +
-    // Tabs
-    '<div style="display:flex;gap:6px;margin-bottom:18px">' +
-      pfTabBtn('phones', 'Phones') +
-      pfTabBtn('proxies', 'Proxies') +
-    '</div>' +
-    '<div id="pfTabContent"></div>';
-
-  pfSwitchTab(phoneFarmTab);
-}
-
-function pfStatCard(val, label, color) {
-  return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:16px 18px">' +
-    '<div style="font-size:24px;font-weight:800;color:' + color + '">' + val + '</div>' +
-    '<div style="font-size:11px;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">' + label + '</div>' +
   '</div>';
 }
 
-function pfTabBtn(id, label) {
-  var active = phoneFarmTab === id;
-  return '<button onclick="pfSwitchTab(\'' + id + '\')" style="background:' + (active ? 'rgba(255,255,255,0.08)' : 'transparent') + ';border:1px solid ' + (active ? 'var(--border-bright)' : 'var(--border)') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';border-radius:7px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all 0.15s">' + label + '</button>';
-}
-
-function pfSwitchTab(tab) {
-  phoneFarmTab = tab;
-  // Re-render tabs highlighting
-  var shell = document.getElementById('pfShell');
-  if (shell) {
-    var tabBtns = shell.querySelectorAll('[onclick^="pfSwitchTab"]');
-    tabBtns.forEach(function(btn) {
-      var t = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
-      var isActive = t === tab;
-      btn.style.background = isActive ? 'rgba(255,255,255,0.08)' : 'transparent';
-      btn.style.borderColor = isActive ? 'var(--border-bright)' : 'var(--border)';
-      btn.style.color = isActive ? 'var(--text)' : 'var(--muted)';
-    });
+function pfBuildStats() {
+  var total = phoneFarmPhones.length;
+  var active = phoneFarmPhones.filter(function(p){return p.active;}).length;
+  var totalIG = 0, totalTT = 0;
+  phoneFarmPhones.forEach(function(p){
+    totalIG += pfLines(p.igAccounts).length;
+    totalTT += pfLines(p.ttAccounts).length;
+  });
+  function sc(val, label, color, sub) {
+    return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
+      '<div style="font-size:26px;font-weight:800;color:' + color + ';line-height:1">' + val + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">' + label + '</div>' +
+      (sub ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;opacity:0.7">' + sub + '</div>' : '') +
+    '</div>';
   }
-  if (tab === 'phones') renderPhonesTab();
-  else renderProxiesTab();
+  return '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">' +
+    sc(total, 'Total Phones', 'var(--text)', '') +
+    sc(active, 'Active', 'var(--green)', (total-active) + ' inactive') +
+    sc(totalIG, 'IG Accounts', 'var(--orange)', Math.round(totalIG/Math.max(1,total)*10)/10 + ' avg/phone') +
+    sc(totalTT, 'TT Accounts', 'var(--purple)', Math.round(totalTT/Math.max(1,total)*10)/10 + ' avg/phone') +
+  '</div>';
 }
 
-// ── Phones Table ──────────────────────────────────────────────────────────────
-var pfSearchTerm = '';
-var pfFilterActive = 'all';
+function pfBuildToolbar() {
+  return '<div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">' +
+    '<input id="pfSearch" type="text" placeholder="&#x1F50D; Search phones, accounts, tel..." value="' + escHtml(pfSearchTerm) + '" ' +
+      'oninput="pfSearchTerm=this.value;pfRenderBody()" ' +
+      'style="flex:1;min-width:180px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:8px 13px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none">' +
+    '<div style="display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:3px">' +
+      pfFilterPill('all', 'All') +
+      pfFilterPill('active', 'Active') +
+      pfFilterPill('inactive', 'Inactive') +
+    '</div>' +
+    '<div style="display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:3px">' +
+      pfViewToggle('grid', '&#9783;') +
+      pfViewToggle('table', '&#9776;') +
+    '</div>' +
+  '</div>';
+}
 
-function renderPhonesTab() {
-  var container = document.getElementById('pfTabContent');
-  if (!container) return;
+function pfFilterPill(val, label) {
+  var a = pfFilterActive === val;
+  return '<button onclick="pfFilterActive=\'' + val + '\';pfRenderBody()" class="pf-tab-btn" style="background:' + (a?'rgba(255,255,255,0.09)':'transparent') + ';border:none;border-radius:5px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body);color:' + (a?'var(--text)':'var(--muted)') + '">' + label + '</button>';
+}
 
-  var filtered = phoneFarmPhones.filter(function(p) {
+function pfViewToggle(val, icon) {
+  var a = pfView === val;
+  return '<button onclick="pfView=\'' + val + '\';pfRenderBody()" class="pf-tab-btn" title="' + val + ' view" style="background:' + (a?'rgba(255,255,255,0.09)':'transparent') + ';border:none;border-radius:5px;padding:5px 10px;font-size:14px;cursor:pointer;font-family:var(--font-body);color:' + (a?'var(--text)':'var(--muted)') + '">' + icon + '</button>';
+}
+
+function pfGetFiltered() {
+  return phoneFarmPhones.filter(function(p) {
     if (pfFilterActive === 'active' && !p.active) return false;
     if (pfFilterActive === 'inactive' && p.active) return false;
     if (pfSearchTerm) {
@@ -7938,191 +7952,309 @@ function renderPhonesTab() {
     }
     return true;
   });
+}
 
+function pfRenderBody() {
+  var container = document.getElementById('pfBody');
+  if (!container) return;
+  // Rebuild toolbar to update active states
+  var tb = container.previousSibling;
+  if (tb && tb.id !== 'pfStats') {
+    var newTb = document.createElement('div');
+    newTb.innerHTML = pfBuildToolbar();
+    if (tb.parentNode) tb.parentNode.replaceChild(newTb.firstChild, tb);
+  }
+  var phones = pfGetFiltered();
+  if (pfView === 'grid') pfRenderGrid(container, phones);
+  else pfRenderTable(container, phones);
+}
+
+// ── GRID VIEW ─────────────────────────────────────────────────────────────────
+function pfRenderGrid(container, phones) {
+  if (!phones.length) { container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:14px">No phones match</div>'; return; }
   container.innerHTML =
-    // Filter bar
-    '<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">' +
-      '<input id="pfSearch" type="text" placeholder="Search phones, accounts..." value="' + escHtml(pfSearchTerm) + '" oninput="pfSearchTerm=this.value;renderPhonesTab()" style="flex:1;min-width:200px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none">' +
-      '<div style="display:flex;gap:6px">' +
-        pfFilterBtn('all', 'All') +
-        pfFilterBtn('active', 'Active') +
-        pfFilterBtn('inactive', 'Inactive') +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding-bottom:24px">' +
+      phones.map(function(p) { return pfCard(p); }).join('') +
+    '</div>';
+}
+
+function pfCard(p) {
+  var igList = pfLines(p.igAccounts);
+  var ttList = pfLines(p.ttAccounts);
+  var isSelected = pfSelectedId === p.id;
+
+  var statusDot = p.active
+    ? '<span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;box-shadow:0 0 6px var(--green)"></span>'
+    : '<span style="width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block"></span>';
+
+  var acctBar = '';
+  if (igList.length) acctBar += '<span style="font-size:10px;font-weight:600;color:var(--orange);background:rgba(196,132,90,0.12);border:1px solid rgba(196,132,90,0.2);border-radius:4px;padding:2px 7px">IG \xd7' + igList.length + '</span> ';
+  if (ttList.length) acctBar += '<span style="font-size:10px;font-weight:600;color:var(--purple);background:rgba(160,160,200,0.12);border:1px solid rgba(160,160,200,0.2);border-radius:4px;padding:2px 7px">TT \xd7' + ttList.length + '</span>';
+
+  var firstIG = igList[0] || '';
+  var firstTT = ttList[0] || '';
+
+  return '<div class="pf-card' + (isSelected?' pf-selected':'') + '" onclick="pfOpenDetail(\'' + p.id + '\')" ' +
+    'style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden">' +
+    // Top row: number + status
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--text)">' + p.num + '</span>' +
+        '<div>' +
+          '<div style="font-size:12px;font-weight:700;color:var(--text);font-family:var(--font-mono)">' + escHtml(p.tel||'—') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:4px;margin-top:2px">' + statusDot + '<span style="font-size:10px;color:var(--muted)">' + (p.active?'Active':'Inactive') + '</span></div>' +
+        '</div>' +
       '</div>' +
+      (p.important ? '<span title="Has important notes" style="font-size:12px;color:var(--yellow);cursor:pointer" onclick="pfShowImportant(\'' + p.id + '\');event.stopPropagation()">&#x26A0;</span>' : '') +
     '</div>' +
-    // Table wrapper (scrollable)
-    '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px">' +
+    // Account badges
+    (acctBar ? '<div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px">' + acctBar + '</div>' : '') +
+    // First account previews
+    (firstIG ? '<div style="font-size:11px;color:var(--orange);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">' + escHtml(firstIG) + (igList.length > 1 ? ' <span style="color:var(--muted)">+' + (igList.length-1) + '</span>' : '') + '</div>' : '') +
+    (firstTT ? '<div style="font-size:11px;color:var(--purple);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px">' + escHtml(firstTT) + (ttList.length > 1 ? ' <span style="color:var(--muted)">+' + (ttList.length-1) + '</span>' : '') + '</div>' : '') +
+    // Footer: PIN + Reset
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05)">' +
+      '<span style="font-size:10px;font-family:var(--font-mono);color:var(--muted)">PIN: <strong style="color:var(--text)">' + escHtml(p.pin||'—') + '</strong></span>' +
+      (p.reset ? '<span style="font-size:10px;font-weight:600;color:var(--yellow);background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.2);border-radius:3px;padding:1px 5px">RST</span>' : '') +
+    '</div>' +
+  '</div>';
+}
+
+// ── TABLE VIEW ────────────────────────────────────────────────────────────────
+function pfRenderTable(container, phones) {
+  if (!phones.length) { container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:14px">No phones match</div>'; return; }
+  container.innerHTML =
+    '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px;margin-bottom:24px">' +
       '<table style="width:100%;border-collapse:collapse;white-space:nowrap">' +
         '<thead>' +
           '<tr style="background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border)">' +
-            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">#</th>' +
-            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Tel</th>' +
-            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:0.5px">IG Accounts</th>' +
-            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.5px">TT Accounts</th>' +
-            '<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Active</th>' +
-            '<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Reset</th>' +
-            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">PIN / PUK</th>' +
-            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">iCloud</th>' +
-            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">IG Mail</th>' +
-            '<th style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px"></th>' +
+            ['#','Tel','IG Accounts','TT Accounts','Active','Reset','PIN','PUK','iCloud',''].map(function(h,i) {
+              var clr = i===2?'var(--orange)':i===3?'var(--purple)':'var(--muted)';
+              return '<th style="padding:10px 13px;text-align:left;font-size:11px;font-weight:700;color:'+clr+';text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">' + h + '</th>';
+            }).join('') +
           '</tr>' +
         '</thead>' +
         '<tbody>' +
-          (filtered.length === 0 ? '<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No phones found</td></tr>' :
-            filtered.map(function(p) { return renderPhoneRow(p); }).join('')) +
+          phones.map(function(p) {
+            var ig = pfLines(p.igAccounts);
+            var tt = pfLines(p.ttAccounts);
+            var isSel = pfSelectedId === p.id;
+            function accts(list, color) {
+              if (!list.length) return '<span style="color:var(--muted);font-size:12px">—</span>';
+              return list.slice(0,2).map(function(a){
+                return '<span class="pf-acct-tag" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);color:'+color+'">' + escHtml(a) + '</span>';
+              }).join('') + (list.length>2 ? '<span style="font-size:10px;color:var(--muted);margin-left:3px">+' + (list.length-2) + '</span>' : '');
+            }
+            return '<tr onclick="pfOpenDetail(\'' + p.id + '\')" style="border-bottom:1px solid var(--border);cursor:pointer;background:' + (isSel?'rgba(112,112,240,0.05)':'transparent') + ';transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'' + (isSel?'rgba(112,112,240,0.05)':'transparent') + '\'">' +
+              '<td style="padding:10px 13px;font-weight:700;color:var(--muted);font-size:12px">' + p.num + '</td>' +
+              '<td style="padding:10px 13px;font-family:var(--font-mono);font-size:12px;color:var(--text);font-weight:600">' + escHtml(p.tel||'—') + '</td>' +
+              '<td style="padding:10px 13px;max-width:240px;white-space:normal">' + accts(ig,'var(--orange)') + '</td>' +
+              '<td style="padding:10px 13px;max-width:240px;white-space:normal">' + accts(tt,'var(--purple)') + '</td>' +
+              '<td style="padding:10px 13px;text-align:center">' + (p.active?pfIs():pfNo()) + '</td>' +
+              '<td style="padding:10px 13px;text-align:center">' + (p.reset?pfIs():pfNo()) + '</td>' +
+              '<td style="padding:10px 13px;font-family:var(--font-mono);font-size:12px;color:var(--text)">' + escHtml(p.pin||'—') + '</td>' +
+              '<td style="padding:10px 13px;font-family:var(--font-mono);font-size:12px;color:var(--muted)">' + escHtml(p.puk||'—') + '</td>' +
+              '<td style="padding:10px 13px;font-family:var(--font-mono);font-size:11px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(p.icloud||'—') + '</td>' +
+              '<td style="padding:10px 13px"><div style="display:flex;gap:6px" onclick="event.stopPropagation()">' +
+                '<button onclick="openPhoneModal(\'' + p.id + '\')" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:var(--font-body)" onmouseover="this.style.borderColor=\'var(--border-bright)\';this.style.color=\'var(--text)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--muted)\'">Edit</button>' +
+              '</div></td>' +
+            '</tr>';
+          }).join('') +
         '</tbody>' +
       '</table>' +
     '</div>';
 }
 
-function pfFilterBtn(val, label) {
-  var active = pfFilterActive === val;
-  return '<button onclick="pfFilterActive=\'' + val + '\';renderPhonesTab()" style="background:' + (active ? 'rgba(255,255,255,0.08)' : 'transparent') + ';border:1px solid ' + (active ? 'var(--border-bright)' : 'var(--border)') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';border-radius:6px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">' + label + '</button>';
-}
+// ── DETAIL PANEL ──────────────────────────────────────────────────────────────
+function pfOpenDetail(id, scroll) {
+  pfSelectedId = id;
+  var p = phoneFarmPhones.find(function(x){ return x.id === id; });
+  if (!p) return;
 
-function renderPhoneRow(p) {
-  var igList = (p.igAccounts||'').split('\n').filter(function(s){return s.trim();});
-  var ttList = (p.ttAccounts||'').split('\n').filter(function(s){return s.trim();});
-  var mailList = (p.igMails||'').split('\n').filter(function(s){return s.trim();});
+  var panel = document.getElementById('pfDetailPanel');
+  if (!panel) return;
 
-  function acctPills(list, color) {
-    if (!list.length) return '<span style="color:var(--muted);font-size:12px">—</span>';
+  panel.className = 'pf-open';
+
+  var igList = pfLines(p.igAccounts);
+  var ttList = pfLines(p.ttAccounts);
+  var mailList = pfLines(p.igMails);
+
+  function section(title, content, color) {
+    return '<div style="padding:16px 18px;border-bottom:1px solid var(--border)">' +
+      '<div style="font-size:10px;font-weight:700;color:' + (color||'var(--muted)') + ';text-transform:uppercase;letter-spacing:0.7px;margin-bottom:10px">' + title + '</div>' +
+      content +
+    '</div>';
+  }
+
+  function credRow(label, value, copyVal) {
+    if (!value) return '';
+    return '<div class="pf-cred-row" style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:11px;color:var(--muted);min-width:60px">' + label + '</span>' +
+      '<span style="font-size:12px;font-family:var(--font-mono);color:var(--text);flex:1;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px">' + escHtml(value) + '</span>' +
+      '<span class="pf-copy-btn">' + pfCopyBtn(copyVal||value, label) + '</span>' +
+    '</div>';
+  }
+
+  function acctList(list, color) {
+    if (!list.length) return '<span style="font-size:12px;color:var(--muted)">None</span>';
     return list.map(function(a) {
-      return '<span style="display:inline-block;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 7px;font-size:11px;color:' + color + ';font-family:var(--font-mono);margin:1px 2px;white-space:nowrap">' + escHtml(a.trim()) + '</span>';
+      return '<div class="pf-cred-row" style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+        '<span style="font-size:12px;font-family:var(--font-mono);color:' + color + '">' + escHtml(a) + '</span>' +
+        '<span class="pf-copy-btn">' + pfCopyBtn(a) + '</span>' +
+      '</div>';
     }).join('');
   }
 
-  var pinPuk = '';
-  if (p.pin || p.puk) pinPuk = '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + (p.pin ? 'PIN: <strong style="color:var(--text)">' + escHtml(p.pin) + '</strong>' : '') + (p.pin && p.puk ? ' / ' : '') + (p.puk ? 'PUK: <strong style="color:var(--text)">' + escHtml(p.puk) + '</strong>' : '') + '</span>';
-  else pinPuk = '<span style="color:var(--muted);font-size:12px">—</span>';
-
-  var icloudCell = p.icloud ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">' + escHtml(p.icloud) + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>';
-
-  var mailCell;
-  if (!mailList.length) {
-    mailCell = '<span style="color:var(--muted);font-size:12px">—</span>';
-  } else {
-    mailCell = '<div style="font-size:11px;font-family:var(--font-mono);color:var(--muted);line-height:1.6">' +
-      mailList.slice(0,2).map(function(m){ return escHtml(m); }).join('<br>') +
-      (mailList.length > 2 ? '<br><span style="color:var(--accent)">+' + (mailList.length-2) + ' more</span>' : '') +
-      '</div>';
-  }
-
-  return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
-    '<td style="padding:10px 12px;font-weight:700;color:var(--muted);font-size:13px">' + p.num + '</td>' +
-    '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text);font-weight:600">' + escHtml(p.tel||'—') + '</td>' +
-    '<td style="padding:10px 12px;max-width:220px;white-space:normal">' + acctPills(igList, 'var(--orange)') + '</td>' +
-    '<td style="padding:10px 12px;max-width:220px;white-space:normal">' + acctPills(ttList, 'var(--purple)') + '</td>' +
-    '<td style="padding:10px 12px;text-align:center">' + pfBoolBadge(p.active) + '</td>' +
-    '<td style="padding:10px 12px;text-align:center">' + pfBoolBadge(p.reset, 'YES', 'NO') + '</td>' +
-    '<td style="padding:10px 12px">' + pinPuk + '</td>' +
-    '<td style="padding:10px 12px;max-width:180px;white-space:normal">' + icloudCell + '</td>' +
-    '<td style="padding:10px 12px;max-width:200px;white-space:normal">' + mailCell + '</td>' +
-    '<td style="padding:10px 12px">' +
-      '<div style="display:flex;gap:6px">' +
-        pfActionBtn('Edit', 'var(--accent)', 'openPhoneModal(\'' + p.id + '\')') +
-        (p.important ? pfActionBtn('!', 'var(--yellow)', 'pfShowImportant(\'' + p.id + '\')') : '') +
+  panel.innerHTML =
+    // Header
+    '<div style="padding:18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card2);z-index:1">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between">' +
+        '<div>' +
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<span style="width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,0.07);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--text)">' + p.num + '</span>' +
+            '<div>' +
+              '<div style="font-size:15px;font-weight:700;color:var(--text);font-family:var(--font-mono)">' + escHtml(p.tel||'—') + '</div>' +
+              '<div style="font-size:11px;color:var(--muted);margin-top:2px">Phone ' + p.num + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="pfCloseDetail()" style="background:transparent;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;border-radius:6px;line-height:1" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#x2715;</button>' +
       '</div>' +
-    '</td>' +
-  '</tr>';
+      // Status badges
+      '<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">' +
+        (p.active ? '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(126,191,154,0.12);color:var(--green);border:1px solid rgba(126,191,154,0.25)">&#9679; Active</span>' :
+                    '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1)">Inactive</span>') +
+        (p.reset ? '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(240,180,41,0.1);color:var(--yellow);border:1px solid rgba(240,180,41,0.2)">Reset Done</span>' : '') +
+        (p.igBio ? '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(196,132,90,0.1);color:var(--orange);border:1px solid rgba(196,132,90,0.2)">Bio Set</span>' : '') +
+      '</div>' +
+      // Action buttons
+      '<div style="display:flex;gap:6px;margin-top:10px">' +
+        '<button onclick="openPhoneModal(\'' + p.id + '\')" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 0;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)" onmouseover="this.style.borderColor=\'var(--border-bright)\'" onmouseout="this.style.borderColor=\'var(--border)\'">Edit</button>' +
+        '<button onclick="deletePhoneEntry(\'' + p.id + '\')" style="background:rgba(212,112,128,0.08);border:1px solid rgba(212,112,128,0.2);color:var(--red);border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:var(--font-body)" onmouseover="this.style.background=\'rgba(212,112,128,0.15)\'" onmouseout="this.style.background=\'rgba(212,112,128,0.08)\'">Del</button>' +
+      '</div>' +
+    '</div>' +
+
+    // IG Accounts
+    section('Instagram', acctList(igList, 'var(--orange)'), 'var(--orange)') +
+
+    // TT Accounts
+    section('TikTok', acctList(ttList, 'var(--purple)'), 'var(--purple)') +
+
+    // Credentials
+    section('Credentials',
+      credRow('PIN', p.pin, p.pin) +
+      credRow('PUK', p.puk, p.puk) +
+      credRow('iCloud', p.icloud, p.icloud)
+    ) +
+
+    // IG Mails
+    (mailList.length ? section('IG Emails',
+      mailList.map(function(m){ return credRow('', m, m); }).join('')
+    ) : '') +
+
+    // Important notes
+    (p.important ? section('Important Notes',
+      '<div style="background:rgba(240,180,41,0.06);border:1px solid rgba(240,180,41,0.15);border-radius:8px;padding:12px;font-family:var(--font-mono);font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">' + escHtml(p.important) + '</div>' +
+      '<button onclick="copyToClipboard(' + "'" + escHtml(p.important).replace(/'/g,"&#39;") + "'" + ')" style="margin-top:8px;background:transparent;border:1px solid rgba(240,180,41,0.2);color:var(--yellow);border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:var(--font-body)">Copy All</button>',
+      'var(--yellow)'
+    ) : '') +
+
+    // Nav arrows
+    '<div style="display:flex;gap:6px;padding:14px 18px;border-top:1px solid var(--border)">' +
+      '<button onclick="pfDetailNav(-1)" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:8px;font-size:13px;cursor:pointer;font-family:var(--font-body)" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#x2190; Prev</button>' +
+      '<button onclick="pfDetailNav(1)" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:8px;font-size:13px;cursor:pointer;font-family:var(--font-body)" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">Next &#x2192;</button>' +
+    '</div>';
+
+  // Highlight selected card / row
+  document.querySelectorAll('.pf-card, #pfBody tr').forEach(function(el) {
+    el.classList.remove('pf-selected');
+  });
+  var sel = document.querySelector('[onclick*="pfOpenDetail(\'' + id + '\')"]');
+  if (sel && sel.classList.contains('pf-card')) sel.classList.add('pf-selected');
+}
+
+function pfCloseDetail() {
+  pfSelectedId = null;
+  var panel = document.getElementById('pfDetailPanel');
+  if (panel) { panel.className = 'pf-closed'; panel.innerHTML = ''; }
+  document.querySelectorAll('.pf-card').forEach(function(el){ el.classList.remove('pf-selected'); });
+}
+
+function pfDetailNav(dir) {
+  var filtered = pfGetFiltered();
+  var idx = filtered.findIndex(function(p){ return p.id === pfSelectedId; });
+  if (idx === -1) return;
+  var next = filtered[idx + dir];
+  if (next) pfOpenDetail(next.id, true);
+}
+
+function pfSwitchMainTab(tab) {
+  if (tab === 'proxies') {
+    var page = document.getElementById('phoneFarmPage');
+    if (!page) return;
+    page.innerHTML = '<div style="max-width:900px;margin:0 auto;padding:28px 24px"><div id="pfProxiesRoot"></div></div>';
+    pfBuildProxiesView();
+  }
 }
 
 function pfShowImportant(id) {
   var p = phoneFarmPhones.find(function(x){ return x.id === id; });
   if (!p || !p.important) return;
-  pfOpenModal('Phone ' + p.num + ' — Important Notes',
-    '<div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:8px;padding:16px;font-family:var(--font-mono);font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">' + escHtml(p.important) + '</div>',
-    function() { pfCloseModal(); }
+  pfOpenModal('Phone ' + p.num + ' — Important',
+    '<div style="background:rgba(240,180,41,0.07);border:1px solid rgba(240,180,41,0.18);border-radius:8px;padding:16px;font-family:var(--font-mono);font-size:13px;color:var(--text);line-height:1.8;white-space:pre-wrap">' + escHtml(p.important) + '</div>',
+    function(){ pfCloseModal(); }, 'Close'
   );
-  // Replace save button with close only
-  setTimeout(function() {
-    var footer = document.querySelector('#pfModalOverlay > div > div:last-child');
-    if (footer) footer.innerHTML = '<button onclick="pfCloseModal()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:var(--font-body)">Close</button>';
-  }, 50);
 }
 
-// ── Phone Modal (Add / Edit) ──────────────────────────────────────────────────
+// ── Phone Modal ───────────────────────────────────────────────────────────────
 function openPhoneModal(id) {
   var p = id ? phoneFarmPhones.find(function(x){ return x.id === id; }) : null;
-  var v = function(field, def) { return p ? (p[field] !== undefined ? p[field] : def) : def; };
+  var v = function(f, d) { return p && p[f] !== undefined ? p[f] : d; };
 
   var body =
     '<div style="display:flex;flex-direction:column;gap:14px">' +
       '<div style="display:grid;grid-template-columns:80px 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '"># Nr</label>' +
-          '<input id="pfPNum" type="number" value="' + escHtml(String(v('num',phoneFarmPhones.length+1))) + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Tel Number</label>' +
-          '<input id="pfPTel" type="text" placeholder="041 xxx xxx" value="' + escHtml(v('tel','')) + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
+        '<div><label style="' + pfLabelStyle() + '"># Nr</label><input id="pfPNum" type="number" value="' + v('num',phoneFarmPhones.length+1) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">Tel Number</label><input id="pfPTel" type="text" placeholder="041 xxx xxx" value="' + escHtml(v('tel','')) + '" style="' + pfInputStyle() + '"></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">IG Accounts (one per line)</label>' +
-          '<textarea id="pfPIG" rows="4" placeholder="@AccountName" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('igAccounts','')) + '</textarea>' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">TT Accounts (one per line)</label>' +
-          '<textarea id="pfPTT" rows="4" placeholder="@AccountName" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('ttAccounts','')) + '</textarea>' +
-        '</div>' +
+        '<div><label style="' + pfLabelStyle() + '">IG Accounts (one per line)</label><textarea id="pfPIG" rows="5" placeholder="@AccountName" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('igAccounts','')) + '</textarea></div>' +
+        '<div><label style="' + pfLabelStyle() + '">TT Accounts (one per line)</label><textarea id="pfPTT" rows="5" placeholder="@AccountName" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('ttAccounts','')) + '</textarea></div>' +
       '</div>' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">IG Mails (one per line)</label>' +
-        '<textarea id="pfPMails" rows="3" placeholder="email@hotmail.com" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('igMails','')) + '</textarea>' +
+      '<div><label style="' + pfLabelStyle() + '">IG Mails (one per line)</label><textarea id="pfPMails" rows="3" placeholder="email@hotmail.com" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('igMails','')) + '</textarea></div>' +
+      '<div><label style="' + pfLabelStyle() + '">Important Notes</label><textarea id="pfPImportant" rows="3" placeholder="IG PASS: ...\nIG MAIL PASS: ..." style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('important','')) + '</textarea></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+        '<div><label style="' + pfLabelStyle() + '">PIN</label><input id="pfPPIN" type="text" value="' + escHtml(v('pin','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">PUK</label><input id="pfPPUK" type="text" value="' + escHtml(v('puk','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">iCloud</label><input id="pfPiCloud" type="text" value="' + escHtml(v('icloud','')) + '" style="' + pfInputStyle() + '"></div>' +
       '</div>' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">Important Notes (passwords, etc.)</label>' +
-        '<textarea id="pfPImportant" rows="3" placeholder="IG PASS: ...\nIG MAIL PASS: ..." style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('important','')) + '</textarea>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">PIN</label>' +
-          '<input id="pfPPIN" type="text" placeholder="0000" value="' + escHtml(v('pin','')) + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">PUK</label>' +
-          '<input id="pfPPUK" type="text" placeholder="00000000" value="' + escHtml(v('puk','')) + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-      '</div>' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">iCloud</label>' +
-        '<input id="pfPiCloud" type="text" placeholder="phonidark1@icloud.com / Desc123$" value="' + escHtml(v('icloud','')) + '" style="' + pfInputStyle() + '">' +
-      '</div>' +
-      '<div style="display:flex;gap:20px;align-items:center;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border)">' +
-        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">' +
-          '<input id="pfPActive" type="checkbox"' + (v('active',false) ? ' checked' : '') + ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)"> Active' +
-        '</label>' +
-        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">' +
-          '<input id="pfPReset" type="checkbox"' + (v('reset',false) ? ' checked' : '') + ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--yellow)"> Reset Done' +
-        '</label>' +
-        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">' +
-          '<input id="pfPBio" type="checkbox"' + (v('igBio',false) ? ' checked' : '') + ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--orange)"> IG Bio Set' +
-        '</label>' +
+      '<div style="display:flex;gap:20px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border)">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)"><input id="pfPActive" type="checkbox"' + (v('active',false)?' checked':'') + ' style="accent-color:var(--green)"> Active</label>' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)"><input id="pfPReset" type="checkbox"' + (v('reset',false)?' checked':'') + ' style="accent-color:var(--yellow)"> Reset Done</label>' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)"><input id="pfPBio" type="checkbox"' + (v('igBio',false)?' checked':'') + ' style="accent-color:var(--orange)"> IG Bio Set</label>' +
       '</div>' +
     '</div>';
 
-  pfOpenModal((id ? 'Edit Phone ' + (p ? p.num : '') : 'Add Phone'), body, function() { savePhoneEntry(id); });
+  pfOpenModal((id ? 'Edit Phone ' + (p?p.num:'') : 'Add Phone'), body, function(){ savePhoneEntry(id); });
 }
 
 function savePhoneEntry(id) {
-  var num      = parseInt(document.getElementById('pfPNum').value) || 0;
-  var tel      = (document.getElementById('pfPTel').value||'').trim();
-  var igAccounts = (document.getElementById('pfPIG').value||'').trim();
-  var ttAccounts = (document.getElementById('pfPTT').value||'').trim();
-  var igMails  = (document.getElementById('pfPMails').value||'').trim();
-  var important = (document.getElementById('pfPImportant').value||'').trim();
-  var pin      = (document.getElementById('pfPPIN').value||'').trim();
-  var puk      = (document.getElementById('pfPPUK').value||'').trim();
-  var icloud   = (document.getElementById('pfPiCloud').value||'').trim();
-  var active   = document.getElementById('pfPActive').checked;
-  var reset    = document.getElementById('pfPReset').checked;
-  var igBio    = document.getElementById('pfPBio').checked;
-
-  if (!tel && !num) { showToast('Tel number is required', 'alert', 3000); return; }
-
-  var entry = { num:num, tel:tel, igAccounts:igAccounts, ttAccounts:ttAccounts, igMails:igMails, important:important, pin:pin, puk:puk, icloud:icloud, active:active, reset:reset, igBio:igBio };
-
+  var entry = {
+    num:       parseInt(document.getElementById('pfPNum').value)||0,
+    tel:       (document.getElementById('pfPTel').value||'').trim(),
+    igAccounts:(document.getElementById('pfPIG').value||'').trim(),
+    ttAccounts:(document.getElementById('pfPTT').value||'').trim(),
+    igMails:   (document.getElementById('pfPMails').value||'').trim(),
+    important: (document.getElementById('pfPImportant').value||'').trim(),
+    pin:       (document.getElementById('pfPPIN').value||'').trim(),
+    puk:       (document.getElementById('pfPPUK').value||'').trim(),
+    icloud:    (document.getElementById('pfPiCloud').value||'').trim(),
+    active:    document.getElementById('pfPActive').checked,
+    reset:     document.getElementById('pfPReset').checked,
+    igBio:     document.getElementById('pfPBio').checked
+  };
+  if (!entry.tel && !entry.num) { showToast('Tel number required','alert',3000); return; }
   if (id) {
     var idx = phoneFarmPhones.findIndex(function(x){ return x.id === id; });
     if (idx !== -1) phoneFarmPhones[idx] = Object.assign(phoneFarmPhones[idx], entry);
@@ -8130,45 +8262,51 @@ function savePhoneEntry(id) {
     entry.id = pfGenId();
     phoneFarmPhones.push(entry);
   }
-
-  savePhoneFarmData('phones', 'phones', phoneFarmPhones, 'Phone saved');
+  pfSave('phones','phones',phoneFarmPhones,'Phone saved');
   pfCloseModal();
-  pfRenderShell();
+  phoneFarmLoaded = true;
+  pfBuild();
+  if (id) pfOpenDetail(id, false);
 }
 
 function deletePhoneEntry(id) {
-  if (!confirm('Delete this phone entry?')) return;
+  if (!confirm('Delete this phone?')) return;
   phoneFarmPhones = phoneFarmPhones.filter(function(x){ return x.id !== id; });
-  savePhoneFarmData('phones', 'phones', phoneFarmPhones, 'Phone deleted');
-  renderPhonesTab();
+  pfSelectedId = null;
+  pfSave('phones','phones',phoneFarmPhones,'Phone deleted');
+  pfCloseDetail();
+  pfBuild();
 }
 
-// ── Proxies Tab ───────────────────────────────────────────────────────────────
-function renderProxiesTab() {
-  var container = document.getElementById('pfTabContent');
-  if (!container) return;
+// ── Proxies View ──────────────────────────────────────────────────────────────
+function pfBuildProxiesView() {
+  var root = document.getElementById('pfProxiesRoot');
+  if (!root) return;
+  var rows = phoneFarmProxies.length === 0
+    ? '<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No proxies yet</td></tr>'
+    : phoneFarmProxies.map(function(p) {
+        return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
+          '<td style="padding:11px 14px;font-family:var(--font-mono);font-size:12px;color:var(--text);font-weight:600">' + escHtml(p.ip||'—') + '</td>' +
+          '<td style="padding:11px 14px;font-family:var(--font-mono);font-size:12px;color:var(--muted)">' + escHtml(String(p.port||'—')) + '</td>' +
+          '<td style="padding:11px 14px;font-size:12px;color:var(--muted)">' + escHtml(p.type||'DC') + '</td>' +
+          '<td style="padding:11px 14px;font-size:12px;color:var(--text)">' + escHtml(p.label||'') + '</td>' +
+          '<td style="padding:11px 14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + escHtml(p.username||'') + '</td>' +
+          '<td style="padding:11px 14px"><div style="display:flex;gap:6px">' +
+            '<button onclick="openProxyModal(\'' + p.id + '\')" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:var(--font-body)" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">Edit</button>' +
+            '<button onclick="deleteProxy(\'' + p.id + '\')" style="background:transparent;border:1px solid rgba(212,112,128,0.3);color:var(--red);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:var(--font-body)">Del</button>' +
+          '</div></td>' +
+        '</tr>';
+      }).join('');
 
-  var rows = phoneFarmProxies.length === 0 ?
-    '<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No proxies configured yet</td></tr>' :
-    phoneFarmProxies.map(function(p) {
-      return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
-        '<td style="padding:11px 14px;font-weight:600;color:var(--text);font-family:var(--font-mono);font-size:12px">' + escHtml(p.ip||'—') + '</td>' +
-        '<td style="padding:11px 14px;color:var(--muted);font-family:var(--font-mono);font-size:12px">' + escHtml(String(p.port||'—')) + '</td>' +
-        '<td style="padding:11px 14px;color:var(--muted);font-size:12px">' + escHtml(p.type||'DC') + '</td>' +
-        '<td style="padding:11px 14px;color:var(--muted);font-size:12px">' + escHtml(p.label||'') + '</td>' +
-        '<td style="padding:11px 14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + escHtml(p.username||'') + '</td>' +
-        '<td style="padding:11px 14px"><div style="display:flex;gap:6px">' +
-          pfActionBtn('Edit', 'var(--accent)', 'openProxyModal(\'' + p.id + '\')') +
-          pfActionBtn('Del', 'var(--red)', 'deleteProxy(\'' + p.id + '\')') +
-        '</div></td>' +
-      '</tr>';
-    }).join('');
-
-  container.innerHTML =
-    '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">' +
-      '<button onclick="openProxyModal(null)" style="background:rgba(126,191,154,0.12);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Proxy</button>' +
+  root.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+      '<div>' +
+        '<button onclick="renderPhoneFarmPage()" style="background:transparent;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:0;font-family:var(--font-body)" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#x2190; Back to Phones</button>' +
+        '<div style="font-size:20px;font-weight:800;color:var(--text);margin-top:8px">Proxies</div>' +
+      '</div>' +
+      '<button onclick="openProxyModal(null)" style="background:rgba(126,191,154,0.12);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Proxy</button>' +
     '</div>' +
-    '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+    '<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
       '<table style="width:100%;border-collapse:collapse">' +
         '<thead><tr style="background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border)">' +
           ['IP','Port','Type','Label','Username',''].map(function(h){ return '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">' + h + '</th>'; }).join('') +
@@ -8180,63 +8318,43 @@ function renderProxiesTab() {
 
 function openProxyModal(id) {
   var p = id ? phoneFarmProxies.find(function(x){ return x.id === id; }) : null;
-  var v = function(f,d) { return p && p[f] !== undefined ? p[f] : d; };
-
+  var v = function(f,d){ return p && p[f] !== undefined ? p[f] : d; };
   var body =
     '<div style="display:flex;flex-direction:column;gap:14px">' +
       '<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">IP Address *</label>' +
-          '<input id="pfXIP" type="text" placeholder="1.2.3.4" value="' + escHtml(v('ip','')) + '" style="' + pfInputStyle() + '"></div>' +
-        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Port</label>' +
-          '<input id="pfXPort" type="text" placeholder="8080" value="' + escHtml(String(v('port',''))) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">IP Address *</label><input id="pfXIP" type="text" placeholder="1.2.3.4" value="' + escHtml(v('ip','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">Port</label><input id="pfXPort" type="text" placeholder="8080" value="' + escHtml(String(v('port',''))) + '" style="' + pfInputStyle() + '"></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Type</label>' +
-          '<select id="pfXType" style="' + pfSelectStyle() + '">' +
-            ['Residential','Mobile','DC'].map(function(t){ return '<option value="' + t + '"' + (v('type','DC')===t?' selected':'') + '>' + t + '</option>'; }).join('') +
-          '</select></div>' +
-        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Label</label>' +
-          '<input id="pfXLabel" type="text" placeholder="My Proxy" value="' + escHtml(v('label','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">Type</label><select id="pfXType" style="' + pfSelectStyle() + '">' + ['Residential','Mobile','DC'].map(function(t){ return '<option value="' + t + '"' + (v('type','DC')===t?' selected':'') + '>' + t + '</option>'; }).join('') + '</select></div>' +
+        '<div><label style="' + pfLabelStyle() + '">Label</label><input id="pfXLabel" type="text" value="' + escHtml(v('label','')) + '" style="' + pfInputStyle() + '"></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Username</label>' +
-          '<input id="pfXUser" type="text" value="' + escHtml(v('username','')) + '" style="' + pfInputStyle() + '"></div>' +
-        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Password</label>' +
-          '<input id="pfXPass" type="text" value="' + escHtml(v('password','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">Username</label><input id="pfXUser" type="text" value="' + escHtml(v('username','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div><label style="' + pfLabelStyle() + '">Password</label><input id="pfXPass" type="text" value="' + escHtml(v('password','')) + '" style="' + pfInputStyle() + '"></div>' +
       '</div>' +
     '</div>';
-
-  pfOpenModal(id ? 'Edit Proxy' : 'Add Proxy', body, function() { saveProxy(id); });
+  pfOpenModal(id?'Edit Proxy':'Add Proxy', body, function(){ saveProxy(id); });
 }
 
 function saveProxy(id) {
-  var ip       = (document.getElementById('pfXIP').value||'').trim();
-  var port     = (document.getElementById('pfXPort').value||'').trim();
-  var type     = document.getElementById('pfXType').value;
-  var label    = (document.getElementById('pfXLabel').value||'').trim();
-  var username = (document.getElementById('pfXUser').value||'').trim();
-  var password = (document.getElementById('pfXPass').value||'').trim();
-
-  if (!ip) { showToast('IP address required', 'alert', 3000); return; }
-
-  var entry = { ip:ip, port:port, type:type, label:label, username:username, password:password };
+  var ip = (document.getElementById('pfXIP').value||'').trim();
+  if (!ip) { showToast('IP required','alert',3000); return; }
+  var entry = { ip:ip, port:(document.getElementById('pfXPort').value||'').trim(), type:document.getElementById('pfXType').value, label:(document.getElementById('pfXLabel').value||'').trim(), username:(document.getElementById('pfXUser').value||'').trim(), password:(document.getElementById('pfXPass').value||'').trim() };
   if (id) {
     var idx = phoneFarmProxies.findIndex(function(x){ return x.id === id; });
     if (idx !== -1) phoneFarmProxies[idx] = Object.assign(phoneFarmProxies[idx], entry);
-  } else {
-    entry.id = pfGenId();
-    phoneFarmProxies.push(entry);
-  }
-  savePhoneFarmData('proxies', 'proxies', phoneFarmProxies, 'Proxy saved');
+  } else { entry.id = pfGenId(); phoneFarmProxies.push(entry); }
+  pfSave('proxies','proxies',phoneFarmProxies,'Proxy saved');
   pfCloseModal();
-  renderProxiesTab();
+  pfBuildProxiesView();
 }
 
 function deleteProxy(id) {
   if (!confirm('Delete this proxy?')) return;
   phoneFarmProxies = phoneFarmProxies.filter(function(x){ return x.id !== id; });
-  savePhoneFarmData('proxies', 'proxies', phoneFarmProxies, 'Proxy deleted');
-  renderProxiesTab();
+  pfSave('proxies','proxies',phoneFarmProxies,'Proxy deleted');
+  pfBuildProxiesView();
 }
 
 
