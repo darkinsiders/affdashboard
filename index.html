@@ -2569,13 +2569,12 @@ function detectNetwork(url) {
   return null;
 }
 
-function buildPostbackUrls(network, funnelOverride) {
+function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   // Source/campaign macros vary by network
   var srcParams;
   if (network.name === 'affilika' || network.name === 'casinobet') {
     srcParams = ''; // Sub-tracking macros not confirmed for these platforms
   } else {
-    // All CellXpert-platform networks (CellXpert, FTDGallery, Padrino) use afp2/afp3
     srcParams = '&source=[afp2]&campaign=[afp3]';
   }
   var funnelParam;
@@ -2586,14 +2585,14 @@ function buildPostbackUrls(network, funnelOverride) {
   } else {
     funnelParam = '[trackingcode]';
   }
-  // Revenue only recorded if platform sends [commissionamount] — otherwise 0
-  var qftdRevenue = network.name === 'affilika'
-    ? '{payout}'
-    : (network.name === 'casinobet' ? '{deposits_sum}' : '[commissionamount]');
+  // Revenue hardcoded from deal's CPA amount so every FTD/QFTD records the correct commission
+  var cpa = (cpaAmount && cpaAmount > 0) ? cpaAmount : 0;
+  var ftdRevenue  = network.name === 'affilika' ? '{first_deposit}' : cpa;
+  var qftdRevenue = network.name === 'affilika' ? '{payout}' : (network.name === 'casinobet' ? '{deposits_sum}' : cpa);
   var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=' + funnelParam + '&offer=' + network.name;
   return {
     reg:  base + '&status=Registration&type=Registration&revenue=0',
-    ftd:  base + '&status=FTD&type=FTD&revenue=' + (network.name === 'affilika' ? '{first_deposit}' : '0'),
+    ftd:  base + '&status=FTD&type=FTD&revenue=' + ftdRevenue,
     qftd: base + '&status=QFTD&type=QFTD&revenue=' + qftdRevenue
   };
 }
@@ -2610,15 +2609,18 @@ function openPostbackModal(dealId) {
     return;
   }
 
-  var urls = buildPostbackUrls(net);
+  var urls = buildPostbackUrls(net, null, deal.cpaAmount || 0);
   var networkLabel = net.name.toUpperCase();
   if (net.clickMacro === '[afp1]') networkLabel += ' (uses [afp1])';
   var trackingNote = (net.name === 'cellxpert' || net.name === 'ftdgallery' || net.name === 'padrino')
     ? 'These URLs now include source tracking (<code>[afp2]</code>/<code>[afp3]</code>). If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.'
     : 'These URLs use the current network macros shown above. If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.';
+  var cpaNote = (deal.cpaAmount > 0)
+    ? 'Revenue is hardcoded to <code style="color:var(--green)">€' + deal.cpaAmount + '</code> per FTD/QFTD from this deal\'s CPA amount. Update the deal\'s CPA to regenerate.'
+    : '<span style="color:#f0b429">&#9888; No CPA amount set on this deal — revenue will record as €0. Set a CPA amount in the deal to fix this.</span>';
   var macroNote = net.name === 'affilika'
     ? 'Paste these in your affiliate platform\'s postback settings. For Affilika, <code style="color:var(--accent)">{campaign_id}</code> maps the funnel, <code style="color:var(--accent)">{first_deposit}</code> is used for FTD value, and <code style="color:var(--accent)">{payout}</code> is used for Qualified CPA.'
-    : 'Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically. Revenue is only recorded when the platform sends a commission value.';
+    : 'Paste these in your affiliate platform\'s postback settings. ' + cpaNote;
 
   function row(label, url) {
     var id = 'pburl-' + label.toLowerCase().replace(/ /g, '-') + '-' + dealId;
