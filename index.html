@@ -3983,102 +3983,159 @@ function renderHomePage() {
   var hour = now.getHours();
   var greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   var dateStr = now.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
-  var activeCount = (deals || []).filter(function(d){ return d.status === 'active'; }).length;
+  var activeDeals = (deals||[]).filter(function(d){ return (d.status||'active') === 'active'; }).length;
+  var pausedDeals = (deals||[]).filter(function(d){ return d.status === 'paused'; }).length;
 
-  var funnelCardsHtml = FUNNEL_NAMES.map(function(f) {
+  // Health warnings
+  var warnings = [];
+  FUNNEL_NAMES.forEach(function(f) {
+    var ids = assignments[f] || [];
+    if (ids.length === 0) warnings.push(f + ' has no assigned deals');
+    var wTotal = 0;
+    if (dealWeights[f]) Object.keys(dealWeights[f]).forEach(function(k){ wTotal += +(dealWeights[f][k]||0); });
+    if (ids.length > 0 && Math.abs(wTotal - 100) > 1) warnings.push(f + ' weights = ' + wTotal + '% (not 100%)');
+  });
+
+  var warningHtml = warnings.length ? '<div style="background:rgba(212,112,128,0.08);border:1px solid rgba(212,112,128,0.25);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">' +
+    '<span style="color:var(--red);font-size:16px;line-height:1;flex-shrink:0">⚠</span>' +
+    '<div style="font-size:12px;color:var(--red);line-height:1.7">' + warnings.map(function(w){ return escHtml(w); }).join('<br>') + '</div>' +
+  '</div>' : '';
+
+  var funnelStatusHtml = FUNNEL_NAMES.map(function(f) {
     var color = FUNNEL_COLORS[f] || 'var(--muted)';
     var fAssigned = !!(assignments[f] && assignments[f].length > 0);
-    return '<div id="hfc-' + f + '" onclick="setFunnel(\'' + escHtml(f) + '\')" ' +
-      'style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color 0.15s">' +
+    var dealCount = (assignments[f]||[]).length;
+    return '<div id="hfc-' + f + '" onclick="setFunnel(\'' + escHtml(f) + '\')" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all 0.18s;position:relative;overflow:hidden" onmouseover="this.style.borderColor=\'' + color.replace('var(','').replace(')','') + '\';this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'\'">' +
+      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:' + color + ';opacity:' + (fAssigned ? '0.8' : '0.2') + '"></div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
-        '<div style="display:flex;align-items:center;gap:7px">' +
-          '<span style="width:7px;height:7px;border-radius:50%;background:' + color + ';flex-shrink:0;box-shadow:0 0 5px ' + color + '"></span>' +
-          '<span style="font-family:var(--font-display);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">' + escHtml(f) + '</span>' +
-        '</div>' +
+        '<span style="font-family:var(--font-display);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:' + color + '">' + escHtml(f) + '</span>' +
         '<span style="font-size:9px;font-weight:700;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;background:' + (fAssigned ? 'var(--green-glow)' : 'var(--red-glow)') + ';color:' + (fAssigned ? 'var(--green)' : 'var(--red)') + '">' + (fAssigned ? 'LIVE' : 'EMPTY') + '</span>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center">' +
-        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--text)" id="hfc-clicks-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Clicks</div></div>' +
-        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--green)" id="hfc-ftds-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">FTDs</div></div>' +
-        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)" id="hfc-rev-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Rev</div></div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center;margin-bottom:10px">' +
+        '<div><div style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:var(--text)" id="hfc-clicks-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">Clicks</div></div>' +
+        '<div><div style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:var(--green)" id="hfc-ftds-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">FTDs</div></div>' +
+        '<div><div style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)" id="hfc-rev-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">Rev</div></div>' +
       '</div>' +
+      '<div style="height:3px;background:var(--card2);border-radius:2px;overflow:hidden">' +
+        '<div id="hfc-bar-' + f + '" style="height:3px;background:' + color + ';border-radius:2px;width:0%;transition:width 0.6s ease;opacity:0.6"></div>' +
+      '</div>' +
+      '<div style="font-size:9px;color:var(--muted);margin-top:5px;text-align:right">' + dealCount + ' deal' + (dealCount !== 1 ? 's' : '') + '</div>' +
     '</div>';
   }).join('');
 
   var actions = [
-    { icon:'🔗', label:'Link Builder',   fn:"setPage('builder')" },
-    { icon:'🎰', label:'Casino Deals',    fn:"dealsSubTab='deals';setPage('deals')" },
-    { icon:'🌐', label:'Landing Pages',   fn:"dealsSubTab='lps';setPage('deals')" },
-    { icon:'📊', label:'Analytics',       fn:"analyticsTab='clicks';setPage('analytics')" },
-    { icon:'⚙️', label:'Funnel Config',   fn:"setPage('funnels')" },
-    { icon:'🤖', label:'Bot Content',     fn:"setPage('tools')" },
+    { icon:'🔗', label:'Link Builder',   fn:"setPage('builder')", color:'var(--yellow)' },
+    { icon:'🎰', label:'Casino Deals',    fn:"dealsSubTab='deals';setPage('deals')", color:'var(--green)' },
+    { icon:'🌐', label:'Landing Pages',   fn:"dealsSubTab='lps';setPage('deals')", color:'var(--accent)' },
+    { icon:'📊', label:'Analytics',       fn:"analyticsTab='clicks';setPage('analytics')", color:'var(--purple)' },
+    { icon:'⚙️', label:'Funnel Config',   fn:"setPage('funnels')", color:'var(--orange)' },
+    { icon:'🤖', label:'Bot Content',     fn:"setPage('tools')", color:'#229ED9' },
   ];
   var actionGrid = actions.map(function(a) {
-    return '<div onclick="' + a.fn + '" ' +
-      'style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;transition:all 0.15s" ' +
-      'onmouseover="this.style.background=\'rgba(255,255,255,0.05)\'" onmouseout="this.style.background=\'var(--card)\'">' +
-      '<span style="font-size:20px;line-height:1">' + a.icon + '</span>' +
-      '<span style="font-size:9px;font-weight:700;color:var(--text);font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em;line-height:1.3">' + a.label + '</span>' +
+    return '<div onclick="' + a.fn + '" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:11px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;transition:all 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.05)\';this.style.borderColor=\'' + a.color.replace('var(','').replace(')','') + '\'" onmouseout="this.style.background=\'var(--card)\';this.style.borderColor=\'var(--border)\'">' +
+      '<span style="font-size:18px;line-height:1">' + a.icon + '</span>' +
+      '<span style="font-size:9px;font-weight:700;color:var(--muted);font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em;line-height:1.3">' + a.label + '</span>' +
     '</div>';
   }).join('');
 
   el.innerHTML =
     '<div style="padding:24px 32px 40px;max-width:1800px;margin:0 auto;position:relative;z-index:1">' +
 
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
+      // Header
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">' +
         '<div>' +
-          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:3px">' + greeting + ' · ' + escHtml(dateStr) + '</div>' +
-          '<div style="font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-0.01em;color:rgba(255,255,255,0.85)">Command Center</div>' +
+          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:3px">' + escHtml(greeting) + ' · ' + escHtml(dateStr) + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:-0.02em;color:rgba(255,255,255,0.88)">Command Center</div>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;align-items:center">' +
-          '<select id="homeFilterDays" onchange="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+        '<div style="display:flex;gap:6px;align-items:center">' +
+          '<div style="font-size:11px;color:var(--muted);padding:5px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px"><strong style="color:var(--green)">' + activeDeals + '</strong> active · <strong style="color:var(--yellow)">' + pausedDeals + '</strong> paused</div>' +
+          '<select id="homeFilterDays" onchange="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
             '<option value="1">Today</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="0">All time</option>' +
           '</select>' +
-          '<button onclick="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:14px;cursor:pointer;transition:color 0.15s" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#8635;</button>' +
+          '<button onclick="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--muted);font-size:14px;cursor:pointer;transition:color 0.15s" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#8635;</button>' +
         '</div>' +
       '</div>' +
 
-      '<div style="background:var(--card);border:1px solid rgba(126,191,154,0.2);border-top:3px solid var(--green);border-radius:14px;padding:26px 30px;margin-bottom:12px;position:relative;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
-        '<div style="position:absolute;inset:0;background:radial-gradient(ellipse 55% 140% at 0% 50%,var(--green-glow) 0%,transparent 70%);pointer-events:none"></div>' +
-        '<div style="position:relative">' +
-          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--green);margin-bottom:10px">Total Revenue</div>' +
-          '<div style="display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap">' +
-            '<div id="homeHeroRevenue" style="font-family:var(--font-mono);font-size:54px;font-weight:800;color:rgba(255,255,255,0.9);line-height:1;letter-spacing:-0.02em">€0</div>' +
-            '<div style="padding-bottom:7px;display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end">' +
-              '<div><div id="homeHero-ftds" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--green)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">FTDs</div></div>' +
-              '<div><div id="homeHero-clicks" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Clicks</div></div>' +
-              '<div><div id="homeHero-avgrev" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--yellow)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Avg/FTD</div></div>' +
-              '<div><div id="homeHero-cr" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--orange)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">CR%</div></div>' +
-              '<div><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--accent)">' + activeCount + '</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Active Deals</div></div>' +
+      // Warnings
+      warningHtml +
+
+      // Revenue hero + KPI row
+      '<div style="display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:12px;align-items:stretch">' +
+
+        // Left: big revenue card with sparkline
+        '<div style="background:var(--card);border:1px solid rgba(126,191,154,0.2);border-top:2px solid var(--green);border-radius:12px;padding:22px 26px;position:relative;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+          '<div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 120% at 0% 60%,var(--green-glow) 0%,transparent 70%);pointer-events:none"></div>' +
+          '<div style="position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap">' +
+            '<div>' +
+              '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--green);margin-bottom:8px">Total Revenue</div>' +
+              '<div id="homeHeroRevenue" style="font-family:var(--font-mono);font-size:52px;font-weight:800;color:rgba(255,255,255,0.92);line-height:1;letter-spacing:-0.02em">€0</div>' +
+              '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px">' +
+                '<div><div id="homeHero-ftds" style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--green)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">FTDs</div></div>' +
+                '<div><div id="homeHero-regs" style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--accent)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Regs</div></div>' +
+                '<div><div id="homeHero-clicks" style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--text)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Clicks</div></div>' +
+                '<div><div id="homeHero-avgrev" style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--yellow)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Avg/FTD</div></div>' +
+                '<div><div id="homeHero-cr" style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--orange)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">CR%</div></div>' +
+              '</div>' +
+            '</div>' +
+            // Revenue sparkline
+            '<div style="flex-shrink:0">' +
+              '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px;text-align:right">Revenue trend</div>' +
+              '<div id="homeSparkline" style="width:180px;height:52px"><svg width="180" height="52"><text x="90" y="30" text-anchor="middle" fill="rgba(255,255,255,0.12)" font-size="11">Loading…</text></svg></div>' +
             '</div>' +
           '</div>' +
         '</div>' +
-      '</div>' +
 
-      '<div style="display:grid;grid-template-columns:1fr 214px;gap:10px;margin-bottom:10px">' +
-        '<div>' +
-          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:7px">Funnels · <span id="homeFunnelPeriod">7d</span></div>' +
-          '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="homeFunnelCards">' + funnelCardsHtml + '</div>' +
-        '</div>' +
-        '<div>' +
+        // Right: quick actions
+        '<div style="min-width:176px">' +
           '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:7px">Quick Access</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' + actionGrid + '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">' + actionGrid + '</div>' +
         '</div>' +
       '</div>' +
 
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
-          '<div style="padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Traffic Sources</div>' +
-          '<div id="homeSources" style="padding:14px 16px"><div style="color:var(--muted);font-size:12px">Loading…</div></div>' +
-        '</div>' +
-        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
-          '<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
-            '<span style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Live Events</span>' +
-            '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">latest 12</span>' +
+      // Daily trend chart + funnel status
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+
+        // Daily trend chart
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;backdrop-filter:blur(36px) saturate(2.2)">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
+            '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Daily Activity</div>' +
+            '<div style="display:flex;gap:12px;font-size:10px;color:var(--muted)">' +
+              '<span><span style="display:inline-block;width:8px;height:2px;background:var(--accent);vertical-align:middle;margin-right:4px;border-radius:1px"></span>Clicks</span>' +
+              '<span><span style="display:inline-block;width:8px;height:2px;background:var(--green);vertical-align:middle;margin-right:4px;border-radius:1px"></span>FTDs</span>' +
+            '</div>' +
           '</div>' +
-          '<div id="homeEvents"><div style="padding:14px 16px;color:var(--muted);font-size:12px">Loading…</div></div>' +
+          '<div id="homeDailyChart" style="height:110px;position:relative"><svg width="100%" height="110"><text x="50%" y="58" text-anchor="middle" fill="rgba(255,255,255,0.12)" font-size="11">Loading…</text></svg></div>' +
+          '<div id="homeDailyLabels" style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--muted);font-family:var(--font-mono)"></div>' +
+        '</div>' +
+
+        // Source donut + bars
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;backdrop-filter:blur(36px) saturate(2.2)">' +
+          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:14px">Traffic Sources</div>' +
+          '<div style="display:flex;gap:16px;align-items:flex-start">' +
+            '<div id="homeSourceDonut" style="flex-shrink:0;width:90px;height:90px"></div>' +
+            '<div id="homeSources" style="flex:1;min-width:0"><div style="color:var(--muted);font-size:12px">Loading…</div></div>' +
+          '</div>' +
         '</div>' +
       '</div>' +
+
+      // Funnels row
+      '<div style="margin-bottom:12px">' +
+        '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:7px">Funnels · <span id="homeFunnelPeriod">7d</span></div>' +
+        '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="homeFunnelCards">' + funnelStatusHtml + '</div>' +
+      '</div>' +
+
+      // Live events
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+        '<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+          '<span style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Live Events</span>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-dot 2s infinite"></span>' +
+            '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">auto-updating</span>' +
+          '</div>' +
+        '</div>' +
+        '<div id="homeEvents"><div style="padding:14px 16px;color:var(--muted);font-size:12px">Loading…</div></div>' +
+      '</div>' +
+
     '</div>';
 
   loadHomeData();
@@ -4101,11 +4158,11 @@ function loadHomeData() {
   Promise.all([
     db.collection('clicks').orderBy('ts','desc').limit(2000).get(),
     db.collection('conversions').get(),
-    db.collection('postbacks').orderBy('ts','desc').limit(12).get()
+    db.collection('postbacks').orderBy('ts','desc').limit(20).get()
   ]).then(function(results) {
     var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
 
-    var totalClicks = 0, clicksByFunnel = {}, clicksBySrc = {};
+    var totalClicks = 0, clicksByFunnel = {}, clicksBySrc = {}, clicksByDay = {};
     clickSnap.forEach(function(doc) {
       var d = doc.data();
       var ts = d.ts ? new Date(d.ts) : null;
@@ -4115,9 +4172,15 @@ function loadHomeData() {
       clicksByFunnel[f] = (clicksByFunnel[f] || 0) + 1;
       var s = d.src || 'NoSource';
       clicksBySrc[s] = (clicksBySrc[s] || 0) + 1;
+      // Daily bucketing
+      if (ts) {
+        var dayKey = ts.getFullYear() + '-' + String(ts.getMonth()+1).padStart(2,'0') + '-' + String(ts.getDate()).padStart(2,'0');
+        if (!clicksByDay[dayKey]) clicksByDay[dayKey] = { clicks: 0, ftds: 0 };
+        clicksByDay[dayKey].clicks++;
+      }
     });
 
-    var totalRegs = 0, totalFtds = 0, totalRevenue = 0, byFunnel = {};
+    var totalRegs = 0, totalFtds = 0, totalRevenue = 0, byFunnel = {}, revenueByDay = {};
     convSnap.forEach(function(doc) {
       var d = doc.data();
       if (cutoffDate && d.date < cutoffDate) return;
@@ -4129,6 +4192,15 @@ function loadHomeData() {
       totalRegs    += +(d.regs    || 0);
       totalFtds    += +(d.ftds    || 0);
       totalRevenue += +(d.revenue || 0);
+      // Revenue + FTD by day
+      if (d.date) {
+        if (!revenueByDay[d.date]) revenueByDay[d.date] = { revenue: 0, ftds: 0 };
+        revenueByDay[d.date].revenue += +(d.revenue || 0);
+        revenueByDay[d.date].ftds    += +(d.ftds    || 0);
+        // Also add ftds to clicksByDay for the chart
+        if (clicksByDay[d.date]) clicksByDay[d.date].ftds += +(d.ftds || 0);
+        else clicksByDay[d.date] = { clicks: 0, ftds: +(d.ftds || 0) };
+      }
     });
 
     function hset(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
@@ -4137,41 +4209,146 @@ function loadHomeData() {
     var cr = totalClicks > 0 ? (totalFtds / totalClicks * 100).toFixed(1) + '%' : '0%';
     hset('homeHeroRevenue', '€' + totalRevenue.toFixed(0));
     hset('homeHero-ftds',   totalFtds);
+    hset('homeHero-regs',   totalRegs);
     hset('homeHero-clicks', totalClicks);
     hset('homeHero-avgrev', avgRev);
     hset('homeHero-cr',     cr);
 
+    // Funnel cards
+    var maxFunnelClicks = Math.max(1, FUNNEL_NAMES.reduce(function(m,f){ return Math.max(m, clicksByFunnel[f]||0); }, 0));
     FUNNEL_NAMES.forEach(function(f) {
       var conv = byFunnel[f] || { regs:0, ftds:0, revenue:0 };
       hset('hfc-clicks-' + f, clicksByFunnel[f] || 0);
       hset('hfc-ftds-' + f, conv.ftds);
       hset('hfc-rev-' + f, conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—');
+      var bar = document.getElementById('hfc-bar-' + f);
+      if (bar) bar.style.width = Math.round((clicksByFunnel[f]||0) / maxFunnelClicks * 100) + '%';
     });
 
-    var srcList = Object.keys(clicksBySrc).sort(function(a,b){ return clicksBySrc[b]-clicksBySrc[a]; }).slice(0,6);
-    var maxC = Math.max(1, clicksBySrc[srcList[0]] || 0);
+    // --- Daily activity bar chart ---
+    var chartEl = document.getElementById('homeDailyChart');
+    var labelsEl = document.getElementById('homeDailyLabels');
+    if (chartEl) {
+      // Build last N days
+      var numDays = days > 0 ? Math.min(days, 30) : 14;
+      var dayKeys = [];
+      for (var i = numDays - 1; i >= 0; i--) {
+        var d2 = new Date(); d2.setDate(d2.getDate() - i);
+        var k = d2.getFullYear() + '-' + String(d2.getMonth()+1).padStart(2,'0') + '-' + String(d2.getDate()).padStart(2,'0');
+        dayKeys.push(k);
+      }
+      var maxVal = Math.max(1, dayKeys.reduce(function(m,k){ return Math.max(m, (clicksByDay[k]||{}).clicks||0); }, 0));
+      var W = 500, H = 110, pad = 2, barW = Math.max(3, Math.floor((W - pad * dayKeys.length) / dayKeys.length));
+      var svgBars = dayKeys.map(function(k, i) {
+        var data2 = clicksByDay[k] || { clicks: 0, ftds: 0 };
+        var clickH = Math.round(data2.clicks / maxVal * (H - 14));
+        var ftdH   = Math.round(data2.ftds   / maxVal * (H - 14));
+        var x = i * (barW + pad);
+        var clickRect = clickH > 0 ? '<rect x="' + x + '" y="' + (H - 14 - clickH) + '" width="' + barW + '" height="' + clickH + '" fill="rgba(112,112,120,0.4)" rx="1"/>' : '';
+        var ftdRect   = ftdH   > 0 ? '<rect x="' + x + '" y="' + (H - 14 - ftdH  ) + '" width="' + barW + '" height="' + ftdH   + '" fill="var(--green)" rx="1" opacity="0.8"/>' : '';
+        return clickRect + ftdRect;
+      }).join('');
+      chartEl.innerHTML = '<svg width="100%" height="' + H + '" viewBox="0 0 ' + (dayKeys.length * (barW + pad)) + ' ' + H + '" preserveAspectRatio="none">' + svgBars + '</svg>';
+      // Labels — show every few days
+      if (labelsEl) {
+        var step = Math.ceil(dayKeys.length / 7);
+        labelsEl.innerHTML = dayKeys.map(function(k, i) {
+          if (i % step !== 0 && i !== dayKeys.length - 1) return '<span></span>';
+          var parts = k.split('-');
+          var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          return '<span>' + (parseInt(parts[2])) + ' ' + months[parseInt(parts[1])-1] + '</span>';
+        }).join('');
+      }
+    }
+
+    // --- Revenue sparkline ---
+    var sparkEl = document.getElementById('homeSparkline');
+    if (sparkEl) {
+      var numDaysSpark = days > 0 ? Math.min(days, 14) : 14;
+      var sparkKeys = [];
+      for (var i2 = numDaysSpark - 1; i2 >= 0; i2--) {
+        var d3 = new Date(); d3.setDate(d3.getDate() - i2);
+        sparkKeys.push(d3.getFullYear() + '-' + String(d3.getMonth()+1).padStart(2,'0') + '-' + String(d3.getDate()).padStart(2,'0'));
+      }
+      var sparkVals = sparkKeys.map(function(k){ return (revenueByDay[k]||{}).revenue || 0; });
+      var sparkMax = Math.max(1, Math.max.apply(null, sparkVals));
+      var SW = 180, SH = 52, sparkPad = 6;
+      var pts = sparkVals.map(function(v, i3) {
+        var x3 = sparkPad + i3 * (SW - sparkPad*2) / Math.max(1, sparkVals.length - 1);
+        var y3 = SH - sparkPad - Math.round(v / sparkMax * (SH - sparkPad*2));
+        return x3 + ',' + y3;
+      }).join(' ');
+      var areaBase = SH - sparkPad;
+      var firstPt = sparkVals.length > 0 ? (sparkPad + ',') + (SH - sparkPad - Math.round(sparkVals[0]/sparkMax*(SH-sparkPad*2))) : sparkPad + ',' + areaBase;
+      var lastPt  = sparkVals.length > 0 ? ((sparkPad + (sparkVals.length-1)*(SW-sparkPad*2)/Math.max(1,sparkVals.length-1)) + ',' + (SH-sparkPad-Math.round(sparkVals[sparkVals.length-1]/sparkMax*(SH-sparkPad*2)))) : (SW-sparkPad) + ',' + areaBase;
+      var areaPath = 'M ' + firstPt.replace(',',' ') + ' ' + pts.split(' ').slice(1).map(function(p){ return 'L ' + p.replace(',',' '); }).join(' ') + ' L ' + lastPt.split(',')[0] + ' ' + areaBase + ' L ' + sparkPad + ' ' + areaBase + ' Z';
+      sparkEl.innerHTML = '<svg width="' + SW + '" height="' + SH + '">' +
+        '<defs><linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--green)" stop-opacity="0.25"/><stop offset="100%" stop-color="var(--green)" stop-opacity="0"/></linearGradient></defs>' +
+        (sparkVals.some(function(v){ return v > 0; }) ? '<path d="' + areaPath + '" fill="url(#sparkGrad)"/>' : '') +
+        (pts.indexOf(' ') !== -1 ? '<polyline points="' + pts + '" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' : '') +
+      '</svg>';
+    }
+
+    // --- Source donut + bar list ---
+    var srcList = Object.keys(clicksBySrc).sort(function(a,b){ return clicksBySrc[b]-clicksBySrc[a]; }).slice(0,7);
+    var maxSrc = Math.max(1, clicksBySrc[srcList[0]] || 0);
     var srcEl = document.getElementById('homeSources');
+    var donutEl = document.getElementById('homeSourceDonut');
+
     if (srcEl) {
       srcEl.innerHTML = srcList.length ? srcList.map(function(sid) {
         var sc = getTrafficSources().find(function(ts){ return ts.id === sid; });
         var n = clicksBySrc[sid];
-        var pct = Math.round(n / maxC * 100);
-        return '<div style="margin-bottom:11px">' +
-          '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
-            '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(sc ? sc.name : sid) + '</span>' +
-            '<span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">' + n + '</span>' +
+        var pct = totalClicks > 0 ? Math.round(n / totalClicks * 100) : 0;
+        var barPct = Math.round(n / maxSrc * 100);
+        var col = sc ? sc.color : 'var(--accent)';
+        return '<div style="margin-bottom:9px">' +
+          '<div style="display:flex;justify-content:space-between;margin-bottom:3px">' +
+            '<span style="font-size:11px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:5px">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:' + col + ';flex-shrink:0"></span>' +
+              escHtml(sc ? sc.name : sid) + '</span>' +
+            '<span style="font-size:10px;font-family:var(--font-mono);color:var(--muted)">' + n + ' <span style="color:var(--border)">' + pct + '%</span></span>' +
           '</div>' +
-          '<div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">' +
-            '<div style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:2px;transition:width 0.5s ease"></div>' +
+          '<div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden">' +
+            '<div style="width:' + barPct + '%;height:100%;background:' + col + ';border-radius:2px;transition:width 0.5s ease;opacity:0.8"></div>' +
           '</div></div>';
       }).join('') : '<div style="color:var(--muted);font-size:12px">No click data yet</div>';
     }
 
+    // Donut SVG
+    if (donutEl && srcList.length > 0) {
+      var DS = 90, DR = 28, dc = DS/2;
+      var startAngle = -Math.PI/2;
+      var slices = '';
+      srcList.forEach(function(sid) {
+        var sc2 = getTrafficSources().find(function(ts){ return ts.id === sid; });
+        var col2 = sc2 ? sc2.color : '#707078';
+        var frac = clicksBySrc[sid] / totalClicks;
+        var angle = frac * Math.PI * 2;
+        var x1 = dc + DR * Math.cos(startAngle);
+        var y1 = dc + DR * Math.sin(startAngle);
+        var x2 = dc + DR * Math.cos(startAngle + angle);
+        var y2 = dc + DR * Math.sin(startAngle + angle);
+        var large = angle > Math.PI ? 1 : 0;
+        if (frac > 0.01) {
+          slices += '<path d="M ' + dc + ' ' + dc + ' L ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' A ' + DR + ' ' + DR + ' 0 ' + large + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1) + ' Z" fill="' + col2 + '" opacity="0.85"/>';
+        }
+        startAngle += angle;
+      });
+      // Donut hole
+      slices += '<circle cx="' + dc + '" cy="' + dc + '" r="' + Math.round(DR*0.55) + '" fill="var(--card)"/>';
+      slices += '<text x="' + dc + '" y="' + (dc+1) + '" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.6)" font-size="10" font-family="var(--font-mono)" font-weight="700">' + totalClicks + '</text>';
+      donutEl.innerHTML = '<svg width="' + DS + '" height="' + DS + '">' + slices + '</svg>';
+    } else if (donutEl) {
+      donutEl.innerHTML = '';
+    }
+
+    // Live events
     var evEl = document.getElementById('homeEvents');
     if (evEl) {
       var evs = [];
       pbSnap.forEach(function(doc) { evs.push(doc.data()); });
-      evEl.innerHTML = evs.length ? evs.map(function(d) {
+      evEl.innerHTML = evs.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">' + evs.map(function(d) {
         var isFtd = d.eventType === 'ftd', isReg = d.eventType === 'reg';
         var bc = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
         var bl = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType || '?').toUpperCase();
@@ -4180,20 +4357,22 @@ function loadHomeData() {
         var f = d.funnelKey || d.funnel || '?';
         var fc = FUNNEL_COLORS[f] || 'var(--muted)';
         return '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-          '<div style="font-size:9px;font-family:var(--font-mono);color:var(--muted);white-space:nowrap;min-width:76px">' + tStr + '</div>' +
-          '<span style="font-size:9px;font-weight:800;letter-spacing:0.04em;color:' + bc + ';background:' + bc + '1a;padding:2px 6px;border-radius:3px;border:1px solid ' + bc + '44;white-space:nowrap">' + bl + '</span>' +
-          '<span style="font-size:11px;font-weight:700;color:' + fc + ';white-space:nowrap">' + escHtml(f) + '</span>' +
-          '<span style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(d.source || d.src || 'NoSource') + '</span>' +
-          (d.revenue > 0 ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--yellow);white-space:nowrap">€' + (+d.revenue).toFixed(0) + '</span>' : '') +
+          '<span style="font-size:9px;font-weight:800;letter-spacing:0.04em;color:' + bc + ';background:' + bc + '1a;padding:2px 6px;border-radius:3px;border:1px solid ' + bc + '44;white-space:nowrap;flex-shrink:0">' + bl + '</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + fc + ';white-space:nowrap;flex-shrink:0">' + escHtml(f) + '</span>' +
+          '<span style="font-size:10px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(d.source || d.src || '—') + '</span>' +
+          (d.revenue > 0 ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--yellow);white-space:nowrap;flex-shrink:0">€' + (+d.revenue).toFixed(0) + '</span>' : '') +
+          '<span style="font-size:9px;font-family:var(--font-mono);color:rgba(255,255,255,0.18);white-space:nowrap;flex-shrink:0">' + tStr + '</span>' +
         '</div>';
-      }).join('') : '<div style="padding:14px 16px;color:var(--muted);font-size:12px;text-align:center">No events yet</div>';
+      }).join('') + '</div>' : '<div style="padding:14px 16px;color:var(--muted);font-size:12px;text-align:center">No events yet — postbacks will appear here in real time</div>';
     }
 
   }).catch(function(err) {
     var h = document.getElementById('homeHeroRevenue');
     if (h) h.textContent = 'Error';
+    console.error('Home data error:', err);
   });
 }
+
 
 
 function renderOverviewTab() {
