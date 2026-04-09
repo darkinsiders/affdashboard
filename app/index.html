@@ -7712,816 +7712,532 @@ function renderMetaCampaignsPage() {
 
 
 // ── PHONE_FARM ────────────────────────────────────────────────────────
-var phoneFarmDevices = [];
-var phoneFarmAccounts = [];
+// Phone Farm Management — redesigned around real phone/account data
+
+var phoneFarmPhones = [];
 var phoneFarmProxies = [];
-var phoneFarmTab = 'devices';
+var phoneFarmTab = 'phones';
 var phoneFarmLoaded = false;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Default seed data ─────────────────────────────────────────────────────────
+var PHONE_FARM_DEFAULT = [
+  { id:'phone_1',  num:1,  tel:'041 855 069',  igAccounts:'@BigWinAlgorithm\n@TheJackpotJunkiee\n@TheDiamondDrift', ttAccounts:'@BigWinAlgorithm\n@JackpotJunkie\n@TheDiamondDrift', reset:true,  active:true,  igMails:'brenda0beawa@hotmail.com\nbrandei155b2@hotmail.com\nbimdriede09c@hotmail.com\nbernice9bd70@hotmail.com', important:'IG PASS: Desc123$\nIG MAIL PASS: war$$9900$$', igBio:false, pin:'0673', puk:'18543700', icloud:'' },
+  { id:'phone_2',  num:2,  tel:'041 820 992',  igAccounts:'', ttAccounts:'', reset:false, active:false, igMails:'', important:'locked', igBio:false, pin:'8568', puk:'20345013', icloud:'' },
+  { id:'phone_3',  num:3,  tel:'041 831 372',  igAccounts:'@The_Celestialcipher\n@TheSparkGlamour\n@VaultVirtue\n@TheMeteorMuse', ttAccounts:'@TheMeteorMuse\n@TheCelestialCipher\n@VaultVirtue', reset:true,  active:true,  igMails:'bridgetaee82@hotmail.com\nbrian26b51ma@hotmail.com\nbridgeteedbo@hotmail.com\nbridgetc4abo@hotmail.com', important:'IG PASS: Desc123$\nIG MAIL PASS: war$$9900$$', igBio:false, pin:'0492', puk:'28168319', icloud:'' },
+  { id:'phone_4',  num:4,  tel:'041 951 713',  igAccounts:'@TheGhostGambit\n@WizardOfWheels\n@CalculatedSpinner', ttAccounts:'@TheGhostGambit\n@WizardOfWheels\n@Enhanced.Spin', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'7683', puk:'48999059', icloud:'' },
+  { id:'phone_5',  num:5,  tel:'041 857 501',  igAccounts:'@WagerCipher\n@EdgeAlchemist\n@TheJackpotWhisper\n@MysticFateSpin', ttAccounts:'@WagerCipher\n@EdgeAlchemist\n@JackpotWhisper', reset:true,  active:true,  igMails:'bridgetf9bbo@hotmail.com\nbrittany06d5@hotmail.com\nbrittanydba9@hotmail.com\nbrooksf342a0@hotmail.com', important:'IG PASS: Desc123$\nIG MAIL PASS: war$$9900$$', igBio:false, pin:'0380', puk:'91387559', icloud:'' },
+  { id:'phone_6',  num:6,  tel:'041 882 081',  igAccounts:'@TheShadowStakes\n@TheEdgeEclipse\n@WealthSpinPro\n@TheGoldenFate', ttAccounts:'@TheShadowStakes\n@WealthSpinPro\n@TheEdgeEclipse', reset:true,  active:true,  igMails:'carlosa27are@hotmail.com\ncarlosfa26b4@hotmail.com\ncarolina8a8t@hotmail.com\ncarolinad3ba@hotmail.com', important:'IG PASS: Desc123$\nIG MAIL PASS: war$$9900$$', igBio:false, pin:'2048', puk:'75637937', icloud:'' },
+  { id:'phone_7',  num:7,  tel:'041 856 430',  igAccounts:'', ttAccounts:'@TheTurnTactic\n@TheLureLogic\n@TopazTitan7', reset:true,  active:true,  igMails:'caterina830d@hotmail.com\ncaterinafa1b@hotmail.com\ncaudill8f6de@hotmail.com\nchrissy81f74@hotmail.com', important:'IG PASS: Desc123$\nIG MAIL PASS: war$$9900$$', igBio:false, pin:'8121', puk:'59693602', icloud:'' },
+  { id:'phone_8',  num:8,  tel:'041 855 068',  igAccounts:'@TheInsiderElite\n@TheFalconFusion\n@TreasureStakesPro\n@The_GhostGroove', ttAccounts:'@TheInsiderElite\n@SlotInsiders\n@TheFalconFusion', reset:true,  active:true,  igMails:'christena3ef@hotmail.com\ncolemanb8821@hotmail.com\ncorettafee2a@hotmail.com\ndaniel5b75ad@hotmail.com', important:'IG PASS: Desc123$\nIG MAIL PASS: war$$9900$$', igBio:false, pin:'3594', puk:'86021129', icloud:'' },
+  { id:'phone_9',  num:9,  tel:'041 294 776',  igAccounts:'@TheCybeSorceress', ttAccounts:'@CyberSorceress\n@PearlPhantom\n@TheTurnTactic', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'8155', puk:'40708676', icloud:'phonidark9@icloud.com / Desc123$' },
+  { id:'phone_10', num:10, tel:'041 8',         igAccounts:'', ttAccounts:'', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'', puk:'', icloud:'' },
+  { id:'phone_11', num:11, tel:'041838432',     igAccounts:'', ttAccounts:'@richashelrk\n@gamblegeniusx\n@slotsaibling', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'6238', puk:'36276417', icloud:'NE DELA' },
+  { id:'phone_12', num:12, tel:'041838482',     igAccounts:'@TheFortuneFlash\n@TheCobraCosmos\n@PitBossPrestige', ttAccounts:'@TheFortuneFlash\n@PitBossPrestige\n@CobraCosmos', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'9461', puk:'34642074', icloud:'phonidark12@icloud.com / Desc123$' },
+  { id:'phone_13', num:13, tel:'041838435',     igAccounts:'@CashCloutCode\n@TheBigValut\n@TheFortuneFever', ttAccounts:'@CashCloutCode\n@TheFortuneFever\n@TheBigValut', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'5704', puk:'72506493', icloud:'phonidark13@icloud.com / Desc123$' },
+  { id:'phone_14', num:14, tel:'041838436',     igAccounts:'@TheFlexFunds\n@GeneralSpinWin\n@The_WealthWarden', ttAccounts:'@TheFlex_Funds\n@Wealth_Warden\n@GeneralSpinWin', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'7316', puk:'95532761', icloud:'phonidark14@icloud.com / Desc123$' },
+  { id:'phone_15', num:15, tel:'041838493',     igAccounts:'', ttAccounts:'', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'8641', puk:'80319564', icloud:'NE DELA' },
+  { id:'phone_16', num:16, tel:'041838445',     igAccounts:'@SlotioPro\n@TheCometCraze\n@The_VoidVouge\n@The_CosmicCouture', ttAccounts:'@DiceDipolmat\n@WheelOfWonders5\n@CalculatedFortune', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'0643', puk:'13555523', icloud:'phonidark16@icloud.com / Desc123$' },
+  { id:'phone_17', num:17, tel:'041820974',     igAccounts:'@TheGhostGains\n@AceArcadeEclipse\n@PayoutPaladin\n@The_InfinityValut', ttAccounts:'@TheGhostGains\n@PayoutPaladin\n@AceArcadeEclipse', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'8334', puk:'49055411', icloud:'phonidark17@icloud.com / Desc123$' },
+  { id:'phone_18', num:18, tel:'041831359',     igAccounts:'@SlotEliteSpinner\n@The_DiamondSpinner\n@CashFlowPotion\n@TheVisionVaultPro', ttAccounts:'@SlotEliteSpinner\n@CashFlowPotion\n@The_DiamondSpinner', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'3451', puk:'15711050', icloud:'phonidark18@icloud.com / Desc123$' },
+  { id:'phone_19', num:19, tel:'041820994',     igAccounts:'@DeepPocketStrategy\n@The_CheapLeader\n@The_ProfitPhantom', ttAccounts:'@DeepPocketStrategy\n@The_ProfitPhantom\n@CheapLeaderPro', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'4686', puk:'83262846', icloud:'phonidark19@icloud.com / Desc123$' },
+  { id:'phone_20', num:20, tel:'041840474',     igAccounts:'@DarkWagerWizard\n@TheRoyalRelam\n@JackPotSpinPro\n@ArtifactAura', ttAccounts:'@DarkWagerWizard\n@JackPotSpinPro\n@TheRoyalRealm', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'5632', puk:'78494397', icloud:'phonidark20@icloud.com / Desc123$' },
+  { id:'phone_21', num:21, tel:'041840476',     igAccounts:'@RichesDynasty\n@TheCrimsonCipher\n@DarkPhantomPro\n@TheMysticRune', ttAccounts:'@RichesDynasty\n@darkphantompro\n@TheCrimsonCipher', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'9466', puk:'67960226', icloud:'phonidark21@icloud.com / Desc123$' },
+  { id:'phone_22', num:22, tel:'041840478',     igAccounts:'@TheEliteEarnings\n@MysticMomento\n@GrandPrizeLord\n@TheOdysseyStrategy', ttAccounts:'@TheEliteEarnings\n@grandprizelord\n@MysticMomento', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'9054', puk:'71384986', icloud:'phonidark22@icloud.com / Desc123$' },
+  { id:'phone_23', num:23, tel:'041840482',     igAccounts:'@TheShadowloot\n@TitanProSpinner\n@CursedCashFlow\n@CosmicSpinnerPro', ttAccounts:'@TheShadowloot\n@CursedCashFlow\n@TitanProSpinner', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'5319', puk:'92790759', icloud:'phonidark23@icloud.com / Desc123$' },
+  { id:'phone_24', num:24, tel:'041820971',     igAccounts:'@TheVegasCode\n@TheCosmicStrategy\n@GrimGambitPro', ttAccounts:'@TheVegasCode\n@GrimGambitPro\n@TheCosmicStrategy', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'0180', puk:'39367836', icloud:'phonidark24@icloud.com / Desc123$' },
+  { id:'phone_25', num:25, tel:'041821054',     igAccounts:'@TheFortuneFlash\n@RoyalFlushPrize\n@TheInfinitySpinner\n@The_DynastyVault', ttAccounts:'@TheFortuneFlash\n@RoyalFlushPrize\n@TheInfinitySpinner', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'5310', puk:'98812272', icloud:'phonidark25@icloud.com / Desc123$' },
+  { id:'phone_26', num:26, tel:'041293971',     igAccounts:'@AceOfAmbience\n@TheLowRiskHighReward\n@LuckyLaneSpinner\n@SplitSecondStrategist', ttAccounts:'@AceOfAmbience\n@SplitSecondStrat\n@TheAceOfAmbience', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'0402', puk:'99801997', icloud:'phonidark26@icloud.com / Desc123$' },
+  { id:'phone_27', num:27, tel:'041820989',     igAccounts:'@TheRoyalFortune\n@TheLegacyValut\n@mythicSlotWinner\n@TheVaultCypher', ttAccounts:'@TheFortuneRoyal\n@mythicSlotWinner\n@TheLegacyValut', reset:false, active:true,  igMails:'', important:'', igBio:false, pin:'3440', puk:'64570979', icloud:'phonidark27@icloud.com / Desc123$' },
+  { id:'phone_28', num:28, tel:'041821060',     igAccounts:'@TheSpinandGlow\n@The_SpinSiren\n@TheUprisingLuck', ttAccounts:'@GoldGambitGuru\n@SpinAndHustle\n@StarlightSpinner', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'4893', puk:'91971294', icloud:'' },
+  { id:'phone_29', num:29, tel:'041831312',     igAccounts:'@TheEmeraldEnvy\n@TitaniumTempo\n@GalaxyStakes\n@TheGhostGambit', ttAccounts:'@TheEmeraldEnvy\n@TitaniumTempo\n@GalaxyStakes', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'2512', puk:'81934021', icloud:'phonidark29@icloud.com / Desc123$' },
+  { id:'phone_30', num:30, tel:'041840464',     igAccounts:'', ttAccounts:'@infinityai54\n@slotsinfinityai\n@slotsaichrome', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'0520', puk:'88204118', icloud:'phonidark30@icloud.com / Desc123$' },
+  { id:'phone_31', num:31, tel:'041822546',     igAccounts:'@TheLuxuryBling\n@ThePureLogic\n@TheHustleDeal\n@TheDiamondDynamo', ttAccounts:'@TheHustleDeal\n@TheDiamondDynamo\n@TheLuxuryBling', reset:false, active:false, igMails:'', important:'', igBio:false, pin:'3478', puk:'3133114', icloud:'phonidark31@icloud.com / Desc123$' }
+];
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function pfGenId() {
   return 'pf_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
 }
 
-function pfStatusBadge(status) {
-  var cfg = {
-    'Active':    { color: 'var(--green)',  bg: 'rgba(126,191,154,0.12)', border: 'rgba(126,191,154,0.25)' },
-    'Warming':   { color: 'var(--yellow)', bg: 'rgba(229,192,123,0.12)', border: 'rgba(229,192,123,0.25)' },
-    'Inactive':  { color: 'var(--muted)',  bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.1)'  },
-    'Banned':    { color: 'var(--red)',    bg: 'rgba(212,112,128,0.12)', border: 'rgba(212,112,128,0.25)' },
-    'Dead':      { color: 'var(--red)',    bg: 'rgba(212,112,128,0.08)', border: 'rgba(212,112,128,0.18)' }
-  };
-  var s = cfg[status] || cfg['Inactive'];
-  return '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:' + s.bg + ';color:' + s.color + ';border:1px solid ' + s.border + ';white-space:nowrap">' + escHtml(status) + '</span>';
-}
-
-function pfPlatformBadge(platform) {
-  var cfg = {
-    'Facebook':  { color: 'var(--accent)',  bg: 'rgba(112,112,120,0.15)', border: 'rgba(112,112,120,0.3)' },
-    'TikTok':    { color: 'var(--purple)',  bg: 'rgba(160,160,200,0.12)', border: 'rgba(160,160,200,0.25)' },
-    'Instagram': { color: 'var(--orange)',  bg: 'rgba(196,132,90,0.12)',  border: 'rgba(196,132,90,0.25)'  },
-    'Google':    { color: 'var(--yellow)',  bg: 'rgba(229,192,123,0.12)', border: 'rgba(229,192,123,0.25)' }
-  };
-  var s = cfg[platform] || { color: 'var(--muted)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)' };
-  return '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:' + s.bg + ';color:' + s.color + ';border:1px solid ' + s.border + ';white-space:nowrap">' + escHtml(platform) + '</span>';
-}
-
-function pfProxyTypeBadge(type) {
-  var cfg = {
-    'Residential': { color: 'var(--green)',  bg: 'rgba(126,191,154,0.1)',  border: 'rgba(126,191,154,0.22)' },
-    'Mobile':      { color: 'var(--purple)', bg: 'rgba(160,160,200,0.1)',  border: 'rgba(160,160,200,0.22)' },
-    'DC':          { color: 'var(--muted)',  bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)'  }
-  };
-  var s = cfg[type] || cfg['DC'];
-  return '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:' + s.bg + ';color:' + s.color + ';border:1px solid ' + s.border + ';white-space:nowrap">' + escHtml(type || 'DC') + '</span>';
+function pfBoolBadge(val, yesLabel, noLabel) {
+  if (val) return '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:rgba(126,191,154,0.12);color:var(--green);border:1px solid rgba(126,191,154,0.25);white-space:nowrap">' + (yesLabel||'YES') + '</span>';
+  return '<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1);white-space:nowrap">' + (noLabel||'NO') + '</span>';
 }
 
 function pfInputStyle() {
-  return 'width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none;transition:border-color 0.15s';
+  return 'width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none;transition:border-color 0.15s;box-sizing:border-box';
 }
-
-function pfSelectStyle() {
-  return pfInputStyle() + ';appearance:none;-webkit-appearance:none;cursor:pointer';
-}
-
-function pfLabelStyle() {
-  return 'display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:5px';
-}
-
-function pfFieldStyle() {
-  return 'display:flex;flex-direction:column;gap:0';
-}
+function pfSelectStyle() { return pfInputStyle() + ';appearance:none;-webkit-appearance:none;cursor:pointer'; }
+function pfLabelStyle() { return 'display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:5px'; }
+function pfFieldStyle() { return 'display:flex;flex-direction:column;gap:0'; }
 
 function pfActionBtn(label, color, onclick) {
-  return '<button onclick="' + onclick + '" style="background:transparent;border:1px solid ' + color + ';color:' + color + ';border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-body);white-space:nowrap;transition:background 0.15s" onmouseover="this.style.background=\'' + color.replace('var(--', 'rgba(').replace(')', ',0.12)') + '\'" onmouseout="this.style.background=\'transparent\'">' + label + '</button>';
+  return '<button onclick="' + onclick + '" style="background:transparent;border:1px solid ' + color + ';color:' + color + ';border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-body);white-space:nowrap;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'transparent\'">' + label + '</button>';
 }
 
 // ── Firebase Load / Save ───────────────────────────────────────────────────────
-
 function loadPhoneFarmData(callback) {
-  if (phoneFarmLoaded) {
-    if (callback) callback();
-    return;
-  }
-  var loaded = { devices: false, accounts: false, proxies: false };
+  if (phoneFarmLoaded) { if (callback) callback(); return; }
+  var loaded = { phones: false, proxies: false };
   function checkDone() {
-    if (loaded.devices && loaded.accounts && loaded.proxies) {
+    if (loaded.phones && loaded.proxies) {
       phoneFarmLoaded = true;
       if (callback) callback();
     }
   }
-  db.collection('phone_farm').doc('devices').get().then(function(doc) {
-    if (doc.exists) phoneFarmDevices = doc.data().devices || [];
-    loaded.devices = true;
-    checkDone();
-  }).catch(function(e) { console.error('PF devices load error:', e); loaded.devices = true; checkDone(); });
-
-  db.collection('phone_farm').doc('accounts').get().then(function(doc) {
-    if (doc.exists) phoneFarmAccounts = doc.data().accounts || [];
-    loaded.accounts = true;
-    checkDone();
-  }).catch(function(e) { console.error('PF accounts load error:', e); loaded.accounts = true; checkDone(); });
-
+  db.collection('phone_farm').doc('phones').get().then(function(doc) {
+    if (doc.exists && doc.data().phones && doc.data().phones.length > 0) {
+      phoneFarmPhones = doc.data().phones;
+    } else {
+      phoneFarmPhones = PHONE_FARM_DEFAULT.map(function(p) { return Object.assign({}, p); });
+    }
+    loaded.phones = true; checkDone();
+  }).catch(function() {
+    phoneFarmPhones = PHONE_FARM_DEFAULT.map(function(p) { return Object.assign({}, p); });
+    loaded.phones = true; checkDone();
+  });
   db.collection('phone_farm').doc('proxies').get().then(function(doc) {
     if (doc.exists) phoneFarmProxies = doc.data().proxies || [];
-    loaded.proxies = true;
-    checkDone();
-  }).catch(function(e) { console.error('PF proxies load error:', e); loaded.proxies = true; checkDone(); });
+    loaded.proxies = true; checkDone();
+  }).catch(function() { loaded.proxies = true; checkDone(); });
 }
 
-function savePhoneFarmData(collection, key, data, successMsg) {
-  var obj = {};
-  obj[key] = data;
-  db.collection('phone_farm').doc(collection).set(obj).then(function() {
-    showToast(successMsg || 'Saved', 'ftd', 3000);
-  }).catch(function(e) {
-    console.error('PF save error:', e);
-    showToast('Save failed', 'alert', 4000);
-  });
+function savePhoneFarmData(docId, field, data, toast) {
+  var obj = {}; obj[field] = data;
+  db.collection('phone_farm').doc(docId).set(obj, { merge: true }).then(function() {
+    if (toast) showToast(toast, 'ok', 2000);
+  }).catch(function(e) { showToast('Save failed: ' + e.message, 'alert', 3000); });
 }
 
-// ── Modal Layer ───────────────────────────────────────────────────────────────
-
-function pfCloseModal() {
-  var el = document.getElementById('pfModalOverlay');
-  if (el) el.remove();
-}
-
-function pfOpenModal(title, bodyHtml, onSave) {
-  pfCloseModal();
-  var overlay = document.createElement('div');
-  overlay.id = 'pfModalOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:8000;display:flex;align-items:center;justify-content:center;padding:20px';
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) pfCloseModal(); });
-
+// ── Modal helper ──────────────────────────────────────────────────────────────
+var _pfModalClose = null;
+function pfOpenModal(title, body, onSave) {
+  var overlay = document.getElementById('pfModalOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'pfModalOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px)';
+    document.body.appendChild(overlay);
+  }
   overlay.innerHTML =
-    '<div style="background:#0d0d0f;border:1px solid var(--border-bright);border-radius:14px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.7)">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)">' +
-        '<span style="font-size:15px;font-weight:700;color:var(--text);font-family:var(--font-display)">' + escHtml(title) + '</span>' +
-        '<button onclick="pfCloseModal()" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:2px 6px">&times;</button>' +
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">' +
+        '<span style="font-size:16px;font-weight:700;color:var(--text)">' + title + '</span>' +
+        '<button onclick="pfCloseModal()" style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#x2715;</button>' +
       '</div>' +
-      '<div style="padding:22px" id="pfModalBody">' + bodyHtml + '</div>' +
-      '<div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">' +
-        '<button onclick="pfCloseModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">Cancel</button>' +
-        '<button id="pfModalSaveBtn" onclick="pfModalSave()" style="background:rgba(126,191,154,0.12);border:1px solid rgba(126,191,154,0.3);color:var(--green);border-radius:8px;padding:8px 22px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">Save</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(overlay);
-  window._pfModalSaveCallback = onSave;
-}
-
-function pfModalSave() {
-  if (window._pfModalSaveCallback) window._pfModalSaveCallback();
-}
-
-// ── Devices Tab ───────────────────────────────────────────────────────────────
-
-function openPhoneDeviceModal(id) {
-  var dev = id ? phoneFarmDevices.find(function(d) { return d.id === id; }) : null;
-
-  var proxyOptions = phoneFarmProxies.map(function(p) {
-    var sel = dev && dev.proxyId === p.id ? ' selected' : '';
-    return '<option value="' + escHtml(p.id) + '"' + sel + '>' + escHtml(p.label || (p.ip + ':' + p.port)) + '</option>';
-  }).join('');
-
-  var body =
-    '<div style="display:flex;flex-direction:column;gap:16px">' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">Device Name *</label>' +
-        '<input id="pfDName" type="text" placeholder="e.g. Farm Phone 01" value="' + (dev ? escHtml(dev.name) : '') + '" style="' + pfInputStyle() + '">' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Model</label>' +
-          '<input id="pfDModel" type="text" placeholder="e.g. iPhone 13" value="' + (dev ? escHtml(dev.model || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">OS</label>' +
-          '<select id="pfDOS" style="' + pfSelectStyle() + '">' +
-            '<option value="iOS"' + (dev && dev.os === 'iOS' ? ' selected' : '') + '>iOS</option>' +
-            '<option value="Android"' + (dev && dev.os === 'Android' ? ' selected' : '') + '>Android</option>' +
-          '</select>' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Status</label>' +
-          '<select id="pfDStatus" style="' + pfSelectStyle() + '">' +
-            ['Active','Warming','Inactive','Banned'].map(function(s) {
-              return '<option value="' + s + '"' + (dev && dev.status === s ? ' selected' : (s === 'Active' && !dev ? ' selected' : '')) + '>' + s + '</option>';
-            }).join('') +
-          '</select>' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Current IP</label>' +
-          '<input id="pfDIP" type="text" placeholder="e.g. 192.168.1.5" value="' + (dev ? escHtml(dev.ip || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-      '</div>' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">Assigned Proxy</label>' +
-        '<select id="pfDProxy" style="' + pfSelectStyle() + '">' +
-          '<option value="">— None —</option>' + proxyOptions +
-        '</select>' +
-      '</div>' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">Notes</label>' +
-        '<textarea id="pfDNotes" rows="3" placeholder="Optional notes..." style="' + pfInputStyle() + ';resize:vertical">' + (dev ? escHtml(dev.notes || '') : '') + '</textarea>' +
+      '<div id="pfModalBody">' + body + '</div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:16px;border-top:1px solid var(--border)">' +
+        '<button onclick="pfCloseModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:var(--font-body)">Cancel</button>' +
+        '<button onclick="pfSaveFromModal()" style="background:rgba(126,191,154,0.15);border:1px solid rgba(126,191,154,0.3);color:var(--green);border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">Save</button>' +
       '</div>' +
     '</div>';
-
-  pfOpenModal(id ? 'Edit Device' : 'Add Device', body, function() { savePhoneDevice(id); });
+  overlay.style.display = 'flex';
+  _pfModalClose = null;
+  window._pfOnSave = onSave;
 }
 
-function savePhoneDevice(id) {
-  var name    = (document.getElementById('pfDName').value || '').trim();
-  var model   = (document.getElementById('pfDModel').value || '').trim();
-  var os      = document.getElementById('pfDOS').value;
-  var status  = document.getElementById('pfDStatus').value;
-  var ip      = (document.getElementById('pfDIP').value || '').trim();
-  var proxyId = document.getElementById('pfDProxy').value;
-  var notes   = (document.getElementById('pfDNotes').value || '').trim();
-
-  if (!name) { showToast('Device name is required', 'alert', 3000); return; }
-
-  var proxyObj = phoneFarmProxies.find(function(p) { return p.id === proxyId; });
-  var proxyLabel = proxyObj ? (proxyObj.label || proxyObj.ip + ':' + proxyObj.port) : '';
-
-  if (id) {
-    var idx = phoneFarmDevices.findIndex(function(d) { return d.id === id; });
-    if (idx !== -1) {
-      phoneFarmDevices[idx] = Object.assign(phoneFarmDevices[idx], { name: name, model: model, os: os, status: status, ip: ip, proxyId: proxyId, proxyLabel: proxyLabel, notes: notes });
-    }
-  } else {
-    phoneFarmDevices.push({ id: pfGenId(), name: name, model: model, os: os, status: status, ip: ip, proxyId: proxyId, proxyLabel: proxyLabel, notes: notes, lastActive: new Date().toISOString() });
-  }
-
-  savePhoneFarmData('devices', 'devices', phoneFarmDevices, 'Device saved');
-  pfCloseModal();
-  renderPhoneFarmDevicesTab();
+function pfSaveFromModal() { if (window._pfOnSave) window._pfOnSave(); }
+function pfCloseModal() {
+  var overlay = document.getElementById('pfModalOverlay');
+  if (overlay) overlay.style.display = 'none';
 }
 
-function deletePhoneDevice(id) {
-  if (!confirm('Delete this device? Accounts assigned to it will lose their device link.')) return;
-  phoneFarmDevices = phoneFarmDevices.filter(function(d) { return d.id !== id; });
-  phoneFarmAccounts = phoneFarmAccounts.map(function(a) {
-    if (a.deviceId === id) return Object.assign({}, a, { deviceId: '', deviceName: '' });
-    return a;
+// ── Main render ───────────────────────────────────────────────────────────────
+function renderPhoneFarmPage() {
+  var page = document.getElementById('phoneFarmPage');
+  if (!page) return;
+  page.innerHTML = '<div style="max-width:1400px;margin:0 auto;padding:28px 24px"><div id="pfShell"></div></div>';
+  loadPhoneFarmData(function() { pfRenderShell(); });
+}
+
+function pfRenderShell() {
+  var shell = document.getElementById('pfShell');
+  if (!shell) return;
+
+  var active = phoneFarmPhones.filter(function(p){ return p.active; }).length;
+  var totalIG = 0, totalTT = 0;
+  phoneFarmPhones.forEach(function(p) {
+    if (p.igAccounts) totalIG += p.igAccounts.split('\n').filter(function(s){return s.trim();}).length;
+    if (p.ttAccounts) totalTT += p.ttAccounts.split('\n').filter(function(s){return s.trim();}).length;
   });
-  savePhoneFarmData('devices', 'devices', phoneFarmDevices, 'Device deleted');
-  savePhoneFarmData('accounts', 'accounts', phoneFarmAccounts);
-  renderPhoneFarmDevicesTab();
-}
 
-function renderPhoneFarmDevicesTab() {
-  var container = document.getElementById('pfTabContent');
-  if (!container) return;
-
-  var rows = phoneFarmDevices.map(function(dev) {
-    var accCount = phoneFarmAccounts.filter(function(a) { return a.deviceId === dev.id; }).length;
-    var lastActive = dev.lastActive ? new Date(dev.lastActive).toLocaleDateString() : '—';
-    return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
-      '<td style="padding:11px 14px;font-weight:600;color:var(--text)">' + escHtml(dev.name) + '</td>' +
-      '<td style="padding:11px 14px;color:var(--muted);font-family:var(--font-mono);font-size:12px">' + escHtml(dev.model || '—') + '</td>' +
-      '<td style="padding:11px 14px;color:var(--muted);font-size:12px">' + escHtml(dev.os || '—') + '</td>' +
-      '<td style="padding:11px 14px">' + pfStatusBadge(dev.status || 'Inactive') + '</td>' +
-      '<td style="padding:11px 14px;font-family:var(--font-mono);font-size:12px;color:var(--muted)">' + escHtml(dev.ip || '—') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted)">' + escHtml(dev.proxyLabel || '—') + '</td>' +
-      '<td style="padding:11px 14px;text-align:center">' +
-        '<span style="font-size:13px;font-weight:700;color:' + (accCount > 0 ? 'var(--text)' : 'var(--muted)') + '">' + accCount + '</span>' +
-      '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted)">' + lastActive + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(dev.notes || '') + '</td>' +
-      '<td style="padding:11px 14px">' +
-        '<div style="display:flex;gap:6px;align-items:center">' +
-          pfActionBtn('Edit', 'var(--accent)', 'openPhoneDeviceModal(\'' + dev.id + '\')') +
-          pfActionBtn('Del', 'var(--red)', 'deletePhoneDevice(\'' + dev.id + '\')') +
-        '</div>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-
-  var emptyState = phoneFarmDevices.length === 0
-    ? '<tr><td colspan="10" style="padding:48px;text-align:center;color:var(--muted);font-size:13px">No devices yet. Click <strong style="color:var(--text)">Add Device</strong> to get started.</td></tr>'
-    : '';
-
-  container.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">' +
-      '<span style="font-size:13px;color:var(--muted)">' + phoneFarmDevices.length + ' device' + (phoneFarmDevices.length !== 1 ? 's' : '') + '</span>' +
-      '<button onclick="openPhoneDeviceModal()" style="background:rgba(126,191,154,0.1);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Device</button>' +
+  shell.innerHTML =
+    // Header
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px">' +
+      '<div>' +
+        '<div style="font-size:22px;font-weight:800;color:var(--text);letter-spacing:-0.5px">Phone Farm</div>' +
+        '<div style="font-size:13px;color:var(--muted);margin-top:3px">Manage farm phones, SIM cards, and social accounts</div>' +
+      '</div>' +
+      '<button onclick="openPhoneModal(null)" style="background:rgba(126,191,154,0.12);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Phone</button>' +
     '</div>' +
-    '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">' +
-      '<table style="width:100%;border-collapse:collapse;min-width:900px">' +
-        '<thead>' +
-          '<tr style="background:var(--card2);border-bottom:1px solid var(--border)">' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Device Name</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Model</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">OS</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Status</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">IP</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Proxy</th>' +
-            '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Accounts</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Last Active</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Notes</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Actions</th>' +
-          '</tr>' +
-        '</thead>' +
-        '<tbody>' + (rows || emptyState) + '</tbody>' +
-      '</table>' +
-    '</div>';
-}
-
-// ── Accounts Tab ──────────────────────────────────────────────────────────────
-
-var pfAccFilterPlatform = 'all';
-var pfAccFilterDevice = 'all';
-var pfAccFilterStatus = 'all';
-
-function openPhoneAccountModal(id) {
-  var acc = id ? phoneFarmAccounts.find(function(a) { return a.id === id; }) : null;
-
-  var deviceOptions = phoneFarmDevices.map(function(d) {
-    var sel = acc && acc.deviceId === d.id ? ' selected' : '';
-    return '<option value="' + escHtml(d.id) + '"' + sel + '>' + escHtml(d.name) + '</option>';
-  }).join('');
-
-  var proxyOptions = phoneFarmProxies.map(function(p) {
-    var sel = acc && acc.proxyId === p.id ? ' selected' : '';
-    return '<option value="' + escHtml(p.id) + '"' + sel + '>' + escHtml(p.label || (p.ip + ':' + p.port)) + '</option>';
-  }).join('');
-
-  var platforms = ['Facebook', 'TikTok', 'Instagram', 'Google'];
-  var statuses  = ['Active', 'Warming', 'Banned', 'Dead'];
-
-  var body =
-    '<div style="display:flex;flex-direction:column;gap:16px">' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Platform *</label>' +
-          '<select id="pfAPlatform" style="' + pfSelectStyle() + '">' +
-            platforms.map(function(p) {
-              return '<option value="' + p + '"' + (acc && acc.platform === p ? ' selected' : '') + '>' + p + '</option>';
-            }).join('') +
-          '</select>' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Status</label>' +
-          '<select id="pfAStatus" style="' + pfSelectStyle() + '">' +
-            statuses.map(function(s) {
-              return '<option value="' + s + '"' + (acc && acc.status === s ? ' selected' : (s === 'Active' && !acc ? ' selected' : '')) + '>' + s + '</option>';
-            }).join('') +
-          '</select>' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Username</label>' +
-          '<input id="pfAUsername" type="text" placeholder="@username" value="' + (acc ? escHtml(acc.username || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Email</label>' +
-          '<input id="pfAEmail" type="text" placeholder="email@example.com" value="' + (acc ? escHtml(acc.email || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Password Hint</label>' +
-          '<input id="pfAPassword" type="password" placeholder="Stored hint only" value="' + (acc ? escHtml(acc.passwordHint || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Ad Account ID</label>' +
-          '<input id="pfAAdId" type="text" placeholder="e.g. act_12345678" value="' + (acc ? escHtml(acc.adAccountId || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Device</label>' +
-          '<select id="pfADevice" style="' + pfSelectStyle() + '">' +
-            '<option value="">— None —</option>' + deviceOptions +
-          '</select>' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Proxy</label>' +
-          '<select id="pfAProxy" style="' + pfSelectStyle() + '">' +
-            '<option value="">— None —</option>' + proxyOptions +
-          '</select>' +
-        '</div>' +
-      '</div>' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">Created Date</label>' +
-        '<input id="pfACreated" type="date" value="' + (acc && acc.createdDate ? escHtml(acc.createdDate) : new Date().toISOString().slice(0,10)) + '" style="' + pfInputStyle() + '">' +
-      '</div>' +
-      '<div style="' + pfFieldStyle() + '">' +
-        '<label style="' + pfLabelStyle() + '">Notes</label>' +
-        '<textarea id="pfANotes" rows="3" placeholder="Optional notes..." style="' + pfInputStyle() + ';resize:vertical">' + (acc ? escHtml(acc.notes || '') : '') + '</textarea>' +
-      '</div>' +
-    '</div>';
-
-  pfOpenModal(id ? 'Edit Account' : 'Add Account', body, function() { savePhoneAccount(id); });
-}
-
-function savePhoneAccount(id) {
-  var platform     = document.getElementById('pfAPlatform').value;
-  var status       = document.getElementById('pfAStatus').value;
-  var username     = (document.getElementById('pfAUsername').value || '').trim();
-  var email        = (document.getElementById('pfAEmail').value || '').trim();
-  var passwordHint = (document.getElementById('pfAPassword').value || '').trim();
-  var adAccountId  = (document.getElementById('pfAAdId').value || '').trim();
-  var deviceId     = document.getElementById('pfADevice').value;
-  var proxyId      = document.getElementById('pfAProxy').value;
-  var createdDate  = document.getElementById('pfACreated').value;
-  var notes        = (document.getElementById('pfANotes').value || '').trim();
-
-  if (!username && !email) { showToast('Username or email is required', 'alert', 3000); return; }
-
-  var deviceObj = phoneFarmDevices.find(function(d) { return d.id === deviceId; });
-  var deviceName = deviceObj ? deviceObj.name : '';
-  var proxyObj = phoneFarmProxies.find(function(p) { return p.id === proxyId; });
-  var proxyLabel = proxyObj ? (proxyObj.label || proxyObj.ip + ':' + proxyObj.port) : '';
-
-  if (id) {
-    var idx = phoneFarmAccounts.findIndex(function(a) { return a.id === id; });
-    if (idx !== -1) {
-      phoneFarmAccounts[idx] = Object.assign(phoneFarmAccounts[idx], { platform: platform, status: status, username: username, email: email, passwordHint: passwordHint, adAccountId: adAccountId, deviceId: deviceId, deviceName: deviceName, proxyId: proxyId, proxyLabel: proxyLabel, createdDate: createdDate, notes: notes });
-    }
-  } else {
-    phoneFarmAccounts.push({ id: pfGenId(), platform: platform, status: status, username: username, email: email, passwordHint: passwordHint, adAccountId: adAccountId, deviceId: deviceId, deviceName: deviceName, proxyId: proxyId, proxyLabel: proxyLabel, createdDate: createdDate, notes: notes });
-  }
-
-  savePhoneFarmData('accounts', 'accounts', phoneFarmAccounts, 'Account saved');
-  pfCloseModal();
-  renderPhoneFarmAccountsTab();
-}
-
-function deletePhoneAccount(id) {
-  if (!confirm('Delete this account?')) return;
-  phoneFarmAccounts = phoneFarmAccounts.filter(function(a) { return a.id !== id; });
-  savePhoneFarmData('accounts', 'accounts', phoneFarmAccounts, 'Account deleted');
-  renderPhoneFarmAccountsTab();
-}
-
-function pfSetAccFilter(type, val) {
-  if (type === 'platform') pfAccFilterPlatform = val;
-  else if (type === 'device')   pfAccFilterDevice   = val;
-  else if (type === 'status')   pfAccFilterStatus   = val;
-  renderPhoneFarmAccountsTab();
-}
-
-function renderPhoneFarmAccountsTab() {
-  var container = document.getElementById('pfTabContent');
-  if (!container) return;
-
-  var filtered = phoneFarmAccounts.filter(function(a) {
-    if (pfAccFilterPlatform !== 'all' && a.platform !== pfAccFilterPlatform) return false;
-    if (pfAccFilterDevice   !== 'all' && a.deviceId !== pfAccFilterDevice)   return false;
-    if (pfAccFilterStatus   !== 'all' && a.status   !== pfAccFilterStatus)   return false;
-    return true;
-  });
-
-  // Summary badges
-  var platforms = ['Facebook', 'TikTok', 'Instagram', 'Google'];
-  var summaryBadges = platforms.map(function(p) {
-    var activeCount = phoneFarmAccounts.filter(function(a) { return a.platform === p && a.status === 'Active'; }).length;
-    if (activeCount === 0) return '';
-    return pfPlatformBadge(p) + ' <span style="font-size:12px;color:var(--muted);margin-right:6px">' + activeCount + ' active</span>';
-  }).join('');
-
-  var filterBarPlatforms = ['all'].concat(platforms);
-  var filterBarStatuses = ['all', 'Active', 'Warming', 'Banned', 'Dead'];
-
-  function filterBtn(type, val, label, active) {
-    var bg = active ? 'rgba(255,255,255,0.1)' : 'transparent';
-    var color = active ? 'var(--text)' : 'var(--muted)';
-    var border = active ? 'rgba(255,255,255,0.15)' : 'var(--border)';
-    return '<button onclick="pfSetAccFilter(\'' + type + '\',\'' + val + '\')" style="background:' + bg + ';border:1px solid ' + border + ';color:' + color + ';border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body);white-space:nowrap">' + escHtml(label) + '</button>';
-  }
-
-  var platformFilters = filterBarPlatforms.map(function(p) {
-    return filterBtn('platform', p, p === 'all' ? 'All Platforms' : p, pfAccFilterPlatform === p);
-  }).join('');
-
-  var statusFilters = filterBarStatuses.map(function(s) {
-    return filterBtn('status', s, s === 'all' ? 'All Statuses' : s, pfAccFilterStatus === s);
-  }).join('');
-
-  var deviceFilters = '<button onclick="pfSetAccFilter(\'device\',\'all\')" style="background:' + (pfAccFilterDevice === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent') + ';border:1px solid ' + (pfAccFilterDevice === 'all' ? 'rgba(255,255,255,0.15)' : 'var(--border)') + ';color:' + (pfAccFilterDevice === 'all' ? 'var(--text)' : 'var(--muted)') + ';border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body);white-space:nowrap">All Devices</button>' +
-    phoneFarmDevices.map(function(d) {
-      var active = pfAccFilterDevice === d.id;
-      return '<button onclick="pfSetAccFilter(\'device\',\'' + d.id + '\')" style="background:' + (active ? 'rgba(255,255,255,0.1)' : 'transparent') + ';border:1px solid ' + (active ? 'rgba(255,255,255,0.15)' : 'var(--border)') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body);white-space:nowrap">' + escHtml(d.name) + '</button>';
-    }).join('');
-
-  var rows = filtered.map(function(acc) {
-    var created = acc.createdDate ? acc.createdDate : '—';
-    return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
-      '<td style="padding:11px 14px">' + pfPlatformBadge(acc.platform || '—') + '</td>' +
-      '<td style="padding:11px 14px">' +
-        '<div style="font-weight:600;color:var(--text);font-size:13px">' + escHtml(acc.username || '—') + '</div>' +
-        (acc.email ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escHtml(acc.email) + '</div>' : '') +
-      '</td>' +
-      '<td style="padding:11px 14px">' + pfStatusBadge(acc.status || 'Inactive') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted)">' + escHtml(acc.deviceName || '—') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted)">' + escHtml(acc.proxyLabel || '—') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted);font-family:var(--font-mono)">' + escHtml(created) + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted);font-family:var(--font-mono)">' + escHtml(acc.adAccountId || '—') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(acc.notes || '') + '</td>' +
-      '<td style="padding:11px 14px">' +
-        '<div style="display:flex;gap:6px">' +
-          pfActionBtn('Edit', 'var(--accent)', 'openPhoneAccountModal(\'' + acc.id + '\')') +
-          pfActionBtn('Del', 'var(--red)', 'deletePhoneAccount(\'' + acc.id + '\')') +
-        '</div>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-
-  var emptyState = filtered.length === 0
-    ? '<tr><td colspan="9" style="padding:48px;text-align:center;color:var(--muted);font-size:13px">' + (phoneFarmAccounts.length === 0 ? 'No accounts yet. Click <strong style="color:var(--text)">Add Account</strong> to get started.' : 'No accounts match the current filters.') + '</td></tr>'
-    : '';
-
-  container.innerHTML =
-    (summaryBadges
-      ? '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px">' +
-          '<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-right:4px">Active:</span>' +
-          summaryBadges +
-        '</div>'
-      : '') +
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">' + platformFilters + '</div>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">' + statusFilters + '</div>' +
-    (phoneFarmDevices.length > 0
-      ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">' + deviceFilters + '</div>'
-      : '') +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-      '<span style="font-size:13px;color:var(--muted)">' + filtered.length + ' of ' + phoneFarmAccounts.length + ' account' + (phoneFarmAccounts.length !== 1 ? 's' : '') + '</span>' +
-      '<button onclick="openPhoneAccountModal()" style="background:rgba(126,191,154,0.1);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Account</button>' +
+    // Stats row
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">' +
+      pfStatCard(phoneFarmPhones.length, 'Total Phones', 'var(--text)') +
+      pfStatCard(active, 'Active', 'var(--green)') +
+      pfStatCard(totalIG, 'IG Accounts', 'var(--orange)') +
+      pfStatCard(totalTT, 'TT Accounts', 'var(--purple)') +
     '</div>' +
-    '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">' +
-      '<table style="width:100%;border-collapse:collapse;min-width:860px">' +
-        '<thead>' +
-          '<tr style="background:var(--card2);border-bottom:1px solid var(--border)">' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Platform</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Username / Email</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Status</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Device</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Proxy</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Created</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Ad Account ID</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Notes</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Actions</th>' +
-          '</tr>' +
-        '</thead>' +
-        '<tbody>' + (rows || emptyState) + '</tbody>' +
-      '</table>' +
-    '</div>';
-}
-
-// ── Proxies Tab ───────────────────────────────────────────────────────────────
-
-function openPhoneProxyModal(id) {
-  var proxy = id ? phoneFarmProxies.find(function(p) { return p.id === id; }) : null;
-  var types = ['Residential', 'DC', 'Mobile'];
-  var statuses = ['Active', 'Inactive', 'Banned'];
-
-  var body =
-    '<div style="display:flex;flex-direction:column;gap:16px">' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Label *</label>' +
-          '<input id="pfPLabel" type="text" placeholder="e.g. US Residential 01" value="' + (proxy ? escHtml(proxy.label || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Provider</label>' +
-          '<input id="pfPProvider" type="text" placeholder="e.g. Bright Data" value="' + (proxy ? escHtml(proxy.provider || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">IP</label>' +
-          '<input id="pfPIP" type="text" placeholder="e.g. 123.45.67.89" value="' + (proxy ? escHtml(proxy.ip || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Port</label>' +
-          '<input id="pfPPort" type="text" placeholder="e.g. 8080" value="' + (proxy ? escHtml(proxy.port || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Username</label>' +
-          '<input id="pfPUser" type="text" placeholder="Proxy username" value="' + (proxy ? escHtml(proxy.username || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Password</label>' +
-          '<input id="pfPPass" type="password" placeholder="Proxy password" value="' + (proxy ? escHtml(proxy.password || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Type</label>' +
-          '<select id="pfPType" style="' + pfSelectStyle() + '">' +
-            types.map(function(t) {
-              return '<option value="' + t + '"' + (proxy && proxy.type === t ? ' selected' : '') + '>' + t + '</option>';
-            }).join('') +
-          '</select>' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Location</label>' +
-          '<input id="pfPLocation" type="text" placeholder="e.g. US, DE" value="' + (proxy ? escHtml(proxy.location || '') : '') + '" style="' + pfInputStyle() + '">' +
-        '</div>' +
-        '<div style="' + pfFieldStyle() + '">' +
-          '<label style="' + pfLabelStyle() + '">Status</label>' +
-          '<select id="pfPStatus" style="' + pfSelectStyle() + '">' +
-            statuses.map(function(s) {
-              return '<option value="' + s + '"' + (proxy && proxy.status === s ? ' selected' : (s === 'Active' && !proxy ? ' selected' : '')) + '>' + s + '</option>';
-            }).join('') +
-          '</select>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-
-  pfOpenModal(id ? 'Edit Proxy' : 'Add Proxy', body, function() { savePhoneProxy(id); });
-}
-
-function savePhoneProxy(id) {
-  var label    = (document.getElementById('pfPLabel').value || '').trim();
-  var provider = (document.getElementById('pfPProvider').value || '').trim();
-  var ip       = (document.getElementById('pfPIP').value || '').trim();
-  var port     = (document.getElementById('pfPPort').value || '').trim();
-  var username = (document.getElementById('pfPUser').value || '').trim();
-  var password = (document.getElementById('pfPPass').value || '').trim();
-  var type     = document.getElementById('pfPType').value;
-  var location = (document.getElementById('pfPLocation').value || '').trim();
-  var status   = document.getElementById('pfPStatus').value;
-
-  if (!label) { showToast('Proxy label is required', 'alert', 3000); return; }
-
-  if (id) {
-    var idx = phoneFarmProxies.findIndex(function(p) { return p.id === id; });
-    if (idx !== -1) {
-      phoneFarmProxies[idx] = Object.assign(phoneFarmProxies[idx], { label: label, provider: provider, ip: ip, port: port, username: username, password: password, type: type, location: location, status: status });
-    }
-  } else {
-    phoneFarmProxies.push({ id: pfGenId(), label: label, provider: provider, ip: ip, port: port, username: username, password: password, type: type, location: location, status: status });
-  }
-
-  savePhoneFarmData('proxies', 'proxies', phoneFarmProxies, 'Proxy saved');
-  pfCloseModal();
-  renderPhoneFarmProxiesTab();
-}
-
-function deletePhoneProxy(id) {
-  if (!confirm('Delete this proxy? Devices and accounts using it will lose their proxy link.')) return;
-  phoneFarmProxies = phoneFarmProxies.filter(function(p) { return p.id !== id; });
-  phoneFarmDevices = phoneFarmDevices.map(function(d) {
-    if (d.proxyId === id) return Object.assign({}, d, { proxyId: '', proxyLabel: '' });
-    return d;
-  });
-  phoneFarmAccounts = phoneFarmAccounts.map(function(a) {
-    if (a.proxyId === id) return Object.assign({}, a, { proxyId: '', proxyLabel: '' });
-    return a;
-  });
-  savePhoneFarmData('proxies', 'proxies', phoneFarmProxies, 'Proxy deleted');
-  savePhoneFarmData('devices', 'devices', phoneFarmDevices);
-  savePhoneFarmData('accounts', 'accounts', phoneFarmAccounts);
-  renderPhoneFarmProxiesTab();
-}
-
-function renderPhoneFarmProxiesTab() {
-  var container = document.getElementById('pfTabContent');
-  if (!container) return;
-
-  var rows = phoneFarmProxies.map(function(proxy) {
-    var assignedDevices = phoneFarmDevices.filter(function(d) { return d.proxyId === proxy.id; });
-    var assignedNames = assignedDevices.map(function(d) { return escHtml(d.name); }).join(', ') || '—';
-    var ipPort = (proxy.ip && proxy.port) ? escHtml(proxy.ip + ':' + proxy.port) : (proxy.ip ? escHtml(proxy.ip) : '—');
-    return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
-      '<td style="padding:11px 14px;font-weight:600;color:var(--text)">' + escHtml(proxy.label || '—') + '</td>' +
-      '<td style="padding:11px 14px;font-family:var(--font-mono);font-size:12px;color:var(--muted)">' + ipPort + '</td>' +
-      '<td style="padding:11px 14px">' + pfProxyTypeBadge(proxy.type || 'DC') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted)">' + escHtml(proxy.provider || '—') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted)">' + escHtml(proxy.location || '—') + '</td>' +
-      '<td style="padding:11px 14px">' + pfStatusBadge(proxy.status || 'Inactive') + '</td>' +
-      '<td style="padding:11px 14px;font-size:12px;color:var(--muted);max-width:180px">' + assignedNames + '</td>' +
-      '<td style="padding:11px 14px">' +
-        '<div style="display:flex;gap:6px">' +
-          pfActionBtn('Edit', 'var(--accent)', 'openPhoneProxyModal(\'' + proxy.id + '\')') +
-          pfActionBtn('Del', 'var(--red)', 'deletePhoneProxy(\'' + proxy.id + '\')') +
-        '</div>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-
-  var emptyState = phoneFarmProxies.length === 0
-    ? '<tr><td colspan="8" style="padding:48px;text-align:center;color:var(--muted);font-size:13px">No proxies yet. Click <strong style="color:var(--text)">Add Proxy</strong> to get started.</td></tr>'
-    : '';
-
-  container.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">' +
-      '<span style="font-size:13px;color:var(--muted)">' + phoneFarmProxies.length + ' prox' + (phoneFarmProxies.length !== 1 ? 'ies' : 'y') + '</span>' +
-      '<button onclick="openPhoneProxyModal()" style="background:rgba(126,191,154,0.1);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Proxy</button>' +
+    // Tabs
+    '<div style="display:flex;gap:6px;margin-bottom:18px">' +
+      pfTabBtn('phones', 'Phones') +
+      pfTabBtn('proxies', 'Proxies') +
     '</div>' +
-    '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">' +
-      '<table style="width:100%;border-collapse:collapse;min-width:800px">' +
-        '<thead>' +
-          '<tr style="background:var(--card2);border-bottom:1px solid var(--border)">' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Label</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">IP:Port</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Type</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Provider</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Location</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Status</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Assigned To</th>' +
-            '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap">Actions</th>' +
-          '</tr>' +
-        '</thead>' +
-        '<tbody>' + (rows || emptyState) + '</tbody>' +
-      '</table>' +
-    '</div>';
+    '<div id="pfTabContent"></div>';
+
+  pfSwitchTab(phoneFarmTab);
 }
 
-// ── Tab Switching ─────────────────────────────────────────────────────────────
+function pfStatCard(val, label, color) {
+  return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:16px 18px">' +
+    '<div style="font-size:24px;font-weight:800;color:' + color + '">' + val + '</div>' +
+    '<div style="font-size:11px;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">' + label + '</div>' +
+  '</div>';
+}
+
+function pfTabBtn(id, label) {
+  var active = phoneFarmTab === id;
+  return '<button onclick="pfSwitchTab(\'' + id + '\')" style="background:' + (active ? 'rgba(255,255,255,0.08)' : 'transparent') + ';border:1px solid ' + (active ? 'var(--border-bright)' : 'var(--border)') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';border-radius:7px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all 0.15s">' + label + '</button>';
+}
 
 function pfSwitchTab(tab) {
   phoneFarmTab = tab;
-  var tabs = ['devices', 'accounts', 'proxies'];
-  tabs.forEach(function(t) {
-    var btn = document.getElementById('pfTab_' + t);
-    if (!btn) return;
-    var active = t === tab;
-    btn.style.color       = active ? 'var(--text)'                : 'var(--muted)';
-    btn.style.borderColor = active ? 'rgba(255,255,255,0.15)'     : 'transparent';
-    btn.style.background  = active ? 'rgba(255,255,255,0.06)'     : 'transparent';
-  });
-  if (tab === 'devices')  renderPhoneFarmDevicesTab();
-  if (tab === 'accounts') renderPhoneFarmAccountsTab();
-  if (tab === 'proxies')  renderPhoneFarmProxiesTab();
+  // Re-render tabs highlighting
+  var shell = document.getElementById('pfShell');
+  if (shell) {
+    var tabBtns = shell.querySelectorAll('[onclick^="pfSwitchTab"]');
+    tabBtns.forEach(function(btn) {
+      var t = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
+      var isActive = t === tab;
+      btn.style.background = isActive ? 'rgba(255,255,255,0.08)' : 'transparent';
+      btn.style.borderColor = isActive ? 'var(--border-bright)' : 'var(--border)';
+      btn.style.color = isActive ? 'var(--text)' : 'var(--muted)';
+    });
+  }
+  if (tab === 'phones') renderPhonesTab();
+  else renderProxiesTab();
 }
 
-// ── Main Render ───────────────────────────────────────────────────────────────
+// ── Phones Table ──────────────────────────────────────────────────────────────
+var pfSearchTerm = '';
+var pfFilterActive = 'all';
 
-function renderPhoneFarmPage() {
-  var container = document.getElementById('phoneFarmPage');
+function renderPhonesTab() {
+  var container = document.getElementById('pfTabContent');
   if (!container) return;
 
-  // Stat cards data
-  function statCard(label, value, color) {
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;flex:1;min-width:120px">' +
-      '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">' + label + '</div>' +
-      '<div style="font-size:26px;font-weight:700;color:' + color + ';font-family:var(--font-display);line-height:1">' + value + '</div>' +
-    '</div>';
-  }
-
-  var activeDevices  = phoneFarmDevices.filter(function(d) { return d.status === 'Active'; }).length;
-  var bannedDevices  = phoneFarmDevices.filter(function(d) { return d.status === 'Banned'; }).length;
-  var activeAccounts = phoneFarmAccounts.filter(function(a) { return a.status === 'Active'; }).length;
-  var bannedAccounts = phoneFarmAccounts.filter(function(a) { return a.status === 'Banned' || a.status === 'Dead'; }).length;
-  var activeProxies  = phoneFarmProxies.filter(function(p) { return p.status === 'Active'; }).length;
-
-  container.innerHTML =
-    '<div style="padding:28px 28px 0;position:relative;z-index:1">' +
-      '<div style="margin-bottom:24px">' +
-        '<h1 style="font-size:22px;font-weight:700;color:var(--text);font-family:var(--font-display);margin:0 0 4px">Phone Farm</h1>' +
-        '<p style="font-size:13px;color:var(--muted);margin:0">Manage devices, ad accounts, and proxies for your phone farm.</p>' +
-      '</div>' +
-
-      // Stat cards row
-      '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' +
-        statCard('Total Devices',   phoneFarmDevices.length,  'var(--text)') +
-        statCard('Active Devices',  activeDevices,            'var(--green)') +
-        statCard('Banned Devices',  bannedDevices,            bannedDevices > 0 ? 'var(--red)' : 'var(--muted)') +
-        statCard('Total Accounts',  phoneFarmAccounts.length, 'var(--text)') +
-        statCard('Active Accounts', activeAccounts,           'var(--green)') +
-        statCard('Banned/Dead',     bannedAccounts,           bannedAccounts > 0 ? 'var(--red)' : 'var(--muted)') +
-        statCard('Proxies',         activeProxies + '/' + phoneFarmProxies.length, 'var(--yellow)') +
-      '</div>' +
-
-      // Tab bar
-      '<div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">' +
-        ['devices','accounts','proxies'].map(function(t) {
-          var labels = { devices: 'Devices', accounts: 'Accounts', proxies: 'Proxies' };
-          var counts = { devices: phoneFarmDevices.length, accounts: phoneFarmAccounts.length, proxies: phoneFarmProxies.length };
-          var active = phoneFarmTab === t;
-          return '<button id="pfTab_' + t + '" onclick="pfSwitchTab(\'' + t + '\')" style="background:' + (active ? 'rgba(255,255,255,0.06)' : 'transparent') + ';border:1px solid ' + (active ? 'rgba(255,255,255,0.15)' : 'transparent') + ';border-bottom:' + (active ? '1px solid transparent' : '1px solid transparent') + ';border-radius:8px 8px 0 0;color:' + (active ? 'var(--text)' : 'var(--muted)') + ';padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);margin-bottom:-1px;transition:color 0.15s,background 0.15s">' +
-            labels[t] + ' <span style="font-size:11px;opacity:0.6;margin-left:3px">(' + counts[t] + ')</span>' +
-          '</button>';
-        }).join('') +
-      '</div>' +
-
-      // Tab content area
-      '<div id="pfTabContent" style="animation:fade-in 0.2s ease"></div>' +
-
-    '</div>';
-
-  // Load data if needed, then render the active tab
-  loadPhoneFarmData(function() {
-    // Re-render stats now that data is loaded
-    var activeDevices2  = phoneFarmDevices.filter(function(d) { return d.status === 'Active'; }).length;
-    var bannedDevices2  = phoneFarmDevices.filter(function(d) { return d.status === 'Banned'; }).length;
-    var activeAccounts2 = phoneFarmAccounts.filter(function(a) { return a.status === 'Active'; }).length;
-    var bannedAccounts2 = phoneFarmAccounts.filter(function(a) { return a.status === 'Banned' || a.status === 'Dead'; }).length;
-    var activeProxies2  = phoneFarmProxies.filter(function(p) { return p.status === 'Active'; }).length;
-
-    // Update tab counts
-    var tabCounts = { devices: phoneFarmDevices.length, accounts: phoneFarmAccounts.length, proxies: phoneFarmProxies.length };
-    ['devices','accounts','proxies'].forEach(function(t) {
-      var btn = document.getElementById('pfTab_' + t);
-      if (btn) {
-        var labels = { devices: 'Devices', accounts: 'Accounts', proxies: 'Proxies' };
-        var active = phoneFarmTab === t;
-        btn.innerHTML = labels[t] + ' <span style="font-size:11px;opacity:0.6;margin-left:3px">(' + tabCounts[t] + ')</span>';
-      }
-    });
-
-    pfSwitchTab(phoneFarmTab);
+  var filtered = phoneFarmPhones.filter(function(p) {
+    if (pfFilterActive === 'active' && !p.active) return false;
+    if (pfFilterActive === 'inactive' && p.active) return false;
+    if (pfSearchTerm) {
+      var s = pfSearchTerm.toLowerCase();
+      return (p.tel||'').toLowerCase().includes(s) ||
+             (p.igAccounts||'').toLowerCase().includes(s) ||
+             (p.ttAccounts||'').toLowerCase().includes(s) ||
+             (p.icloud||'').toLowerCase().includes(s) ||
+             String(p.num).includes(s);
+    }
+    return true;
   });
 
-  // While loading, show default empty tab
-  if (!phoneFarmLoaded) {
-    document.getElementById('pfTabContent').innerHTML =
-      '<div style="padding:60px;text-align:center;color:var(--muted);font-size:13px">Loading farm data\u2026</div>';
-  } else {
-    pfSwitchTab(phoneFarmTab);
-  }
+  container.innerHTML =
+    // Filter bar
+    '<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">' +
+      '<input id="pfSearch" type="text" placeholder="Search phones, accounts..." value="' + escHtml(pfSearchTerm) + '" oninput="pfSearchTerm=this.value;renderPhonesTab()" style="flex:1;min-width:200px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none">' +
+      '<div style="display:flex;gap:6px">' +
+        pfFilterBtn('all', 'All') +
+        pfFilterBtn('active', 'Active') +
+        pfFilterBtn('inactive', 'Inactive') +
+      '</div>' +
+    '</div>' +
+    // Table wrapper (scrollable)
+    '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px">' +
+      '<table style="width:100%;border-collapse:collapse;white-space:nowrap">' +
+        '<thead>' +
+          '<tr style="background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border)">' +
+            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">#</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Tel</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:0.5px">IG Accounts</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.5px">TT Accounts</th>' +
+            '<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Active</th>' +
+            '<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Reset</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">PIN / PUK</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">iCloud</th>' +
+            '<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">IG Mail</th>' +
+            '<th style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px"></th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody>' +
+          (filtered.length === 0 ? '<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No phones found</td></tr>' :
+            filtered.map(function(p) { return renderPhoneRow(p); }).join('')) +
+        '</tbody>' +
+      '</table>' +
+    '</div>';
 }
 
+function pfFilterBtn(val, label) {
+  var active = pfFilterActive === val;
+  return '<button onclick="pfFilterActive=\'' + val + '\';renderPhonesTab()" style="background:' + (active ? 'rgba(255,255,255,0.08)' : 'transparent') + ';border:1px solid ' + (active ? 'var(--border-bright)' : 'var(--border)') + ';color:' + (active ? 'var(--text)' : 'var(--muted)') + ';border-radius:6px;padding:6px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">' + label + '</button>';
+}
+
+function renderPhoneRow(p) {
+  var igList = (p.igAccounts||'').split('\n').filter(function(s){return s.trim();});
+  var ttList = (p.ttAccounts||'').split('\n').filter(function(s){return s.trim();});
+  var mailList = (p.igMails||'').split('\n').filter(function(s){return s.trim();});
+
+  function acctPills(list, color) {
+    if (!list.length) return '<span style="color:var(--muted);font-size:12px">—</span>';
+    return list.map(function(a) {
+      return '<span style="display:inline-block;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 7px;font-size:11px;color:' + color + ';font-family:var(--font-mono);margin:1px 2px;white-space:nowrap">' + escHtml(a.trim()) + '</span>';
+    }).join('');
+  }
+
+  var pinPuk = '';
+  if (p.pin || p.puk) pinPuk = '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + (p.pin ? 'PIN: <strong style="color:var(--text)">' + escHtml(p.pin) + '</strong>' : '') + (p.pin && p.puk ? ' / ' : '') + (p.puk ? 'PUK: <strong style="color:var(--text)">' + escHtml(p.puk) + '</strong>' : '') + '</span>';
+  else pinPuk = '<span style="color:var(--muted);font-size:12px">—</span>';
+
+  var icloudCell = p.icloud ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">' + escHtml(p.icloud) + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>';
+
+  var mailCell;
+  if (!mailList.length) {
+    mailCell = '<span style="color:var(--muted);font-size:12px">—</span>';
+  } else {
+    mailCell = '<div style="font-size:11px;font-family:var(--font-mono);color:var(--muted);line-height:1.6">' +
+      mailList.slice(0,2).map(function(m){ return escHtml(m); }).join('<br>') +
+      (mailList.length > 2 ? '<br><span style="color:var(--accent)">+' + (mailList.length-2) + ' more</span>' : '') +
+      '</div>';
+  }
+
+  return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
+    '<td style="padding:10px 12px;font-weight:700;color:var(--muted);font-size:13px">' + p.num + '</td>' +
+    '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text);font-weight:600">' + escHtml(p.tel||'—') + '</td>' +
+    '<td style="padding:10px 12px;max-width:220px;white-space:normal">' + acctPills(igList, 'var(--orange)') + '</td>' +
+    '<td style="padding:10px 12px;max-width:220px;white-space:normal">' + acctPills(ttList, 'var(--purple)') + '</td>' +
+    '<td style="padding:10px 12px;text-align:center">' + pfBoolBadge(p.active) + '</td>' +
+    '<td style="padding:10px 12px;text-align:center">' + pfBoolBadge(p.reset, 'YES', 'NO') + '</td>' +
+    '<td style="padding:10px 12px">' + pinPuk + '</td>' +
+    '<td style="padding:10px 12px;max-width:180px;white-space:normal">' + icloudCell + '</td>' +
+    '<td style="padding:10px 12px;max-width:200px;white-space:normal">' + mailCell + '</td>' +
+    '<td style="padding:10px 12px">' +
+      '<div style="display:flex;gap:6px">' +
+        pfActionBtn('Edit', 'var(--accent)', 'openPhoneModal(\'' + p.id + '\')') +
+        (p.important ? pfActionBtn('!', 'var(--yellow)', 'pfShowImportant(\'' + p.id + '\')') : '') +
+      '</div>' +
+    '</td>' +
+  '</tr>';
+}
+
+function pfShowImportant(id) {
+  var p = phoneFarmPhones.find(function(x){ return x.id === id; });
+  if (!p || !p.important) return;
+  pfOpenModal('Phone ' + p.num + ' — Important Notes',
+    '<div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:8px;padding:16px;font-family:var(--font-mono);font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap">' + escHtml(p.important) + '</div>',
+    function() { pfCloseModal(); }
+  );
+  // Replace save button with close only
+  setTimeout(function() {
+    var footer = document.querySelector('#pfModalOverlay > div > div:last-child');
+    if (footer) footer.innerHTML = '<button onclick="pfCloseModal()" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 20px;font-size:13px;cursor:pointer;font-family:var(--font-body)">Close</button>';
+  }, 50);
+}
+
+// ── Phone Modal (Add / Edit) ──────────────────────────────────────────────────
+function openPhoneModal(id) {
+  var p = id ? phoneFarmPhones.find(function(x){ return x.id === id; }) : null;
+  var v = function(field, def) { return p ? (p[field] !== undefined ? p[field] : def) : def; };
+
+  var body =
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+      '<div style="display:grid;grid-template-columns:80px 1fr;gap:12px">' +
+        '<div style="' + pfFieldStyle() + '">' +
+          '<label style="' + pfLabelStyle() + '"># Nr</label>' +
+          '<input id="pfPNum" type="number" value="' + escHtml(String(v('num',phoneFarmPhones.length+1))) + '" style="' + pfInputStyle() + '">' +
+        '</div>' +
+        '<div style="' + pfFieldStyle() + '">' +
+          '<label style="' + pfLabelStyle() + '">Tel Number</label>' +
+          '<input id="pfPTel" type="text" placeholder="041 xxx xxx" value="' + escHtml(v('tel','')) + '" style="' + pfInputStyle() + '">' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div style="' + pfFieldStyle() + '">' +
+          '<label style="' + pfLabelStyle() + '">IG Accounts (one per line)</label>' +
+          '<textarea id="pfPIG" rows="4" placeholder="@AccountName" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('igAccounts','')) + '</textarea>' +
+        '</div>' +
+        '<div style="' + pfFieldStyle() + '">' +
+          '<label style="' + pfLabelStyle() + '">TT Accounts (one per line)</label>' +
+          '<textarea id="pfPTT" rows="4" placeholder="@AccountName" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('ttAccounts','')) + '</textarea>' +
+        '</div>' +
+      '</div>' +
+      '<div style="' + pfFieldStyle() + '">' +
+        '<label style="' + pfLabelStyle() + '">IG Mails (one per line)</label>' +
+        '<textarea id="pfPMails" rows="3" placeholder="email@hotmail.com" style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('igMails','')) + '</textarea>' +
+      '</div>' +
+      '<div style="' + pfFieldStyle() + '">' +
+        '<label style="' + pfLabelStyle() + '">Important Notes (passwords, etc.)</label>' +
+        '<textarea id="pfPImportant" rows="3" placeholder="IG PASS: ...\nIG MAIL PASS: ..." style="' + pfInputStyle() + ';resize:vertical">' + escHtml(v('important','')) + '</textarea>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div style="' + pfFieldStyle() + '">' +
+          '<label style="' + pfLabelStyle() + '">PIN</label>' +
+          '<input id="pfPPIN" type="text" placeholder="0000" value="' + escHtml(v('pin','')) + '" style="' + pfInputStyle() + '">' +
+        '</div>' +
+        '<div style="' + pfFieldStyle() + '">' +
+          '<label style="' + pfLabelStyle() + '">PUK</label>' +
+          '<input id="pfPPUK" type="text" placeholder="00000000" value="' + escHtml(v('puk','')) + '" style="' + pfInputStyle() + '">' +
+        '</div>' +
+      '</div>' +
+      '<div style="' + pfFieldStyle() + '">' +
+        '<label style="' + pfLabelStyle() + '">iCloud</label>' +
+        '<input id="pfPiCloud" type="text" placeholder="phonidark1@icloud.com / Desc123$" value="' + escHtml(v('icloud','')) + '" style="' + pfInputStyle() + '">' +
+      '</div>' +
+      '<div style="display:flex;gap:20px;align-items:center;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--border)">' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">' +
+          '<input id="pfPActive" type="checkbox"' + (v('active',false) ? ' checked' : '') + ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)"> Active' +
+        '</label>' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">' +
+          '<input id="pfPReset" type="checkbox"' + (v('reset',false) ? ' checked' : '') + ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--yellow)"> Reset Done' +
+        '</label>' +
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">' +
+          '<input id="pfPBio" type="checkbox"' + (v('igBio',false) ? ' checked' : '') + ' style="width:16px;height:16px;cursor:pointer;accent-color:var(--orange)"> IG Bio Set' +
+        '</label>' +
+      '</div>' +
+    '</div>';
+
+  pfOpenModal((id ? 'Edit Phone ' + (p ? p.num : '') : 'Add Phone'), body, function() { savePhoneEntry(id); });
+}
+
+function savePhoneEntry(id) {
+  var num      = parseInt(document.getElementById('pfPNum').value) || 0;
+  var tel      = (document.getElementById('pfPTel').value||'').trim();
+  var igAccounts = (document.getElementById('pfPIG').value||'').trim();
+  var ttAccounts = (document.getElementById('pfPTT').value||'').trim();
+  var igMails  = (document.getElementById('pfPMails').value||'').trim();
+  var important = (document.getElementById('pfPImportant').value||'').trim();
+  var pin      = (document.getElementById('pfPPIN').value||'').trim();
+  var puk      = (document.getElementById('pfPPUK').value||'').trim();
+  var icloud   = (document.getElementById('pfPiCloud').value||'').trim();
+  var active   = document.getElementById('pfPActive').checked;
+  var reset    = document.getElementById('pfPReset').checked;
+  var igBio    = document.getElementById('pfPBio').checked;
+
+  if (!tel && !num) { showToast('Tel number is required', 'alert', 3000); return; }
+
+  var entry = { num:num, tel:tel, igAccounts:igAccounts, ttAccounts:ttAccounts, igMails:igMails, important:important, pin:pin, puk:puk, icloud:icloud, active:active, reset:reset, igBio:igBio };
+
+  if (id) {
+    var idx = phoneFarmPhones.findIndex(function(x){ return x.id === id; });
+    if (idx !== -1) phoneFarmPhones[idx] = Object.assign(phoneFarmPhones[idx], entry);
+  } else {
+    entry.id = pfGenId();
+    phoneFarmPhones.push(entry);
+  }
+
+  savePhoneFarmData('phones', 'phones', phoneFarmPhones, 'Phone saved');
+  pfCloseModal();
+  pfRenderShell();
+}
+
+function deletePhoneEntry(id) {
+  if (!confirm('Delete this phone entry?')) return;
+  phoneFarmPhones = phoneFarmPhones.filter(function(x){ return x.id !== id; });
+  savePhoneFarmData('phones', 'phones', phoneFarmPhones, 'Phone deleted');
+  renderPhonesTab();
+}
+
+// ── Proxies Tab ───────────────────────────────────────────────────────────────
+function renderProxiesTab() {
+  var container = document.getElementById('pfTabContent');
+  if (!container) return;
+
+  var rows = phoneFarmProxies.length === 0 ?
+    '<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No proxies configured yet</td></tr>' :
+    phoneFarmProxies.map(function(p) {
+      return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
+        '<td style="padding:11px 14px;font-weight:600;color:var(--text);font-family:var(--font-mono);font-size:12px">' + escHtml(p.ip||'—') + '</td>' +
+        '<td style="padding:11px 14px;color:var(--muted);font-family:var(--font-mono);font-size:12px">' + escHtml(String(p.port||'—')) + '</td>' +
+        '<td style="padding:11px 14px;color:var(--muted);font-size:12px">' + escHtml(p.type||'DC') + '</td>' +
+        '<td style="padding:11px 14px;color:var(--muted);font-size:12px">' + escHtml(p.label||'') + '</td>' +
+        '<td style="padding:11px 14px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + escHtml(p.username||'') + '</td>' +
+        '<td style="padding:11px 14px"><div style="display:flex;gap:6px">' +
+          pfActionBtn('Edit', 'var(--accent)', 'openProxyModal(\'' + p.id + '\')') +
+          pfActionBtn('Del', 'var(--red)', 'deleteProxy(\'' + p.id + '\')') +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+
+  container.innerHTML =
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:14px">' +
+      '<button onclick="openProxyModal(null)" style="background:rgba(126,191,154,0.12);border:1px solid rgba(126,191,154,0.25);color:var(--green);border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">+ Add Proxy</button>' +
+    '</div>' +
+    '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+      '<table style="width:100%;border-collapse:collapse">' +
+        '<thead><tr style="background:rgba(255,255,255,0.03);border-bottom:1px solid var(--border)">' +
+          ['IP','Port','Type','Label','Username',''].map(function(h){ return '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">' + h + '</th>'; }).join('') +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' +
+    '</div>';
+}
+
+function openProxyModal(id) {
+  var p = id ? phoneFarmProxies.find(function(x){ return x.id === id; }) : null;
+  var v = function(f,d) { return p && p[f] !== undefined ? p[f] : d; };
+
+  var body =
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">' +
+        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">IP Address *</label>' +
+          '<input id="pfXIP" type="text" placeholder="1.2.3.4" value="' + escHtml(v('ip','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Port</label>' +
+          '<input id="pfXPort" type="text" placeholder="8080" value="' + escHtml(String(v('port',''))) + '" style="' + pfInputStyle() + '"></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Type</label>' +
+          '<select id="pfXType" style="' + pfSelectStyle() + '">' +
+            ['Residential','Mobile','DC'].map(function(t){ return '<option value="' + t + '"' + (v('type','DC')===t?' selected':'') + '>' + t + '</option>'; }).join('') +
+          '</select></div>' +
+        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Label</label>' +
+          '<input id="pfXLabel" type="text" placeholder="My Proxy" value="' + escHtml(v('label','')) + '" style="' + pfInputStyle() + '"></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Username</label>' +
+          '<input id="pfXUser" type="text" value="' + escHtml(v('username','')) + '" style="' + pfInputStyle() + '"></div>' +
+        '<div style="' + pfFieldStyle() + '"><label style="' + pfLabelStyle() + '">Password</label>' +
+          '<input id="pfXPass" type="text" value="' + escHtml(v('password','')) + '" style="' + pfInputStyle() + '"></div>' +
+      '</div>' +
+    '</div>';
+
+  pfOpenModal(id ? 'Edit Proxy' : 'Add Proxy', body, function() { saveProxy(id); });
+}
+
+function saveProxy(id) {
+  var ip       = (document.getElementById('pfXIP').value||'').trim();
+  var port     = (document.getElementById('pfXPort').value||'').trim();
+  var type     = document.getElementById('pfXType').value;
+  var label    = (document.getElementById('pfXLabel').value||'').trim();
+  var username = (document.getElementById('pfXUser').value||'').trim();
+  var password = (document.getElementById('pfXPass').value||'').trim();
+
+  if (!ip) { showToast('IP address required', 'alert', 3000); return; }
+
+  var entry = { ip:ip, port:port, type:type, label:label, username:username, password:password };
+  if (id) {
+    var idx = phoneFarmProxies.findIndex(function(x){ return x.id === id; });
+    if (idx !== -1) phoneFarmProxies[idx] = Object.assign(phoneFarmProxies[idx], entry);
+  } else {
+    entry.id = pfGenId();
+    phoneFarmProxies.push(entry);
+  }
+  savePhoneFarmData('proxies', 'proxies', phoneFarmProxies, 'Proxy saved');
+  pfCloseModal();
+  renderProxiesTab();
+}
+
+function deleteProxy(id) {
+  if (!confirm('Delete this proxy?')) return;
+  phoneFarmProxies = phoneFarmProxies.filter(function(x){ return x.id !== id; });
+  savePhoneFarmData('proxies', 'proxies', phoneFarmProxies, 'Proxy deleted');
+  renderProxiesTab();
+}
 
 
 // ── REPORT_GEN ────────────────────────────────────────────────────────
