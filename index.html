@@ -3805,7 +3805,7 @@ function loadAnalyticsClicks() {
       var ts = d.ts ? new Date(d.ts) : null;
       if (cutoff && ts && ts < cutoff) return;
       if (analyticsFilterFunnel && d.funnel !== analyticsFilterFunnel) return;
-      clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', src: d.src || d.sub1 || '' });
+      clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', src: d.src || 'NoSource' });
     });
     renderClicksData(body, clicks);
   }).catch(function(err) {
