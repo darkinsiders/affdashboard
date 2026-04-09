@@ -2642,19 +2642,18 @@ function detectNetwork(url) {
   if (u.indexOf('cellxpert') !== -1 || u.indexOf('cosmobetpartners') !== -1 ||
       u.indexOf('rollettoaffiliate') !== -1 || u.indexOf('velobetpartners') !== -1 ||
       u.indexOf('ivybetpartners') !== -1 || u.indexOf('spinaniapartners') !== -1 ||
-      u.indexOf('spinania') !== -1 || u.indexOf('needforslots') !== -1) return { name: 'cellxpert', clickMacro: '[afp]' };
-  if (u.indexOf('ftdgallery') !== -1) return { name: 'ftdgallery', clickMacro: '[afp]' };
-  if (u.indexOf('padrino') !== -1) return { name: 'padrino', clickMacro: '[afp]' };
+      u.indexOf('spinania') !== -1 || u.indexOf('needforslots') !== -1 ||
+      u.indexOf('ftdgallery') !== -1 || u.indexOf('padrino') !== -1) return { name: 'cellxpert', clickMacro: '[afp]' };
   if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('clicktrueluck') !== -1 ||
       u.indexOf('clickholyluck') !== -1 || u.indexOf('affilika') !== -1) return { name: 'affilika', clickMacro: '{visit_id}' };
-  if (u.indexOf('casinobet') !== -1) return { name: 'casinobet', clickMacro: '{click_id}' };
+  if (u.indexOf('casinobet') !== -1) return { name: 'custom', clickMacro: '' };
   return null;
 }
 
 function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   // Source/campaign macros vary by network
   var srcParams;
-  if (network.name === 'affilika' || network.name === 'casinobet') {
+  if (network.name === 'affilika' || network.name === 'custom') {
     srcParams = ''; // Sub-tracking macros not confirmed for these platforms
   } else {
     srcParams = '&source=[afp2]&campaign=[afp3]';
@@ -4662,12 +4661,11 @@ function getNetworkId(url) {
   if (u.indexOf('7ladies') !== -1 || u.indexOf('cosmobet') !== -1 ||
       u.indexOf('rolletto') !== -1 || u.indexOf('velobet') !== -1 ||
       u.indexOf('cellxpert') !== -1 || u.indexOf('spinania') !== -1 ||
-      u.indexOf('needforslots') !== -1) return 'cellxpert';
-  if (u.indexOf('ftdgallery') !== -1) return 'ftdgallery';
-  if (u.indexOf('padrino') !== -1) return 'padrino';
+      u.indexOf('needforslots') !== -1 || u.indexOf('ftdgallery') !== -1 ||
+      u.indexOf('padrino') !== -1) return 'cellxpert';
   if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('clicktrueluck') !== -1 ||
       u.indexOf('clickholyluck') !== -1 || u.indexOf('affilika') !== -1) return 'affilika';
-  if (u.indexOf('casinobet') !== -1) return 'casinobet';
+  if (u.indexOf('casinobet') !== -1) return 'custom';
   return 'other';
 }
 
@@ -4676,7 +4674,7 @@ var NETWORK_COLORS = {
   ftdgallery: { bg: 'rgba(224,115,51,0.12)',  color: '#e07333', border: 'rgba(224,115,51,0.25)' },
   padrino:    { bg: 'rgba(29,179,104,0.12)',  color: '#3fb950', border: 'rgba(29,179,104,0.25)' },
   affilika:   { bg: 'rgba(168,85,247,0.12)',  color: '#a855f7', border: 'rgba(168,85,247,0.25)' },
-  casinobet:  { bg: 'rgba(234,179,8,0.12)',   color: '#eab308', border: 'rgba(234,179,8,0.25)' },
+  custom:     { bg: 'rgba(255,255,255,0.06)',  color: 'var(--muted)', border: 'rgba(255,255,255,0.12)' },
   other:      { bg: 'rgba(139,92,246,0.12)',  color: '#bc8cff', border: 'rgba(139,92,246,0.25)' }
 };
 
@@ -5243,7 +5241,7 @@ var BUILDER_NETWORKS = [
   { id: '',           label: 'Auto-detect from URL' },
   { id: 'cellxpert',  label: 'CellXpert',  clickMacro: '[afp]',       src1: 'afp2', src2: 'afp3' },
   { id: 'affilika',   label: 'Affilika',   clickMacro: '{visit_id}',  src1: 'sub1', src2: 'sub2' },
-  { id: 'casinobet',  label: 'CasinoBet',  clickMacro: '{click_id}',  src1: 'sub1', src2: 'sub2' }
+  { id: 'custom',     label: 'Custom',     clickMacro: '',            src1: 'sub1', src2: 'sub2' }
 ];
 
 function builderGetNetwork() {
@@ -5253,8 +5251,8 @@ function builderGetNetwork() {
   }
   var auto = detectNetwork(builderCasinoUrl);
   if (auto) {
-    // CellXpert-platform networks use afp2/afp3; others (Affilika, CasinoBet) use sub1/sub2
-    var usesSub = auto.name === 'affilika' || auto.name === 'casinobet';
+    // CellXpert-platform networks use afp2/afp3; others (Affilika, Custom) use sub1/sub2
+    var usesSub = auto.name === 'affilika' || auto.name === 'custom';
     auto.src1 = usesSub ? 'sub1' : 'afp2';
     auto.src2 = usesSub ? 'sub2' : 'afp3';
   }
