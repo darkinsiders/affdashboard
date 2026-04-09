@@ -7,35 +7,53 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #050810;
-    --card: #090d18;
-    --card2: #0d1220;
-    --border: #16203a;
-    --border-bright: #1e2d4a;
-    --text: #c8daf0;
-    --muted: #3d5470;
-    --accent: #3d8ef0;
-    --accent-glow: rgba(61,142,240,0.18);
-    --accent-dim: rgba(61,142,240,0.08);
-    --green: #1db368;
-    --green-glow: rgba(29,179,104,0.15);
-    --yellow: #d4880a;
-    --yellow-glow: rgba(212,136,10,0.12);
-    --red: #d93e3e;
-    --red-glow: rgba(217,62,62,0.12);
-    --purple: #8b5cf6;
-    --purple-glow: rgba(139,92,246,0.15);
-    --orange: #e07333;
-    --badge-geo: #0c1830;
-    --badge-geo-text: #5899d6;
-    --font-display: 'Syne', sans-serif;
+    /* Surfaces */
+    --bg: #000000;
+    --card: rgba(255,255,255,0.025);
+    --card2: rgba(255,255,255,0.018);
+    --elevated: #161618;
+
+    /* Text */
+    --text: #b0b0b8;
+    --fg: #b0b0b8;
+    --muted: rgba(255,255,255,0.32);
+
+    /* Accent — monochrome gray only */
+    --accent: #707078;
+    --accent-hover: #909098;
+    --accent-glow: rgba(255,255,255,0.06);
+    --accent-dim: rgba(255,255,255,0.04);
+    --accent-muted: rgba(255,255,255,0.12);
+
+    /* Borders */
+    --border: rgba(255,255,255,0.055);
+    --border-bright: rgba(255,255,255,0.1);
+
+    /* Semantic — data only, never decorative */
+    --green: #7EBF9A;
+    --green-glow: rgba(126,191,154,0.1);
+    --yellow: #E5C07B;
+    --yellow-glow: rgba(229,192,123,0.09);
+    --red: #D47080;
+    --red-glow: rgba(212,112,128,0.1);
+    --purple: #a0a0c8;
+    --purple-glow: rgba(160,160,200,0.1);
+    --orange: #c4845a;
+
+    /* Badge geo */
+    --badge-geo: rgba(255,255,255,0.04);
+    --badge-geo-text: rgba(255,255,255,0.45);
+
+    /* Fonts */
+    --font-display: 'Sora', sans-serif;
     --font-body: 'Plus Jakarta Sans', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
+    --font-serif: 'Instrument Serif', serif;
   }
 
   body {
@@ -48,27 +66,91 @@
     overflow-x: hidden;
   }
 
+  /* ── BACKGROUND LAYERS ─────────────────────────────────────────────── */
+  /* Layer 1: Drifting white radial blobs */
   body::before {
     content: '';
     position: fixed;
-    top: -20%;
-    left: -10%;
-    width: 55%;
-    height: 55%;
-    background: radial-gradient(ellipse at center, rgba(61,142,240,0.055) 0%, transparent 70%);
+    inset: 0;
+    background:
+      radial-gradient(ellipse 55% 40% at 15% 20%, rgba(255,255,255,0.018) 0%, transparent 70%),
+      radial-gradient(ellipse 45% 35% at 82% 75%, rgba(255,255,255,0.012) 0%, transparent 70%),
+      radial-gradient(ellipse 35% 30% at 50% 55%, rgba(255,255,255,0.008) 0%, transparent 70%);
     pointer-events: none;
     z-index: 0;
+    animation: bgDrift 32s ease-in-out infinite alternate;
   }
+  /* Layer 2: Dot grid */
   body::after {
     content: '';
     position: fixed;
-    bottom: -20%;
-    right: -10%;
-    width: 50%;
-    height: 50%;
-    background: radial-gradient(ellipse at center, rgba(139,92,246,0.04) 0%, transparent 70%);
+    inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 28px 28px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
     pointer-events: none;
     z-index: 0;
+    opacity: 0.6;
+  }
+
+  @keyframes bgDrift {
+    0%   { background-position: 0% 0%, 100% 100%, 50% 50%; }
+    33%  { background-position: 8% 12%, 88% 82%, 42% 58%; }
+    66%  { background-position: -5% 18%, 105% 70%, 55% 42%; }
+    100% { background-position: 12% -8%, 78% 95%, 48% 62%; }
+  }
+  @keyframes drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%       { transform: translate(18px, -24px) scale(1.04); }
+    66%       { transform: translate(-12px, 16px) scale(0.97); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.85); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* TOAST NOTIFICATIONS */
+  #toastContainer {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .toast {
+    background: rgba(8,8,10,0.95);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 260px;
+    max-width: 360px;
+    backdrop-filter: blur(20px);
+    pointer-events: all;
+    animation: toast-in 0.3s ease;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .toast-ftd { border-left: 3px solid var(--green); }
+  .toast-reg { border-left: 3px solid var(--accent); }
+  .toast-alert { border-left: 3px solid var(--red); }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes toast-out {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(20px); }
   }
 
   /* SCROLLBAR */
@@ -80,7 +162,7 @@
 
   /* ── NAV ───────────────────────────────────────────────────────────────── */
   .top-nav {
-    background: rgba(9,13,24,0.94);
+    background: rgba(0,0,0,0.78);
     border-bottom: 1px solid var(--border);
     padding: 0 28px;
     display: flex;
@@ -89,9 +171,10 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
     height: 48px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03);
   }
 
   /* Logo pill */
@@ -104,7 +187,11 @@
     margin-right: 12px;
     white-space: nowrap;
     flex-shrink: 0;
+    transition: color 0.15s;
+    padding: 4px 0;
   }
+  .nav-logo:hover { color: var(--text); }
+  .nav-logo.active { color: rgba(255,255,255,0.8); }
 
   /* Separator */
   .nav-sep {
@@ -148,12 +235,12 @@
   .nav-group-btn.active .nav-active-dot { display: inline-block; }
 
   /* Accent colors for each group when active */
-  .nav-group-btn.active.grp-funnels  { color: var(--purple); border-color: rgba(139,92,246,0.3); }
+  .nav-group-btn.active.grp-funnels  { color: var(--purple); border-color: rgba(160,160,200,0.25); }
   .nav-group-btn.active.grp-funnels  .nav-active-dot { background: var(--purple); box-shadow: 0 0 5px var(--purple); }
-  .nav-group-btn.active.grp-manage   { color: var(--green);  border-color: rgba(29,179,104,0.3); }
+  .nav-group-btn.active.grp-manage   { color: var(--green);  border-color: rgba(126,191,154,0.25); }
   .nav-group-btn.active.grp-manage   .nav-active-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
-  .nav-group-btn.active.grp-analytics{ color: var(--accent); border-color: rgba(61,142,240,0.3); }
-  .nav-group-btn.active.grp-analytics .nav-active-dot { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  .nav-group-btn.active.grp-analytics{ color: var(--accent); border-color: var(--border-bright); }
+  .nav-group-btn.active.grp-analytics .nav-active-dot { background: var(--accent); box-shadow: 0 0 5px rgba(255,255,255,0.3); }
   .nav-group-btn.active.grp-settings { color: var(--muted);  border-color: var(--border-bright); }
   .nav-group-btn.active.grp-settings .nav-active-dot { background: var(--muted); }
 
@@ -163,14 +250,16 @@
     top: calc(100% + 8px);
     left: 0;
     min-width: 190px;
-    background: var(--card);
+    background: rgba(8,8,10,0.88);
     border: 1px solid var(--border-bright);
     border-radius: 10px;
     padding: 6px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.03);
     display: none;
     z-index: 200;
     animation: dropIn 0.12s ease;
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
   @keyframes dropIn {
     from { opacity: 0; transform: translateY(-6px); }
@@ -252,16 +341,16 @@
     margin-left: 7px;
     vertical-align: middle;
   }
-  .badge-universal { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.2); }
+  .badge-universal { background: var(--purple-glow); color: var(--purple); border: 1px solid rgba(160,160,200,0.2); }
   .badge-dark      { background: rgba(61,142,240,0.10); color: #4a9eff; border: 1px solid rgba(61,142,240,0.2); }
-  .badge-slotio    { background: rgba(29,179,104,0.10); color: var(--green); border: 1px solid rgba(29,179,104,0.2); }
-  .badge-scanio    { background: rgba(224,115,51,0.10); color: var(--orange); border: 1px solid rgba(224,115,51,0.2); }
-  .badge-spingpt   { background: rgba(217,62,62,0.10);  color: var(--red); border: 1px solid rgba(217,62,62,0.2); }
-  .badge-shadow    { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.2); }
+  .badge-slotio    { background: var(--green-glow); color: var(--green); border: 1px solid rgba(126,191,154,0.2); }
+  .badge-scanio    { background: rgba(196,132,90,0.08); color: var(--orange); border: 1px solid rgba(196,132,90,0.2); }
+  .badge-spingpt   { background: var(--red-glow); color: var(--red); border: 1px solid rgba(212,112,128,0.2); }
+  .badge-shadow    { background: var(--purple-glow); color: var(--purple); border: 1px solid rgba(160,160,200,0.2); }
 
   /* HEADER */
   .header {
-    background: var(--card);
+    background: rgba(0,0,0,0.6);
     border-bottom: 1px solid var(--border);
     padding: 18px 32px;
     display: flex;
@@ -270,16 +359,18 @@
     justify-content: space-between;
     position: relative;
     z-index: 1;
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
   .header-icon {
     width: 38px; height: 38px;
-    background: linear-gradient(135deg, rgba(61,142,240,0.3), rgba(61,142,240,0.12));
-    border: 1px solid rgba(61,142,240,0.3);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border-bright);
     border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     font-size: 18px;
     flex-shrink: 0;
-    box-shadow: 0 0 18px rgba(61,142,240,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
   }
   .header h1 {
     font-family: var(--font-display);
@@ -326,16 +417,19 @@
     transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
     position: relative;
     overflow: hidden;
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
   }
   .stat-card::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, var(--accent-dim) 0%, transparent 60%);
+    background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, transparent 60%);
     opacity: 0;
     transition: opacity 0.2s;
   }
-  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.35), 0 0 0 1px var(--border-bright); }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.5), 0 0 0 1px var(--border-bright), inset 0 1px 0 rgba(255,255,255,0.05); }
   .stat-card:hover::before { opacity: 1; }
   .stat-label {
     font-family: var(--font-display);
@@ -373,7 +467,7 @@
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  #searchInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(61,142,240,0.08); }
+  #searchInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,255,255,0.05); }
   #searchInput::placeholder { color: var(--muted); }
 
   .toggle-pill {
@@ -429,7 +523,7 @@
     transition: opacity 0.18s, box-shadow 0.18s;
     white-space: nowrap;
   }
-  .btn-add:hover { opacity: 0.88; box-shadow: 0 4px 18px rgba(61,142,240,0.3); }
+  .btn-add:hover { opacity: 0.88; box-shadow: 0 4px 18px rgba(255,255,255,0.08); }
 
   /* TABLE */
   .table-wrap {
@@ -437,10 +531,12 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow-x: auto;
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
   table { width: 100%; border-collapse: collapse; min-width: 1100px; }
   thead th {
-    background: var(--card2);
+    background: rgba(255,255,255,0.02);
     padding: 11px 16px;
     text-align: left;
     font-family: var(--font-display);
@@ -454,7 +550,7 @@
   }
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
   tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: rgba(61,142,240,0.03); }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
   td { padding: 12px 16px; vertical-align: middle; }
 
   /* Casino name */
@@ -599,7 +695,7 @@
   }
   .modal-overlay.open { display: flex; }
   .modal {
-    background: var(--card);
+    background: rgba(8,8,10,0.92);
     border: 1px solid var(--border-bright);
     border-radius: 10px;
     width: 540px;
@@ -607,7 +703,9 @@
     max-height: calc(100vh - 48px);
     overflow-y: auto;
     padding: 28px;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(61,142,240,0.06);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.03);
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
   .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
   .modal-title {
@@ -649,7 +747,7 @@
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(61,142,240,0.08); }
+  .form-input:focus { border-color: var(--accent-hover); box-shadow: 0 0 0 3px rgba(255,255,255,0.05); }
   .form-input::placeholder { color: var(--muted); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .form-hint { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 5px; }
@@ -698,7 +796,7 @@
     cursor: pointer;
     transition: opacity 0.15s, box-shadow 0.15s;
   }
-  .btn-save:hover { opacity: 0.88; box-shadow: 0 4px 16px rgba(61,142,240,0.3); }
+  .btn-save:hover { opacity: 0.88; box-shadow: 0 4px 16px rgba(255,255,255,0.08); }
 
   /* SECTION HEADERS — shared pattern */
   .section-title-text {
@@ -755,6 +853,8 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow-x: auto;
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
   .glitch-wrap table { width: 100%; border-collapse: collapse; min-width: 680px; }
   .glitch-wrap thead th {
@@ -769,7 +869,7 @@
   }
   .glitch-wrap tbody tr { border-bottom: 1px solid var(--border); }
   .glitch-wrap tbody tr:last-child { border-bottom: none; }
-  .glitch-wrap tbody tr:hover { background: rgba(61,142,240,0.03); }
+  .glitch-wrap tbody tr:hover { background: rgba(255,255,255,0.02); }
   .glitch-wrap td { padding: 10px 16px; font-size: 13px; vertical-align: middle; }
   .slot-name { font-family: var(--font-body); font-weight: 600; color: var(--text); font-size: 13px; }
   .mono-val { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
@@ -800,12 +900,12 @@
     background: var(--card); transition: all 0.15s;
   }
   .sv-tab:hover { color: var(--text); border-color: var(--muted); }
-  .sv-tab.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(61,142,240,0.35); }
+  .sv-tab.active { background: rgba(255,255,255,0.06); color: var(--text); border-color: var(--border-bright); }
   .sv-badge {
     display: inline-block;
     font-family: var(--font-mono); font-size: 10px; font-weight: 600;
     padding: 2px 7px; border-radius: 3px; margin: 2px;
-    background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(61,142,240,0.2);
+    background: rgba(255,255,255,0.05); color: var(--accent); border: 1px solid var(--border);
   }
   .sv-badge-bonus {
     display: inline-block;
@@ -828,14 +928,16 @@
   }
   .geo-tooltip {
     position: fixed;
-    background: var(--card2);
+    background: rgba(8,8,10,0.92);
     border: 1px solid var(--border-bright);
     border-radius: 8px;
     padding: 12px;
     max-width: 280px;
     display: flex; flex-wrap: wrap; gap: 4px;
     z-index: 201;
-    box-shadow: 0 16px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(61,142,240,0.06);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.03);
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
 
   /* SMARTLINKS SECTION */
@@ -881,7 +983,7 @@
     width: 100%;
     background: var(--purple-glow);
     color: var(--purple);
-    border: 1px solid rgba(139,92,246,0.3);
+    border: 1px solid rgba(160,160,200,0.2);
     border-radius: 6px;
     padding: 7px 12px;
     font-family: var(--font-display);
@@ -892,7 +994,7 @@
     transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     white-space: nowrap;
   }
-  .btn-download:hover { background: rgba(139,92,246,0.22); border-color: rgba(139,92,246,0.5); box-shadow: 0 3px 12px var(--purple-glow); }
+  .btn-download:hover { background: rgba(160,160,200,0.1); border-color: rgba(160,160,200,0.3); box-shadow: 0 3px 12px var(--purple-glow); }
   /* Smartlink flow diagram */
   .smartlink-flow {
     display: flex; align-items: center;
@@ -916,13 +1018,13 @@
   .flow-arrow { flex: 1; min-width: 16px; text-align: center; color: var(--border-bright); font-size: 14px; padding-bottom: 16px; }
   /* Hosted URL row */
   .smartlink-hosted-row {
-    background: var(--accent-dim); border: 1px solid rgba(61,142,240,0.18);
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
     border-radius: 6px; padding: 8px; margin-bottom: 8px;
   }
   .smartlink-hosted-label {
     font-family: var(--font-display);
     font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--accent); margin-bottom: 5px;
+    color: var(--muted); margin-bottom: 5px;
   }
   .smartlink-url-display {
     flex: 1; font-family: var(--font-mono); font-size: 10px; color: var(--text);
@@ -967,6 +1069,8 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow-x: auto;
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
   .funnel-col {
     flex: 1;
@@ -1030,9 +1134,9 @@
   .deal-card:hover { border-color: var(--border-bright); }
   .deal-card-priority {
     width: 18px; height: 18px;
-    background: var(--accent-dim);
-    color: var(--accent);
-    border: 1px solid rgba(61,142,240,0.2);
+    background: rgba(255,255,255,0.05);
+    color: var(--muted);
+    border: 1px solid var(--border);
     border-radius: 50%;
     font-family: var(--font-mono);
     font-size: 9px; font-weight: 700;
@@ -1109,6 +1213,8 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow-x: auto;
+    backdrop-filter: blur(36px) saturate(2.2);
+    -webkit-backdrop-filter: blur(36px) saturate(2.2);
   }
   .geo-matrix { width: 100%; border-collapse: collapse; min-width: 480px; }
   .geo-matrix thead th {
@@ -1123,7 +1229,7 @@
   }
   .geo-matrix tbody tr { border-bottom: 1px solid var(--border); }
   .geo-matrix tbody tr:last-child { border-bottom: none; }
-  .geo-matrix tbody tr:hover { background: rgba(61,142,240,0.02); }
+  .geo-matrix tbody tr:hover { background: rgba(255,255,255,0.015); }
   .geo-matrix td { padding: 7px 16px; font-size: 12px; vertical-align: middle; }
   .geo-matrix td.geo-code {
     font-family: var(--font-mono);
@@ -1135,6 +1241,7 @@
 </style>
 </head>
 <body>
+<div id="toastContainer"></div>
 
 <div class="header">
   <div style="display:flex;align-items:center;gap:16px">
@@ -1252,7 +1359,7 @@
 
 <!-- Top Nav -->
 <div class="top-nav" id="topNav">
-  <div class="nav-logo">Dark Intel</div>
+  <div class="nav-logo" onclick="setPage('home')" style="cursor:pointer" id="tab-home">Dark Intel</div>
   <div class="nav-sep"></div>
 
   <!-- Funnels group -->
@@ -1340,6 +1447,10 @@
       <span class="nav-arrow">▾</span>
     </button>
     <div class="nav-dropdown">
+      <div class="nav-item" id="tab-overview"     onclick="navGo(function(){setPage('home')})">
+        <span class="ni-dot" style="background:rgba(255,255,255,0.5)"></span>
+        <span class="ni-label">Home / Overview</span>
+      </div>
       <div class="nav-item" id="tab-clicks"       onclick="navGo(function(){analyticsTab='clicks';setPage('analytics')})">
         <span class="ni-dot" style="background:var(--accent)"></span>
         <span class="ni-label">Click Analytics</span>
@@ -1482,6 +1593,7 @@
 
 </div><!-- end dashboardContent -->
 
+<div id="homePage" style="display:none"></div>
 <div id="analyticsPage" style="display:none"></div>
 <div id="managePage" style="display:none"></div>
 <div id="dealsPage" style="display:none"></div>
@@ -1761,7 +1873,7 @@ document.addEventListener('click', function(e) {
 });
 
 function hideAllPages() {
-  ['managePage','analyticsPage','dealsPage','funnelsPage','settingsPage','builderPage','toolsPage'].forEach(function(id) {
+  ['homePage','managePage','analyticsPage','dealsPage','funnelsPage','settingsPage','builderPage','toolsPage'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -1820,10 +1932,16 @@ function setPage(page) {
   currentPage = page;
   hideAllPages();
 
-  if (page === 'analytics') {
+  if (page === 'home') {
+    var el = document.getElementById('homePage');
+    if (el) el.style.display = '';
+    setNavActive('home', 'home');
+    updateBreadcrumb('Home', '');
+    renderHomePage();
+  } else if (page === 'analytics') {
     var el = document.getElementById('analyticsPage');
     if (el) el.style.display = '';
-    var subLabel = {clicks:'Click Analytics',performance:'Performance',sources:'Sources',roi:'ROI & Spend'}[analyticsTab] || 'Analytics';
+    var subLabel = {clicks:'Click Analytics',performance:'Performance',deals:'Deals',sources:'Sources',roi:'ROI & Spend'}[analyticsTab] || 'Analytics';
     setNavActive(analyticsTab, 'analytics');
     updateBreadcrumb('Analytics', subLabel);
     renderAnalyticsPage();
@@ -1920,43 +2038,12 @@ function renderManagePage() {
   // Funnel badge short labels
   var FUNNEL_SHORT = { Dark: 'Da', Slotio: 'Sl', Scanio: 'Sc', SpinGPT: 'Sg', Shadow: 'Sh' };
 
-  var manageFilteredDeals = deals.filter(function(deal) {
-    if (!dealsFilterSearch) return true;
-    var q = dealsFilterSearch.toLowerCase();
-    var assignedFunnels = FUNNEL_NAMES.filter(function(f) {
-      return (assignments[f] || []).indexOf(deal.id) !== -1;
-    }).join(' ').toLowerCase();
-    var net = (deal.network || getNetworkId(deal.url) || '').toLowerCase();
-    return (deal.name || '').toLowerCase().indexOf(q) !== -1 ||
-      (deal.url || '').toLowerCase().indexOf(q) !== -1 ||
-      assignedFunnels.indexOf(q) !== -1 ||
-      net.indexOf(q) !== -1;
-  });
-
-  var activeDealsCount = deals.filter(function(deal) { return (deal.status || 'active') === 'active'; }).length;
-  var assignedDealsCount = deals.filter(function(deal) {
-    return FUNNEL_NAMES.some(function(f) { return (assignments[f] || []).indexOf(deal.id) !== -1; });
-  }).length;
-  var trackedNetworksCount = {};
-  deals.forEach(function(deal) {
-    trackedNetworksCount[deal.network || getNetworkId(deal.url) || 'other'] = 1;
-  });
-
-  function summaryCard(label, value, sub) {
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;min-width:150px;flex:1">' +
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:6px">' + label + '</div>' +
-      '<div style="font-size:24px;font-weight:800;color:var(--text)">' + value + '</div>' +
-      '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + sub + '</div>' +
-    '</div>';
-  }
-
   // Deal cards
-  var dealCardsHtml = manageFilteredDeals.map(function(deal) {
+  var dealCardsHtml = deals.map(function(deal) {
     var geos = geoArray(deal);
     var rsColor = deal.revshare >= 40 ? 'var(--green)' : 'var(--yellow)';
     var rsBg = deal.revshare >= 40 ? 'rgba(63,185,80,0.1)' : 'rgba(210,153,34,0.1)';
     var rsBorder = deal.revshare >= 40 ? 'rgba(63,185,80,0.3)' : 'rgba(210,153,34,0.3)';
-    var net = deal.network || getNetworkId(deal.url);
 
     // Which funnels this deal is assigned to
     var funnelBadges = FUNNEL_NAMES.map(function(f) {
@@ -1981,14 +2068,12 @@ function renderManagePage() {
       '</div>' +
       '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">' +
         '<span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;background:' + rsBg + ';color:' + rsColor + ';border:1px solid ' + rsBorder + '">' + deal.revshare + '% RS</span>' +
-        networkBadge(net) +
         bgamingHtml +
       '</div>' +
       (funnelBadges
         ? '<div style="display:flex;flex-wrap:wrap;gap:4px"><span style="font-size:10px;color:var(--muted);margin-right:2px;align-self:center">Funnels:</span>' + funnelBadges + '</div>'
         : '<div style="font-size:11px;color:var(--muted)">Not assigned to any funnel</div>') +
       '<div style="display:flex;gap:7px;padding-top:4px;border-top:1px solid var(--border)">' +
-        '<button onclick="openPostbackModal(' + deal.id + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--accent)\';this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Postbacks</button>' +
         '<button onclick="openEditModal(' + deal.id + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--accent)\';this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Edit</button>' +
         '<button onclick="startDeleteManage(' + deal.id + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--red)\';this.style.borderColor=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Delete</button>' +
       '</div>' +
@@ -2004,20 +2089,10 @@ function renderManagePage() {
           '<div style="font-size:20px;font-weight:700;letter-spacing:0.3px">Manage Deals</div>' +
           '<div style="font-size:13px;color:var(--muted);margin-top:4px">Add, edit and manage casino deals</div>' +
         '</div>' +
-        '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
-          '<input type="text" placeholder="Search deals, network, funnel..." value="' + escHtml(dealsFilterSearch) + '" oninput="dealsFilterSearch=this.value;renderManagePage()" style="min-width:260px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none">' +
-          '<button onclick="openModal()" style="display:flex;align-items:center;gap:7px;background:var(--accent);color:#000;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity 0.15s" onmouseover="this.style.opacity=\'0.85\'" onmouseout="this.style.opacity=\'1\'">' +
-            '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>' +
-            '+ Add New Deal' +
-          '</button>' +
-        '</div>' +
-      '</div>' +
-
-      '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' +
-        summaryCard('Total Deals', deals.length, manageFilteredDeals.length !== deals.length ? (manageFilteredDeals.length + ' visible in current search') : 'all imported deals') +
-        summaryCard('Active', activeDealsCount, 'currently live for routing') +
-        summaryCard('Assigned', assignedDealsCount, (deals.length - assignedDealsCount) + ' still need funnel assignment') +
-        summaryCard('Networks', Object.keys(trackedNetworksCount).length, 'affiliate platforms detected') +
+        '<button onclick="openModal()" style="display:flex;align-items:center;gap:7px;background:var(--accent);color:#000;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity 0.15s" onmouseover="this.style.opacity=\'0.85\'" onmouseout="this.style.opacity=\'1\'">' +
+          '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>' +
+          '+ Add New Deal' +
+        '</button>' +
       '</div>' +
 
       // Funnel Health
@@ -2029,10 +2104,10 @@ function renderManagePage() {
       // All Deals
       '<div>' +
         '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">' +
-          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">All Deals (' + manageFilteredDeals.length + ' of ' + deals.length + ')</div>' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">All Deals (' + deals.length + ')</div>' +
         '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">New deals are auto-assigned to funnels based on GEO coverage when saved.</div>' +
-        (manageFilteredDeals.length > 0
+        (deals.length > 0
           ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">' + dealCardsHtml + '</div>'
           : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:48px;text-align:center;color:var(--muted)">No deals yet — click + Add New Deal to get started.</div>') +
       '</div>' +
@@ -2102,7 +2177,7 @@ function renderFunnelGeoBar() {
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
-var currentPage = 'dashboard'; // 'dashboard' | 'deals' | 'funnels' | 'analytics' | 'settings'
+var currentPage = 'home'; // 'home' | 'dashboard' | 'deals' | 'funnels' | 'analytics' | 'settings'
 var deals = [];
 var landingPages = [];
 var dealsFilterStatus = 'active'; // 'active' | 'paused' | 'archived' | 'all'
@@ -2117,6 +2192,8 @@ var sortDir = 1;    // 1 = desc, -1 = asc
 var currentFunnel = null; // null = Universal
 var metaToken = '';
 var metaAccountId = '';
+var tgAdminBotToken = '';   // Cloudflare Worker env — stored in wrangler secrets, not here
+var tgAdminChatId = '';     // Your personal Telegram chat ID for alerts
 var manualSpendEntries = [];
 
 // ── Assignments ────────────────────────────────────────────────────────────
@@ -2133,14 +2210,35 @@ var FUNNEL_NAMES = ['Dark', 'Slotio', 'Scanio', 'SpinGPT', 'Shadow'];
 var FUNNEL_COLORS = {
   Dark: '#58a6ff', Slotio: '#3fb950', Scanio: '#f0883e', SpinGPT: '#f85149', Shadow: '#bc8cff'
 };
-var TRAFFIC_SOURCES = [
-  { id: 'meta',      name: 'Meta Ads',          type: 'paid',    color: '#1877F2' },
-  { id: 'tiktok',    name: 'TikTok',             type: 'paid',    color: '#69C9D0' },
-  { id: 'organic',   name: 'Organic/SEO',        type: 'organic', color: '#3fb950' },
-  { id: 'spam',      name: 'Spam/DM',            type: 'spam',    color: '#f0883e' },
-  { id: 'phonefarm', name: 'Phone Farm',         type: 'content', color: '#bc8cff' },
-  { id: 'tg',        name: 'Telegram (organic)', type: 'content', color: '#229ED9' }
+var DEFAULT_TRAFFIC_SOURCES = [
+  { id: 'meta',       name: 'Meta Ads',           type: 'paid',    color: '#1877F2' },
+  { id: 'google',     name: 'Google Ads',          type: 'paid',    color: '#4285F4' },
+  { id: 'youtube',    name: 'YouTube',             type: 'paid',    color: '#FF0000' },
+  { id: 'tiktok',     name: 'TikTok Ads',          type: 'paid',    color: '#69C9D0' },
+  { id: 'twitter',    name: 'Twitter / X',         type: 'paid',    color: '#1DA1F2' },
+  { id: 'reddit',     name: 'Reddit Ads',          type: 'paid',    color: '#FF4500' },
+  { id: 'native',     name: 'Native Ads',          type: 'paid',    color: '#F5A623' },
+  { id: 'push',       name: 'Push Notifications',  type: 'paid',    color: '#8B5CF6' },
+  { id: 'tg_paid',    name: 'Telegram Paid',       type: 'paid',    color: '#1EA8D4' },
+  { id: 'tg',         name: 'Telegram Organic',    type: 'content', color: '#229ED9' },
+  { id: 'organic',    name: 'Organic / SEO',       type: 'organic', color: '#3fb950' },
+  { id: 'email',      name: 'Email / Newsletter',  type: 'content', color: '#10B981' },
+  { id: 'whatsapp',   name: 'WhatsApp',            type: 'content', color: '#25D366' },
+  { id: 'phonefarm',  name: 'Phone Farm',          type: 'content', color: '#bc8cff' },
+  { id: 'spam',       name: 'Spam / DM',           type: 'spam',    color: '#f0883e' }
 ];
+var customTrafficSources = []; // loaded from Firestore — user-added sources
+function getTrafficSources() {
+  // Merge: custom sources override defaults with same id; new custom sources appended
+  var merged = DEFAULT_TRAFFIC_SOURCES.slice();
+  customTrafficSources.forEach(function(cs) {
+    var idx = merged.findIndex(function(d){ return d.id === cs.id; });
+    if (idx !== -1) merged[idx] = cs; else merged.push(cs);
+  });
+  return merged;
+}
+// Legacy alias — used in many places; replaced by getTrafficSources() calls below
+var TRAFFIC_SOURCES = DEFAULT_TRAFFIC_SOURCES;
 
 var FUNNEL_TO_BOT = {
   Dark:    { username: 'darkrtpbot',    tme: 'https://t.me/darkrtpbot' },
@@ -2176,7 +2274,7 @@ var FUNNEL_CTA = {
   Shadow:  'direct'
 };
 
-var linkHistory = JSON.parse(localStorage.getItem('linkHistory') || '[]');
+var linkHistory = []; // loaded from Firebase (falls back to localStorage for migration)
 
 function saveAssignments() {
   saveToFirebase();
@@ -2602,22 +2700,21 @@ function detectNetwork(url) {
   if (u.indexOf('7ladies') !== -1) return { name: 'cellxpert', clickMacro: '[afp1]' };
   if (u.indexOf('cellxpert') !== -1 || u.indexOf('cosmobetpartners') !== -1 ||
       u.indexOf('rollettoaffiliate') !== -1 || u.indexOf('velobetpartners') !== -1 ||
-      u.indexOf('ivybetpartners') !== -1) return { name: 'cellxpert', clickMacro: '[afp]' };
-  if (u.indexOf('ftdgallery') !== -1 || u.indexOf('spinania') !== -1) return { name: 'ftdgallery', clickMacro: '[afp]' };
-  if (u.indexOf('padrino') !== -1 || u.indexOf('needforslots') !== -1) return { name: 'padrino', clickMacro: '[afp]' };
+      u.indexOf('ivybetpartners') !== -1 || u.indexOf('spinaniapartners') !== -1 ||
+      u.indexOf('spinania') !== -1 || u.indexOf('needforslots') !== -1 ||
+      u.indexOf('ftdgallery') !== -1 || u.indexOf('padrino') !== -1) return { name: 'cellxpert', clickMacro: '[afp]' };
   if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('clicktrueluck') !== -1 ||
       u.indexOf('clickholyluck') !== -1 || u.indexOf('affilika') !== -1) return { name: 'affilika', clickMacro: '{visit_id}' };
-  if (u.indexOf('casinobet') !== -1) return { name: 'casinobet', clickMacro: '{click_id}' };
+  if (u.indexOf('casinobet') !== -1) return { name: 'custom', clickMacro: '' };
   return null;
 }
 
-function buildPostbackUrls(network, funnelOverride) {
+function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   // Source/campaign macros vary by network
   var srcParams;
-  if (network.name === 'affilika' || network.name === 'casinobet') {
+  if (network.name === 'affilika' || network.name === 'custom') {
     srcParams = ''; // Sub-tracking macros not confirmed for these platforms
   } else {
-    // All CellXpert-platform networks (CellXpert, FTDGallery, Padrino) use afp2/afp3
     srcParams = '&source=[afp2]&campaign=[afp3]';
   }
   var funnelParam;
@@ -2628,14 +2725,16 @@ function buildPostbackUrls(network, funnelOverride) {
   } else {
     funnelParam = '[trackingcode]';
   }
-  var qftdSumMacro = network.name === 'affilika'
-    ? '{payout}'
-    : (network.name === 'casinobet' ? '{deposits_sum}' : '[commissionamount]');
+  // Revenue on FTD only — hardcoded per deal so the correct CPA is recorded regardless of what the platform sends
+  // QFTD records €0 (not all platforms have QFTD, and we don't want double-counting)
+  var cpa = (cpaAmount && cpaAmount > 0) ? cpaAmount : 0;
+  var ftdRevenue  = network.name === 'affilika' ? '{first_deposit}' : cpa;
+  var qftdRevenue = 0;
   var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=' + funnelParam + '&offer=' + network.name;
   return {
-    reg:  base + '&status=Registration&type=Registration&sum=0',
-    ftd:  base + '&status=FTD&type=FTD&sum=' + (network.name === 'affilika' ? '{first_deposit}' : '0'),
-    qftd: base + '&status=QFTD&type=QFTD&sum=' + qftdSumMacro
+    reg:  base + '&status=Registration&type=Registration&revenue=0',
+    ftd:  base + '&status=FTD&type=FTD&revenue=' + ftdRevenue,
+    qftd: base + '&status=QFTD&type=QFTD&revenue=' + qftdRevenue
   };
 }
 
@@ -2651,15 +2750,18 @@ function openPostbackModal(dealId) {
     return;
   }
 
-  var urls = buildPostbackUrls(net);
+  var urls = buildPostbackUrls(net, null, deal.cpaAmount || 0);
   var networkLabel = net.name.toUpperCase();
   if (net.clickMacro === '[afp1]') networkLabel += ' (uses [afp1])';
   var trackingNote = (net.name === 'cellxpert' || net.name === 'ftdgallery' || net.name === 'padrino')
     ? 'These URLs now include source tracking (<code>[afp2]</code>/<code>[afp3]</code>). If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.'
     : 'These URLs use the current network macros shown above. If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.';
+  var cpaNote = (deal.cpaAmount > 0)
+    ? 'Revenue of <code style="color:var(--green)">€' + deal.cpaAmount + '</code> is recorded on <strong>FTD</strong>. QFTD URL records €0 — only paste it if your platform requires it. Update the deal\'s CPA amount to regenerate these URLs.'
+    : '<span style="color:#f0b429">&#9888; No CPA amount set on this deal — FTD will record €0 revenue. Set a CPA amount on the deal first, then re-paste the FTD URL.</span>';
   var macroNote = net.name === 'affilika'
-    ? 'Paste these in your affiliate platform\'s postback settings. For Affilika, <code style="color:var(--accent)">{campaign_id}</code> maps the funnel, <code style="color:var(--accent)">{first_deposit}</code> is used for FTD value, and <code style="color:var(--accent)">{payout}</code> is used for Qualified CPA.'
-    : 'Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically.';
+    ? 'Paste these in your affiliate platform\'s postback settings. For Affilika, <code style="color:var(--accent)">{campaign_id}</code> maps the funnel, <code style="color:var(--accent)">{first_deposit}</code> is used for FTD value.'
+    : 'Paste these in your affiliate platform\'s postback settings. ' + cpaNote;
 
   function row(label, url) {
     var id = 'pburl-' + label.toLowerCase().replace(/ /g, '-') + '-' + dealId;
@@ -2955,6 +3057,7 @@ var SMARTLINKS_KEY = 'funnel_smartlinks';
 var SMARTLINK_URLS_KEY = 'funnel_hosted_urls';
 var DEAL_WEIGHTS_KEY = 'deal_weights';
 var dealWeights = {}; // { Dark: { '1': 70, '2': 30 }, ... }
+var CASINOBET_FALLBACK = 'https://casinobet.com/?a=5d9946';
 var smartlinkFallbacks = {};
 var smartlinkHostedUrls = {};
 var smartlinksVisible = true;
@@ -3021,7 +3124,7 @@ function generateRedirectHtml(funnel, urlToCasino) {
   var apiKey = 'AIzaSyCVegt6HxRbJAe1Es_SHEMPH1P3e9YvOvU';
   var firestoreUrl = 'https://firestore.googleapis.com/v1/projects/' + projectId + '/databases/(default)/documents/routes/' + funnel.toLowerCase();
   var clicksUrl = 'https://firestore.googleapis.com/v1/projects/' + projectId + '/databases/(default)/documents/clicks?key=' + apiKey;
-  var fallbackVal = smartlinkFallbacks[funnel] || '';
+  var fallbackVal = smartlinkFallbacks[funnel] || CASINOBET_FALLBACK;
   var casinoMapJson = JSON.stringify(urlToCasino || {});
 
   return '<!DOCTYPE html>\n' +
@@ -3125,7 +3228,7 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '            .then(function(d){ redirect(routes, fallback, d.countryCode, d.ipAddress || \'\', utc); })\n' +
     '            .catch(function(){\n' +
     '              logClick(\'unknown\', \'fallback\');\n' +
-    '              window.location.replace(fallback);\n' +
+    '              window.location.replace(injectTracking(fallback));\n' +
     '            });\n' +
     '        });\n' +
     '    }\n\n' +
@@ -3616,7 +3719,9 @@ function saveToFirebase() {
     landingPages: landingPages,
     manualSpendEntries: manualSpendEntries,
     metaToken: metaToken,
-    metaAccountId: metaAccountId
+    metaAccountId: metaAccountId,
+    customTrafficSources: customTrafficSources,
+    linkHistory: linkHistory
   }).then(function() {
     showSaveIndicator('saved', 'Saved ✓');
   }).catch(function(e) {
@@ -3631,7 +3736,7 @@ var debouncedSaveToFirebase = debounce(saveToFirebase, 600);
 function saveRoutesToFirebase() {
   FUNNEL_NAMES.forEach(function(f) {
     var multiMap = buildMultiRouteMap(f);
-    var fallback = smartlinkFallbacks[f] || '';
+    var fallback = smartlinkFallbacks[f] || CASINOBET_FALLBACK;
     var urlToCasino = {};
     getAssignedDeals(f).forEach(function(d) { urlToCasino[getFunnelUrl(d.url, f)] = d.name; });
     db.collection('routes').doc(f.toLowerCase()).set({
@@ -3646,7 +3751,7 @@ function saveRoutesToFirebase() {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 // Show loading state
-document.body.innerHTML += '<div id="loadingOverlay" style="position:fixed;inset:0;background:#0d0f14;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px"><div style="font-size:16px;color:#7d8590">Loading dashboard\u2026</div></div>';
+document.body.innerHTML += '<div id="loadingOverlay" style="position:fixed;inset:0;background:#000000;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px"><div style="font-size:16px;color:rgba(255,255,255,0.32)">Loading dashboard\u2026</div></div>';
 
 var isInitialLoad = true;
 
@@ -3664,6 +3769,14 @@ DOC_REF.onSnapshot(function(doc) {
       manualSpendEntries = data.manualSpendEntries || [];
       if (data.metaToken) metaToken = data.metaToken;
       if (data.metaAccountId) metaAccountId = data.metaAccountId;
+      if (data.customTrafficSources) customTrafficSources = data.customTrafficSources;
+      if (data.linkHistory) {
+        linkHistory = data.linkHistory;
+      } else {
+        // Migrate from localStorage on first Firebase load
+        var lsHistory = localStorage.getItem('linkHistory');
+        if (lsHistory) { try { linkHistory = JSON.parse(lsHistory); localStorage.removeItem('linkHistory'); } catch(e){} }
+      }
       dataLoaded = true;
       // Run migrations
       var seedMap = {};
@@ -3690,6 +3803,15 @@ DOC_REF.onSnapshot(function(doc) {
         delete smartlinkHostedUrls.Spin;
         changed = true;
       }
+      // Seed landing pages if empty
+      if (!landingPages || landingPages.length === 0) {
+        landingPages = [
+          { id: 1, name: 'Dark — Main', url: 'https://darkspins.com', funnel: 'Dark', source: 'meta', status: 'live', notes: 'wAppDark' },
+          { id: 2, name: 'Slotio — Main', url: 'https://slotioai.com', funnel: 'Slotio', source: 'meta', status: 'live', notes: '' },
+          { id: 3, name: 'Scanio — Main', url: 'https://scanioai.com', funnel: 'Scanio', source: 'meta', status: 'live', notes: '' },
+        ];
+        changed = true;
+      }
       // Migrate deal objects with new fields
       deals.forEach(function(d) {
         var seed = seedMap[d.id];
@@ -3713,6 +3835,7 @@ DOC_REF.onSnapshot(function(doc) {
       assignments = JSON.parse(JSON.stringify(DEFAULT_ASSIGNMENTS));
       dealWeights = {};
       smartlinkFallbacks = {};
+      FUNNEL_NAMES.forEach(function(f) { smartlinkFallbacks[f] = CASINOBET_FALLBACK; });
       smartlinkHostedUrls = {};
       dataLoaded = true;
       FUNNEL_NAMES.forEach(function(f) { equalizeWeights(f); });
@@ -3726,12 +3849,14 @@ DOC_REF.onSnapshot(function(doc) {
     var overlay = document.getElementById('loadingOverlay');
     if (overlay) overlay.remove();
     render();
-    setFunnel(null);
+    setPage('home');
     renderGlitch();
     renderSlotValues();
     renderConflictBadges();
     renderSmartlinks();
     renderFunnelGeoBar();
+    // Start real-time postback listener for toast notifications
+    startPostbackListener();
     return;
   }
 
@@ -3762,10 +3887,61 @@ DOC_REF.onSnapshot(function(doc) {
   if (overlay) overlay.innerHTML = '<div style="font-size:16px;color:#f85149">Failed to connect to database</div><div style="font-size:13px;color:#7d8590;margin-top:8px">' + e.message + '</div>';
 });
 
+// ── Toast Notifications ──────────────────────────────────────────────────────
+function showToast(message, type, duration) {
+  type = type || 'ftd'; // 'ftd' | 'reg' | 'alert'
+  duration = duration || 6000;
+  var container = document.getElementById('toastContainer');
+  if (!container) return;
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.innerHTML = message;
+  container.appendChild(t);
+  setTimeout(function() {
+    t.style.animation = 'toast-out 0.3s ease forwards';
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 320);
+  }, duration);
+}
+
+var _postbackListenerStartTime = null;
+
+function startPostbackListener() {
+  _postbackListenerStartTime = new Date().toISOString();
+  db.collection('postbacks')
+    .orderBy('ts', 'desc')
+    .limit(1)
+    .onSnapshot(function(snap) {
+      if (!_postbackListenerStartTime) return;
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        if (!d.ts || d.ts <= _postbackListenerStartTime) return; // Only new events after page load
+        var et = d.eventType || d.rawEvent || '';
+        var funnel = d.funnelKey || d.funnel || '';
+        var src = d.source || d.src || '';
+        var rev = (et === 'ftd' && d.revenue > 0) ? ' · <span style="color:var(--green);font-weight:700">€' + parseFloat(d.revenue).toFixed(0) + '</span>' : '';
+        var srcBadge = src ? ' · <span style="color:var(--muted);font-size:11px">' + escHtml(src) + '</span>' : '';
+        if (et === 'ftd') {
+          showToast(
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--green);margin-bottom:4px">💰 New FTD</div>' +
+            '<div style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(funnel) + rev + srcBadge + '</div>',
+            'ftd', 8000
+          );
+        } else if (et === 'reg') {
+          showToast(
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--accent);margin-bottom:4px">📋 New Registration</div>' +
+            '<div style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(funnel) + srcBadge + '</div>',
+            'reg', 5000
+          );
+        }
+      });
+    }, function(err) { console.warn('Postback listener error:', err.message); });
+}
+
 // ── Analytics ───────────────────────────────────────────────────────────────
 var analyticsFilterFunnel = '';
 var analyticsFilterDays = 7;
-var analyticsTab = 'clicks';
+var analyticsTab = 'overview';
+var overviewFilterDays = 7;
 var perfFilterDays = 7;
 var perfFilterFunnel = '';
 
@@ -3779,17 +3955,500 @@ function renderAnalyticsPage() {
   container.innerHTML =
     '<div style="padding:32px 32px 0;border-bottom:1px solid var(--border)">' +
       '<div style="display:flex;gap:0">' +
+        tabBtn('overview', 'Overview') +
         tabBtn('clicks', 'Click Analytics') +
         tabBtn('performance', 'Performance') +
+        tabBtn('deals', 'Deals') +
         tabBtn('sources', 'Sources') +
         tabBtn('roi', 'ROI') +
       '</div>' +
     '</div>' +
     '<div id="analyticsTabBody"></div>';
-  if (analyticsTab === 'clicks') renderClicksTab();
+  if (analyticsTab === 'overview') renderOverviewTab();
+  else if (analyticsTab === 'clicks') renderClicksTab();
   else if (analyticsTab === 'performance') renderPerformanceTab();
+  else if (analyticsTab === 'deals') renderDealsAnalyticsTab();
   else if (analyticsTab === 'sources') renderSourcesTab();
   else if (analyticsTab === 'roi') renderRoiTab();
+}
+
+// ── Analytics: Overview Tab ──────────────────────────────────────────────────
+var FUNNEL_COLORS = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: '#f97316', SpinGPT: 'var(--red)', Shadow: 'var(--purple)' };
+
+// ── HOME PAGE ──────────────────────────────────────────────────────────────────
+function renderHomePage() {
+  var el = document.getElementById('homePage');
+  if (!el) return;
+  var now = new Date();
+  var hour = now.getHours();
+  var greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  var dateStr = now.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  var activeCount = (deals || []).filter(function(d){ return d.status === 'active'; }).length;
+
+  var funnelCardsHtml = FUNNEL_NAMES.map(function(f) {
+    var color = FUNNEL_COLORS[f] || 'var(--muted)';
+    var fAssigned = !!(assignments[f] && assignments[f].length > 0);
+    return '<div id="hfc-' + f + '" onclick="setFunnel(\'' + escHtml(f) + '\')" ' +
+      'style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color 0.15s">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:7px">' +
+          '<span style="width:7px;height:7px;border-radius:50%;background:' + color + ';flex-shrink:0;box-shadow:0 0 5px ' + color + '"></span>' +
+          '<span style="font-family:var(--font-display);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">' + escHtml(f) + '</span>' +
+        '</div>' +
+        '<span style="font-size:9px;font-weight:700;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;background:' + (fAssigned ? 'var(--green-glow)' : 'var(--red-glow)') + ';color:' + (fAssigned ? 'var(--green)' : 'var(--red)') + '">' + (fAssigned ? 'LIVE' : 'EMPTY') + '</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center">' +
+        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--text)" id="hfc-clicks-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Clicks</div></div>' +
+        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--green)" id="hfc-ftds-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">FTDs</div></div>' +
+        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)" id="hfc-rev-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Rev</div></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var actions = [
+    { icon:'🔗', label:'Link Builder',   fn:"setPage('builder')" },
+    { icon:'🎰', label:'Casino Deals',    fn:"dealsSubTab='deals';setPage('deals')" },
+    { icon:'🌐', label:'Landing Pages',   fn:"dealsSubTab='lps';setPage('deals')" },
+    { icon:'📊', label:'Analytics',       fn:"analyticsTab='clicks';setPage('analytics')" },
+    { icon:'⚙️', label:'Funnel Config',   fn:"setPage('funnels')" },
+    { icon:'🤖', label:'Bot Content',     fn:"setPage('tools')" },
+  ];
+  var actionGrid = actions.map(function(a) {
+    return '<div onclick="' + a.fn + '" ' +
+      'style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;transition:all 0.15s" ' +
+      'onmouseover="this.style.background=\'rgba(255,255,255,0.05)\'" onmouseout="this.style.background=\'var(--card)\'">' +
+      '<span style="font-size:20px;line-height:1">' + a.icon + '</span>' +
+      '<span style="font-size:9px;font-weight:700;color:var(--text);font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em;line-height:1.3">' + a.label + '</span>' +
+    '</div>';
+  }).join('');
+
+  el.innerHTML =
+    '<div style="padding:24px 32px 40px;max-width:1800px;margin:0 auto;position:relative;z-index:1">' +
+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
+        '<div>' +
+          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:3px">' + greeting + ' · ' + escHtml(dateStr) + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-0.01em;color:rgba(255,255,255,0.85)">Command Center</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+          '<select id="homeFilterDays" onchange="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+            '<option value="1">Today</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="0">All time</option>' +
+          '</select>' +
+          '<button onclick="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:14px;cursor:pointer;transition:color 0.15s" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#8635;</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="background:var(--card);border:1px solid rgba(126,191,154,0.2);border-top:3px solid var(--green);border-radius:14px;padding:26px 30px;margin-bottom:12px;position:relative;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+        '<div style="position:absolute;inset:0;background:radial-gradient(ellipse 55% 140% at 0% 50%,var(--green-glow) 0%,transparent 70%);pointer-events:none"></div>' +
+        '<div style="position:relative">' +
+          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--green);margin-bottom:10px">Total Revenue</div>' +
+          '<div style="display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap">' +
+            '<div id="homeHeroRevenue" style="font-family:var(--font-mono);font-size:54px;font-weight:800;color:rgba(255,255,255,0.9);line-height:1;letter-spacing:-0.02em">€0</div>' +
+            '<div style="padding-bottom:7px;display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end">' +
+              '<div><div id="homeHero-ftds" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--green)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">FTDs</div></div>' +
+              '<div><div id="homeHero-clicks" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Clicks</div></div>' +
+              '<div><div id="homeHero-avgrev" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--yellow)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Avg/FTD</div></div>' +
+              '<div><div id="homeHero-cr" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--orange)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">CR%</div></div>' +
+              '<div><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--accent)">' + activeCount + '</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Active Deals</div></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 214px;gap:10px;margin-bottom:10px">' +
+        '<div>' +
+          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:7px">Funnels · <span id="homeFunnelPeriod">7d</span></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="homeFunnelCards">' + funnelCardsHtml + '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:7px">Quick Access</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' + actionGrid + '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+          '<div style="padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Traffic Sources</div>' +
+          '<div id="homeSources" style="padding:14px 16px"><div style="color:var(--muted);font-size:12px">Loading…</div></div>' +
+        '</div>' +
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+          '<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+            '<span style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Live Events</span>' +
+            '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">latest 12</span>' +
+          '</div>' +
+          '<div id="homeEvents"><div style="padding:14px 16px;color:var(--muted);font-size:12px">Loading…</div></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  loadHomeData();
+}
+
+function loadHomeData() {
+  var daysSel = document.getElementById('homeFilterDays');
+  var days = daysSel ? +daysSel.value : 7;
+  var pLabel = days === 0 ? 'all' : days === 1 ? '1d' : days + 'd';
+  var pEl = document.getElementById('homeFunnelPeriod');
+  if (pEl) pEl.textContent = pLabel;
+
+  var cutoffTs = null, cutoffDate = null;
+  if (days > 0) {
+    var cd = new Date(); cd.setDate(cd.getDate() - days);
+    cutoffDate = cd.toISOString().split('T')[0];
+    cutoffTs = new Date(cutoffDate + 'T00:00:00Z');
+  }
+
+  Promise.all([
+    db.collection('clicks').orderBy('ts','desc').limit(2000).get(),
+    db.collection('conversions').get(),
+    db.collection('postbacks').orderBy('ts','desc').limit(12).get()
+  ]).then(function(results) {
+    var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
+
+    var totalClicks = 0, clicksByFunnel = {}, clicksBySrc = {};
+    clickSnap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.ts ? new Date(d.ts) : null;
+      if (cutoffTs && ts && ts < cutoffTs) return;
+      totalClicks++;
+      var f = d.funnel || 'Unknown';
+      clicksByFunnel[f] = (clicksByFunnel[f] || 0) + 1;
+      var s = d.src || 'NoSource';
+      clicksBySrc[s] = (clicksBySrc[s] || 0) + 1;
+    });
+
+    var totalRegs = 0, totalFtds = 0, totalRevenue = 0, byFunnel = {};
+    convSnap.forEach(function(doc) {
+      var d = doc.data();
+      if (cutoffDate && d.date < cutoffDate) return;
+      var f = d.funnel || 'Unknown';
+      if (!byFunnel[f]) byFunnel[f] = { regs:0, ftds:0, revenue:0 };
+      byFunnel[f].regs    += +(d.regs    || 0);
+      byFunnel[f].ftds    += +(d.ftds    || 0);
+      byFunnel[f].revenue += +(d.revenue || 0);
+      totalRegs    += +(d.regs    || 0);
+      totalFtds    += +(d.ftds    || 0);
+      totalRevenue += +(d.revenue || 0);
+    });
+
+    function hset(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
+
+    var avgRev = totalFtds > 0 ? '€' + (totalRevenue / totalFtds).toFixed(0) : '—';
+    var cr = totalClicks > 0 ? (totalFtds / totalClicks * 100).toFixed(1) + '%' : '0%';
+    hset('homeHeroRevenue', '€' + totalRevenue.toFixed(0));
+    hset('homeHero-ftds',   totalFtds);
+    hset('homeHero-clicks', totalClicks);
+    hset('homeHero-avgrev', avgRev);
+    hset('homeHero-cr',     cr);
+
+    FUNNEL_NAMES.forEach(function(f) {
+      var conv = byFunnel[f] || { regs:0, ftds:0, revenue:0 };
+      hset('hfc-clicks-' + f, clicksByFunnel[f] || 0);
+      hset('hfc-ftds-' + f, conv.ftds);
+      hset('hfc-rev-' + f, conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—');
+    });
+
+    var srcList = Object.keys(clicksBySrc).sort(function(a,b){ return clicksBySrc[b]-clicksBySrc[a]; }).slice(0,6);
+    var maxC = Math.max(1, clicksBySrc[srcList[0]] || 0);
+    var srcEl = document.getElementById('homeSources');
+    if (srcEl) {
+      srcEl.innerHTML = srcList.length ? srcList.map(function(sid) {
+        var sc = getTrafficSources().find(function(ts){ return ts.id === sid; });
+        var n = clicksBySrc[sid];
+        var pct = Math.round(n / maxC * 100);
+        return '<div style="margin-bottom:11px">' +
+          '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
+            '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(sc ? sc.name : sid) + '</span>' +
+            '<span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">' + n + '</span>' +
+          '</div>' +
+          '<div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">' +
+            '<div style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:2px;transition:width 0.5s ease"></div>' +
+          '</div></div>';
+      }).join('') : '<div style="color:var(--muted);font-size:12px">No click data yet</div>';
+    }
+
+    var evEl = document.getElementById('homeEvents');
+    if (evEl) {
+      var evs = [];
+      pbSnap.forEach(function(doc) { evs.push(doc.data()); });
+      evEl.innerHTML = evs.length ? evs.map(function(d) {
+        var isFtd = d.eventType === 'ftd', isReg = d.eventType === 'reg';
+        var bc = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
+        var bl = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType || '?').toUpperCase();
+        var ts = d.ts ? new Date(d.ts) : null;
+        var tStr = ts ? ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + ' ' + ts.toLocaleDateString([],{month:'short',day:'numeric'}) : '—';
+        var f = d.funnelKey || d.funnel || '?';
+        var fc = FUNNEL_COLORS[f] || 'var(--muted)';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+          '<div style="font-size:9px;font-family:var(--font-mono);color:var(--muted);white-space:nowrap;min-width:76px">' + tStr + '</div>' +
+          '<span style="font-size:9px;font-weight:800;letter-spacing:0.04em;color:' + bc + ';background:' + bc + '1a;padding:2px 6px;border-radius:3px;border:1px solid ' + bc + '44;white-space:nowrap">' + bl + '</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + fc + ';white-space:nowrap">' + escHtml(f) + '</span>' +
+          '<span style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(d.source || d.src || 'NoSource') + '</span>' +
+          (d.revenue > 0 ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--yellow);white-space:nowrap">€' + (+d.revenue).toFixed(0) + '</span>' : '') +
+        '</div>';
+      }).join('') : '<div style="padding:14px 16px;color:var(--muted);font-size:12px;text-align:center">No events yet</div>';
+    }
+
+  }).catch(function(err) {
+    var h = document.getElementById('homeHeroRevenue');
+    if (h) h.textContent = 'Error';
+  });
+}
+
+
+function renderOverviewTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  var daysOpts = [1,7,30,0].map(function(d) {
+    var label = d === 0 ? 'All time' : d === 1 ? 'Today' : 'Last ' + d + ' days';
+    return '<option value="' + d + '"' + (overviewFilterDays === d ? ' selected' : '') + '>' + label + '</option>';
+  }).join('');
+  body.innerHTML =
+    '<div style="padding:28px 32px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">' +
+      '<div>' +
+        '<div style="font-size:18px;font-weight:700">Overview</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:3px">All funnels · clicks + conversions + revenue at a glance</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<select onchange="overviewFilterDays=+this.value;loadOverviewData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
+        '<button onclick="loadOverviewData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="overviewBody" style="padding:0 32px 40px"><div style="color:var(--muted);font-size:13px">Loading...</div></div>';
+  loadOverviewData();
+}
+
+function loadOverviewData() {
+  var body = document.getElementById('overviewBody');
+  if (!body) return;
+  body.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">Loading data...</div>';
+
+  var cutoffDate = null;
+  var cutoffTs = null;
+  if (overviewFilterDays > 0) {
+    var cd = new Date();
+    cd.setDate(cd.getDate() - overviewFilterDays);
+    cutoffDate = cd.toISOString().split('T')[0];
+    cutoffTs = new Date(cutoffDate + 'T00:00:00Z');
+  }
+
+  Promise.all([
+    db.collection('clicks').orderBy('ts', 'desc').limit(2000).get(),
+    db.collection('conversions').get(),
+    db.collection('postbacks').orderBy('ts', 'desc').limit(30).get()
+  ]).then(function(results) {
+    var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
+
+    // ── Clicks ──
+    var totalClicks = 0;
+    var clicksByFunnel = {}, clicksBySrc = {};
+    clickSnap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.ts ? new Date(d.ts) : null;
+      if (cutoffTs && ts && ts < cutoffTs) return;
+      totalClicks++;
+      var f = d.funnel || 'Unknown';
+      clicksByFunnel[f] = (clicksByFunnel[f] || 0) + 1;
+      var src = d.src || 'NoSource';
+      clicksBySrc[src] = (clicksBySrc[src] || 0) + 1;
+    });
+
+    // ── Conversions ──
+    var totalRegs = 0, totalFtds = 0, totalRevenue = 0;
+    var byFunnel = {};
+    var bySrcConv = {};
+    convSnap.forEach(function(doc) {
+      var d = doc.data();
+      if (cutoffDate && d.date < cutoffDate) return;
+      var f = d.funnel || 'Unknown';
+      if (!byFunnel[f]) byFunnel[f] = { regs: 0, ftds: 0, revenue: 0 };
+      byFunnel[f].regs += +(d.regs || 0);
+      byFunnel[f].ftds += +(d.ftds || 0);
+      byFunnel[f].revenue += +(d.revenue || 0);
+      totalRegs += +(d.regs || 0);
+      totalFtds += +(d.ftds || 0);
+      totalRevenue += +(d.revenue || 0);
+      if (d.sources) {
+        Object.keys(d.sources).forEach(function(sid) {
+          if (!bySrcConv[sid]) bySrcConv[sid] = { regs: 0, ftds: 0, revenue: 0 };
+          bySrcConv[sid].regs += +(d.sources[sid].regs || 0);
+          bySrcConv[sid].ftds += +(d.sources[sid].ftds || 0);
+          bySrcConv[sid].revenue += +(d.sources[sid].revenue || 0);
+        });
+      }
+    });
+
+    // ── Recent postbacks ──
+    var recentEvents = [];
+    pbSnap.forEach(function(doc) {
+      var d = doc.data();
+      if (recentEvents.length < 15) recentEvents.push(d);
+    });
+
+    renderOverviewData(body, {
+      totalClicks, totalRegs, totalFtds, totalRevenue,
+      clicksByFunnel, byFunnel, clicksBySrc, bySrcConv, recentEvents
+    });
+  }).catch(function(err) {
+    body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:12px 0">Failed to load: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function renderOverviewData(container, data) {
+  var totalClicks = data.totalClicks, totalRegs = data.totalRegs,
+      totalFtds = data.totalFtds, totalRevenue = data.totalRevenue;
+  var cr = totalClicks > 0 ? (totalFtds / totalClicks * 100).toFixed(2) + '%' : '—';
+  var epc = totalClicks > 0 && totalRevenue > 0 ? '€' + (totalRevenue / totalClicks).toFixed(2) : '—';
+  var r2f = totalRegs > 0 ? (totalFtds / totalRegs * 100).toFixed(1) + '%' : '—';
+
+  function kpi(label, val, sub, color, icon) {
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;flex:1;min-width:120px;position:relative;overflow:hidden">' +
+      '<div style="position:absolute;inset:0;background:' + color + ';opacity:0.04;pointer-events:none"></div>' +
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + color + ';border-radius:3px 0 0 3px"></div>' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">' + label + '</div>' +
+      '<div style="font-size:26px;font-weight:800;color:' + color + ';font-family:var(--font-mono);line-height:1">' + val + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:5px">' + sub + '</div>' +
+    '</div>';
+  }
+
+  // Funnels
+  var allFunnels = FUNNEL_NAMES;
+  var funnelRows = allFunnels.map(function(f) {
+    var conv = data.byFunnel[f] || { regs: 0, ftds: 0, revenue: 0 };
+    var clicks = data.clicksByFunnel[f] || 0;
+    var cr = clicks > 0 ? (conv.ftds / clicks * 100).toFixed(1) + '%' : '—';
+    var color = FUNNEL_COLORS[f] || 'var(--muted)';
+    var hasData = clicks > 0 || conv.regs > 0 || conv.ftds > 0 || conv.revenue > 0;
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)' + (!hasData ? ';opacity:0.4' : '') + '">' +
+      '<td style="padding:10px 14px;white-space:nowrap">' +
+        '<span style="display:inline-flex;align-items:center;gap:7px">' +
+          '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0;box-shadow:0 0 6px ' + color + '"></span>' +
+          '<span style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(f) + '</span>' +
+        '</span>' +
+      '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--muted)">' + clicks + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--text)">' + conv.regs + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--green);font-weight:700">' + conv.ftds + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--yellow);font-weight:700">' + (conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—') + '</td>' +
+      '<td style="padding:10px 14px;font-size:12px;text-align:right;color:var(--muted)">' + cr + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // Sources
+  var allSrcIds = {};
+  Object.keys(data.clicksBySrc).forEach(function(k) { allSrcIds[k] = 1; });
+  Object.keys(data.bySrcConv).forEach(function(k) { allSrcIds[k] = 1; });
+  var srcList = Object.keys(allSrcIds).sort(function(a, b) {
+    return (data.clicksBySrc[b] || 0) - (data.clicksBySrc[a] || 0);
+  }).slice(0, 8);
+  var maxClicks = srcList.reduce(function(m, s) { return Math.max(m, data.clicksBySrc[s] || 0); }, 1);
+
+  var srcRows = srcList.map(function(sid) {
+    var sc = getTrafficSources().find(function(ts) { return ts.id === sid; });
+    var label = sc ? sc.name : sid;
+    var clicks = data.clicksBySrc[sid] || 0;
+    var conv = data.bySrcConv[sid] || { regs: 0, ftds: 0, revenue: 0 };
+    var barPct = Math.round(clicks / maxClicks * 100);
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<td style="padding:10px 14px;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;min-width:100px">' + escHtml(label) + '</td>' +
+      '<td style="padding:10px 14px;min-width:160px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<div style="flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">' +
+            '<div style="width:' + barPct + '%;height:100%;background:var(--accent);border-radius:3px;transition:width 0.4s ease"></div>' +
+          '</div>' +
+          '<span style="font-size:12px;font-family:var(--font-mono);color:var(--muted);min-width:28px;text-align:right">' + clicks + '</span>' +
+        '</div>' +
+      '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--green);font-weight:700">' + conv.ftds + '</td>' +
+      '<td style="padding:10px 14px;font-size:13px;font-family:var(--font-mono);text-align:right;color:var(--yellow)">' + (conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // Recent events
+  var eventRows = data.recentEvents.map(function(d) {
+    var isReg = d.eventType === 'reg';
+    var isFtd = d.eventType === 'ftd';
+    var badgeColor = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
+    var badgeLabel = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType || d.rawEvent || '?').toUpperCase();
+    var ts = d.ts ? new Date(d.ts) : null;
+    var timeStr = ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + ts.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—';
+    var funnel = d.funnelKey || d.funnel || '?';
+    var fColor = FUNNEL_COLORS[funnel] || 'var(--muted)';
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<td style="padding:8px 14px;font-size:11px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap">' + timeStr + '</td>' +
+      '<td style="padding:8px 14px"><span style="font-size:11px;font-weight:700;color:' + fColor + '">' + escHtml(funnel) + '</span></td>' +
+      '<td style="padding:8px 14px"><span style="font-size:10px;font-weight:800;letter-spacing:0.5px;color:' + badgeColor + ';background:' + badgeColor + '1a;padding:2px 7px;border-radius:4px;border:1px solid ' + badgeColor + '44">' + badgeLabel + '</span></td>' +
+      '<td style="padding:8px 14px;font-size:11px;color:var(--muted)">' + escHtml(d.source || d.src || 'NoSource') + '</td>' +
+      '<td style="padding:8px 14px;font-size:12px;font-family:var(--font-mono);color:var(--yellow);text-align:right">' + (d.revenue > 0 ? '€' + (+d.revenue).toFixed(0) : '—') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var thStyle = 'padding:8px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);text-align:right;white-space:nowrap';
+  var thL = thStyle + ';text-align:left';
+
+  container.innerHTML =
+    // ── KPI Row ──
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px">' +
+      kpi('Clicks', totalClicks, 'smartlink visits', 'var(--accent)', '↗') +
+      kpi('Regs', totalRegs, 'registrations', '#818cf8', '✓') +
+      kpi('FTDs', totalFtds, 'first deposits', 'var(--green)', '💰') +
+      kpi('Revenue', totalRevenue > 0 ? '€' + totalRevenue.toFixed(0) : '€0', 'from FTDs', 'var(--yellow)', '€') +
+      kpi('Click→FTD', cr, 'conversion rate', 'var(--purple)', '%') +
+      kpi('Reg→FTD', r2f, 'deposit rate', '#06b6d4', '→') +
+      kpi('EPC', epc, 'earnings per click', '#f97316', '⚡') +
+    '</div>' +
+
+    // ── Two columns: Funnels + Recent ──
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+
+      // Funnels
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
+        '<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+          '<div style="font-size:13px;font-weight:700">Funnel Breakdown</div>' +
+        '</div>' +
+        '<table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="border-bottom:1px solid var(--border)">' +
+            '<th style="' + thL + '">Funnel</th>' +
+            '<th style="' + thStyle + '">Clicks</th>' +
+            '<th style="' + thStyle + '">Regs</th>' +
+            '<th style="' + thStyle + '">FTDs</th>' +
+            '<th style="' + thStyle + '">Revenue</th>' +
+            '<th style="' + thStyle + '">CR%</th>' +
+          '</tr></thead>' +
+          '<tbody>' + funnelRows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+
+      // Recent events
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
+        '<div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+          '<div style="font-size:13px;font-weight:700">Recent Events</div>' +
+          '<span style="font-size:11px;color:var(--muted)">latest 15 postbacks</span>' +
+        '</div>' +
+        (eventRows
+          ? '<table style="width:100%;border-collapse:collapse"><tbody>' + eventRows + '</tbody></table>'
+          : '<div style="padding:24px;font-size:13px;color:var(--muted);text-align:center">No events yet</div>') +
+      '</div>' +
+
+    '</div>' +
+
+    // ── Sources ──
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--border)">' +
+        '<div style="font-size:13px;font-weight:700">Traffic Sources</div>' +
+      '</div>' +
+      (srcRows
+        ? '<table style="width:100%;border-collapse:collapse">' +
+            '<thead><tr style="border-bottom:1px solid var(--border)">' +
+              '<th style="' + thL + '">Source</th>' +
+              '<th style="' + thL + ';min-width:200px">Clicks</th>' +
+              '<th style="' + thStyle + '">FTDs</th>' +
+              '<th style="' + thStyle + '">Revenue</th>' +
+            '</tr></thead>' +
+            '<tbody>' + srcRows + '</tbody>' +
+          '</table>'
+        : '<div style="padding:24px;font-size:13px;color:var(--muted);text-align:center">No click data yet</div>') +
+    '</div>';
 }
 
 function renderClicksTab() {
@@ -3814,6 +4473,7 @@ function renderClicksTab() {
             '<option value="0">All time</option>' +
           '</select>' +
           '<button onclick="loadAnalyticsClicks()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+          '<button onclick="exportClicksCSV()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--green);font-size:12px;cursor:pointer">&#8595; CSV</button>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -3841,8 +4501,9 @@ function loadAnalyticsClicks() {
       var ts = d.ts ? new Date(d.ts) : null;
       if (cutoff && ts && ts < cutoff) return;
       if (analyticsFilterFunnel && d.funnel !== analyticsFilterFunnel) return;
-      clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', src: d.src || d.sub1 || '' });
+      clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', src: d.src || 'NoSource', campaign: d.campaign || '' });
     });
+    _lastClicksData = clicks;
     renderClicksData(body, clicks);
   }).catch(function(err) {
     body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0">Failed to load: ' + escHtml(err.message) + '</div>';
@@ -3979,6 +4640,39 @@ function renderClicksData(container, clicks) {
     );
 }
 
+// ── CSV Export Utilities ─────────────────────────────────────────────────────
+function downloadCSV(filename, rows) {
+  var csv = rows.map(function(row) {
+    return row.map(function(cell) {
+      var s = String(cell == null ? '' : cell);
+      if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+        return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }).join(',');
+  }).join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+var _lastClicksData = []; // store last loaded clicks for export
+
+function exportClicksCSV() {
+  if (!_lastClicksData.length) { alert('No click data loaded. Refresh the tab first.'); return; }
+  var rows = [['Time', 'Funnel', 'Casino', 'GEO', 'Source', 'Campaign']];
+  _lastClicksData.forEach(function(c) {
+    rows.push([
+      c.ts ? c.ts.toISOString() : '',
+      c.funnel || '', c.casino || '', c.geo || '',
+      c.src || '', c.campaign || ''
+    ]);
+  });
+  var label = analyticsFilterDays ? analyticsFilterDays + 'd' : 'all';
+  downloadCSV('clicks_' + label + '_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+}
+
 // ── Performance Tab ──────────────────────────────────────────────────────────
 
 function renderPerformanceTab() {
@@ -4062,6 +4756,51 @@ function renderPerformanceData(container, rows) {
 
   var periodLabel = perfFilterDays === 1 ? 'today' : perfFilterDays > 0 ? 'last ' + perfFilterDays + ' days' : 'all time';
 
+  // Build per-funnel totals for waterfall
+  var byFunnel = {};
+  rows.forEach(function(r) {
+    if (!byFunnel[r.funnel]) byFunnel[r.funnel] = { regs: 0, ftds: 0, revenue: 0 };
+    byFunnel[r.funnel].regs += r.regs;
+    byFunnel[r.funnel].ftds += r.ftds;
+    byFunnel[r.funnel].revenue += r.revenue;
+  });
+
+  // Funnel waterfall bars — pulls from clicks if available
+  function waterfallBar(label, value, maxVal, color, note) {
+    var pct = maxVal > 0 ? Math.round(value / maxVal * 100) : 0;
+    return '<div style="margin-bottom:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+        '<span style="font-size:12px;font-weight:700;color:var(--text)">' + label + '</span>' +
+        '<div style="text-align:right">' +
+          '<span style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:' + color + '">' + value + '</span>' +
+          (note ? '<span style="font-size:11px;color:var(--muted);margin-left:8px">' + note + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="height:6px;background:var(--card2);border-radius:3px;overflow:hidden">' +
+        '<div style="height:6px;background:' + color + ';border-radius:3px;width:' + pct + '%;transition:width 0.4s ease"></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var waterfallHtml = '';
+  if (rows.length > 0 && totalRegs > 0) {
+    var funnelWaterfall = Object.keys(byFunnel).map(function(f) {
+      var d = byFunnel[f];
+      var r2f = d.regs > 0 ? (d.ftds/d.regs*100).toFixed(0) + '%' : '—';
+      return '<div style="flex:1;min-width:180px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:16px;position:relative;overflow:hidden">' +
+        '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:' + (funnelColors[f] || 'var(--muted)') + '"></div>' +
+        '<div style="font-size:11px;font-weight:700;color:' + (funnelColors[f] || 'var(--muted)') + ';text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">' + f + '</div>' +
+        waterfallBar('Regs', d.regs, d.regs, 'var(--accent)', '') +
+        waterfallBar('FTDs', d.ftds, d.regs, 'var(--green)', r2f + ' CR') +
+        waterfallBar('Revenue', d.revenue > 0 ? '€' + Math.round(d.revenue) : 0, d.regs, 'var(--yellow)', '') +
+      '</div>';
+    }).join('');
+    waterfallHtml = '<div style="margin-bottom:20px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:12px">Conversion Funnel by Channel</div>' +
+      '<div style="display:flex;gap:12px;flex-wrap:wrap">' + funnelWaterfall + '</div>' +
+    '</div>';
+  }
+
   container.innerHTML =
     '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">' +
       kpiCard('Registrations', totalRegs, periodLabel, 'var(--accent)') +
@@ -4069,6 +4808,7 @@ function renderPerformanceData(container, rows) {
       kpiCard('Revenue', '€' + totalRevenue.toFixed(0), 'from qualified CPAs', 'var(--yellow)') +
       kpiCard('Reg → FTD', regToFtd, 'conversion rate', 'var(--purple)') +
     '</div>' +
+    waterfallHtml +
     (rows.length === 0
       ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center;color:var(--muted);font-size:13px">No conversion data yet for this period.</div>'
       : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
@@ -4094,12 +4834,12 @@ function getNetworkId(url) {
   var u = url.toLowerCase();
   if (u.indexOf('7ladies') !== -1 || u.indexOf('cosmobet') !== -1 ||
       u.indexOf('rolletto') !== -1 || u.indexOf('velobet') !== -1 ||
-      u.indexOf('cellxpert') !== -1) return 'cellxpert';
-  if (u.indexOf('ftdgallery') !== -1) return 'ftdgallery';
-  if (u.indexOf('padrino') !== -1) return 'padrino';
+      u.indexOf('cellxpert') !== -1 || u.indexOf('spinania') !== -1 ||
+      u.indexOf('needforslots') !== -1 || u.indexOf('ftdgallery') !== -1 ||
+      u.indexOf('padrino') !== -1) return 'cellxpert';
   if (u.indexOf('clickspinorhino') !== -1 || u.indexOf('clicktrueluck') !== -1 ||
       u.indexOf('clickholyluck') !== -1 || u.indexOf('affilika') !== -1) return 'affilika';
-  if (u.indexOf('casinobet') !== -1) return 'casinobet';
+  if (u.indexOf('casinobet') !== -1) return 'custom';
   return 'other';
 }
 
@@ -4108,7 +4848,7 @@ var NETWORK_COLORS = {
   ftdgallery: { bg: 'rgba(224,115,51,0.12)',  color: '#e07333', border: 'rgba(224,115,51,0.25)' },
   padrino:    { bg: 'rgba(29,179,104,0.12)',  color: '#3fb950', border: 'rgba(29,179,104,0.25)' },
   affilika:   { bg: 'rgba(168,85,247,0.12)',  color: '#a855f7', border: 'rgba(168,85,247,0.25)' },
-  casinobet:  { bg: 'rgba(234,179,8,0.12)',   color: '#eab308', border: 'rgba(234,179,8,0.25)' },
+  custom:     { bg: 'rgba(255,255,255,0.06)',  color: 'var(--muted)', border: 'rgba(255,255,255,0.12)' },
   other:      { bg: 'rgba(139,92,246,0.12)',  color: '#bc8cff', border: 'rgba(139,92,246,0.25)' }
 };
 
@@ -4273,6 +5013,7 @@ function renderDealsTable() {
       '<input type="text" placeholder="Search deals..." value="' + escHtml(dealsFilterSearch) + '" oninput="dealsFilterSearch=this.value;renderDealsTable()" style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;min-width:220px;outline:none">' +
       '<select onchange="dealsFilterFunnel=this.value;renderDealsTable()" style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;margin-left:auto">' + funnelOptsSel + '</select>' +
       (needsReset ? '<button onclick="clearDealsFilters()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:6px 12px;color:var(--muted);font-size:12px;cursor:pointer">Clear Filters</button>' : '') +
+      '<button onclick="exportDealsCSV()" style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:6px 12px;color:var(--green);font-size:12px;cursor:pointer">&#8595; CSV</button>' +
       '<button onclick="openModal()" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add Deal</button>' +
     '</div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">' +
@@ -4298,6 +5039,16 @@ function renderDealsTable() {
     );
 }
 
+function exportDealsCSV() {
+  var rows = [['ID', 'Casino', 'Status', 'Network', 'Deal Type', 'CPA (€)', 'RevShare %', 'Min Deposit', 'GEOs', 'Funnels', 'URL']];
+  deals.forEach(function(d) {
+    var funnels = FUNNEL_NAMES.filter(function(f){ return (assignments[f]||[]).indexOf(d.id) !== -1; }).join('; ');
+    var geos = geoArray(d).join(' ');
+    rows.push([d.id, d.name, d.status||'active', d.network||getNetworkId(d.url), d.dealType||'RS', d.cpaAmount||0, d.revshare||0, d.deposit||0, geos, funnels, d.url]);
+  });
+  downloadCSV('deals_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+}
+
 // ── Landing Pages ──────────────────────────────────────────────────────────
 function nextLpId() {
   return landingPages.length > 0 ? Math.max.apply(null, landingPages.map(function(l) { return l.id; })) + 1 : 1;
@@ -4307,54 +5058,44 @@ function renderLandingPagesTab() {
   var body = document.getElementById('dealsSubBody');
   if (!body) return;
 
-  var srcOpts = '<option value="">All Sources</option>' + TRAFFIC_SOURCES.map(function(s){
-    return '<option value="' + s.id + '">' + s.name + '</option>';
-  }).join('');
-  var funnelOpts2 = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){
-    return '<option value="' + f + '">' + f + '</option>';
-  }).join('');
-
-  var rows = landingPages.map(function(lp) {
-    var src = TRAFFIC_SOURCES.find(function(s) { return s.id === lp.source; });
-    var srcColor = src ? src.color : 'var(--muted)';
+  var cards = landingPages.map(function(lp) {
+    var src = getTrafficSources().find(function(s) { return s.id === lp.source; });
     var srcName = src ? src.name : (lp.source || '—');
     var fcol = FUNNEL_COLORS[lp.funnel] || 'var(--muted)';
-    var statusCol = lp.status === 'live' ? 'var(--green)' : 'var(--yellow)';
-    return '<tr style="border-bottom:1px solid var(--border)">' +
-      '<td style="padding:9px 12px;font-weight:600;font-size:13px">' + escHtml(lp.name) + '</td>' +
-      '<td style="padding:9px 12px"><a href="' + escHtml(lp.url) + '" target="_blank" style="color:var(--accent);font-size:11px;font-family:var(--font-mono);text-decoration:none;max-width:280px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(lp.url) + '</a></td>' +
-      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + fcol + '">' + escHtml(lp.funnel||'—') + '</span></td>' +
-      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + srcColor + '">' + escHtml(srcName) + '</span></td>' +
-      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + statusCol + '">' + (lp.status === 'live' ? '● Live' : '○ Paused') + '</span></td>' +
-      '<td style="padding:9px 12px;font-size:12px;color:var(--muted)">' + escHtml(lp.notes||'') + '</td>' +
-      '<td style="padding:9px 12px"><div style="display:flex;gap:6px">' +
-        '<button onclick="openLpModal(' + lp.id + ')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:3px 9px;color:var(--text);font-size:11px;cursor:pointer">Edit</button>' +
-        '<button onclick="deleteLp(' + lp.id + ')" style="background:none;border:1px solid rgba(217,62,62,0.3);border-radius:4px;padding:3px 9px;color:var(--red);font-size:11px;cursor:pointer">Del</button>' +
-      '</div></td>' +
-    '</tr>';
+    var isLive = lp.status === 'live';
+    var domain = '';
+    try { domain = new URL(lp.url).hostname.replace('www.',''); } catch(e) { domain = lp.url; }
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:' + fcol + ';opacity:0.6"></div>' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(lp.name) + '</div>' +
+          '<a href="' + escHtml(lp.url) + '" target="_blank" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">' + escHtml(domain) + ' ↗</a>' +
+        '</div>' +
+        '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;margin-left:10px;background:' + (isLive ? 'var(--green-glow)' : 'var(--yellow-glow)') + ';color:' + (isLive ? 'var(--green)' : 'var(--yellow)') + ';border:1px solid ' + (isLive ? 'rgba(126,191,154,0.3)' : 'rgba(229,192,123,0.3)') + '">' + (isLive ? '● Live' : '○ Paused') + '</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
+        (lp.funnel ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08)">' + escHtml(lp.funnel) + '</span>' : '') +
+        (srcName !== '—' ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border)">' + escHtml(srcName) + '</span>' : '') +
+        (lp.notes ? '<span style="font-size:10px;color:var(--muted);padding:2px 8px">' + escHtml(lp.notes) + '</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:6px">' +
+        '<a href="' + escHtml(lp.url) + '" target="_blank" style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.04)\'">Open ↗</a>' +
+        '<button onclick="openLpModal(' + lp.id + ')" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.04)\'">Edit</button>' +
+        '<button onclick="deleteLp(' + lp.id + ')" style="background:var(--red-glow);border:1px solid rgba(212,112,128,0.3);border-radius:6px;padding:6px 10px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer">Del</button>' +
+      '</div>' +
+    '</div>';
   }).join('');
 
   body.innerHTML =
-    '<div style="display:flex;justify-content:flex-end;margin-bottom:16px">' +
-      '<button onclick="openLpModal(null)" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add Landing Page</button>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+      '<div style="font-size:13px;color:var(--muted)">' + landingPages.length + ' landing page' + (landingPages.length !== 1 ? 's' : '') + '</div>' +
+      '<button onclick="openLpModal(null)" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add</button>' +
     '</div>' +
     (landingPages.length === 0
-      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:40px;text-align:center;color:var(--muted);font-size:13px">No landing pages yet. Add your first one to track where traffic lands before converting.</div>'
-      : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
-          '<thead><tr style="background:var(--card2)">' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Name</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">URL</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnel</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Status</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Notes</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Actions</th>' +
-          '</tr></thead>' +
-          '<tbody>' + rows + '</tbody>' +
-        '</table></div></div>'
-    ) +
-    // LP Modal placeholder
-    '';
+      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:48px;text-align:center;color:var(--muted);font-size:13px">No landing pages yet. Click <strong style="color:var(--text)">+ Add</strong> to add your first one.</div>'
+      : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">' + cards + '</div>'
+    );
 }
 
 function openLpModal(id) {
@@ -4364,7 +5105,7 @@ function openLpModal(id) {
   var funnelOpts = '<option value="">Select funnel</option>' + FUNNEL_NAMES.map(function(f){
     return '<option value="' + f + '"' + (v.funnel === f ? ' selected' : '') + '>' + f + '</option>';
   }).join('');
-  var srcOpts = '<option value="">Select source</option>' + TRAFFIC_SOURCES.map(function(s){
+  var srcOpts = '<option value="">Select source</option>' + getTrafficSources().map(function(s){
     return '<option value="' + s.id + '"' + (v.source === s.id ? ' selected' : '') + '>' + s.name + '</option>';
   }).join('');
 
@@ -4590,18 +5331,35 @@ function renderSettingsPage() {
   var container = document.getElementById('settingsPage');
   if (!container) return;
 
-  var srcRows = TRAFFIC_SOURCES.map(function(s, i) {
+  var allSources = getTrafficSources();
+  var TYPE_COLORS = { paid: 'var(--accent)', organic: 'var(--green)', content: 'var(--purple)', spam: 'var(--orange)' };
+
+  // Build source rows — built-ins show "(built-in)" label, customs get edit/delete
+  var srcRows = allSources.map(function(s) {
+    var isCustom = customTrafficSources.some(function(cs){ return cs.id === s.id; });
+    var typeCol = TYPE_COLORS[s.type] || 'var(--muted)';
     return '<tr style="border-bottom:1px solid var(--border)">' +
-      '<td style="padding:9px 12px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + s.color + ';margin-right:6px"></span><span style="font-weight:600">' + escHtml(s.name) + '</span></td>' +
+      '<td style="padding:9px 12px">' +
+        '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + s.color + ';margin-right:7px;vertical-align:middle"></span>' +
+        '<span style="font-weight:600;color:var(--text)">' + escHtml(s.name) + '</span>' +
+        (isCustom ? '' : '<span style="font-size:10px;color:var(--muted);margin-left:6px">built-in</span>') +
+      '</td>' +
       '<td style="padding:9px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + escHtml(s.id) + '</td>' +
-      '<td style="padding:9px 12px;font-size:12px;color:var(--muted)">' + s.type + '</td>' +
+      '<td style="padding:9px 12px"><span style="font-size:11px;color:' + typeCol + '">' + s.type + '</span></td>' +
+      '<td style="padding:9px 12px;text-align:right">' +
+        (isCustom
+          ? '<button onclick="editTrafficSource(\'' + escHtml(s.id) + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 10px;color:var(--accent);font-size:11px;cursor:pointer;margin-right:4px">Edit</button>' +
+            '<button onclick="deleteTrafficSource(\'' + escHtml(s.id) + '\')" style="background:none;border:1px solid rgba(212,112,128,0.2);border-radius:5px;padding:3px 10px;color:var(--red);font-size:11px;cursor:pointer">Del</button>'
+          : '<button onclick="overrideTrafficSource(\'' + escHtml(s.id) + '\')" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 10px;color:var(--muted);font-size:11px;cursor:pointer">Override</button>'
+        ) +
+      '</td>' +
     '</tr>';
   }).join('');
 
   container.innerHTML =
-    '<div style="padding:28px 32px 32px;max-width:720px">' +
+    '<div style="padding:28px 32px 40px;max-width:820px">' +
 
-      // Meta API section
+      // ── Meta Ads API ──────────────────────────────────────────
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
         '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Meta Ads API</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-bottom:18px">Connect your Meta Ads account to automatically pull spend data for the ROI tab.</div>' +
@@ -4612,36 +5370,207 @@ function renderSettingsPage() {
             '<input id="settings-meta-account" value="' + escHtml(metaAccountId) + '" placeholder="act_123456789" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
         '</div>' +
         '<button onclick="saveMetaSettings()" style="background:var(--accent);border:none;border-radius:6px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save Meta Settings</button>' +
-        '<span id="metaSaveMsg" style="margin-left:12px;font-size:12px;color:var(--green);display:none">Saved ✓</span>' +
+        '<span id="metaSaveMsg" style="margin-left:12px;font-size:12px;color:var(--green);display:none">Saved \u2713</span>' +
       '</div>' +
 
-      // Postback info
+      // ── Postback Setup ────────────────────────────────────────
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
         '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Postback Setup</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Use the per-deal postback generator from Casino Deals so each network gets the right macros.</div>' +
         '<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--accent)">' +
-          'Affiliate Dashboard > Casino Deals > Postback URLs' +
+          'Affiliate Dashboard \u203a Casino Deals \u203a Postback URLs' +
         '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-top:12px">The worker endpoint stays the same, but the macros differ by network. Using the deal-level generator avoids broken partner setups.</div>' +
       '</div>' +
 
-      // Traffic Sources
+      // ── Telegram Alerts ───────────────────────────────────────
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Telegram Admin Alerts</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:16px">Get notified on your phone when FTDs and Regs arrive. Configure once in your Cloudflare Worker secrets.</div>' +
+        '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:14px">' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:10px">One-time Setup</div>' +
+          '<ol style="font-size:12px;color:var(--text);padding-left:18px;line-height:2;margin:0">' +
+            '<li>Create a bot via <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> \u2192 copy the token</li>' +
+            '<li>Get your chat ID: message <a href="https://t.me/userinfobot" target="_blank" style="color:var(--accent)">@userinfobot</a></li>' +
+            '<li>In Cloudflare dashboard \u2192 Worker \u2192 Settings \u2192 Variables, add: <code style="background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:3px;font-size:11px;color:var(--yellow)">TG_BOT_TOKEN</code> and <code style="background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:3px;font-size:11px;color:var(--yellow)">TG_CHAT_ID</code></li>' +
+            '<li>Redeploy the worker (or it picks up secrets automatically)</li>' +
+          '</ol>' +
+        '</div>' +
+        '<div style="background:rgba(126,191,154,0.06);border:1px solid rgba(126,191,154,0.2);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--green)">' +
+          '\u2713 Browser toast notifications are active \u2014 new FTDs/Regs show as pop-ups in this tab (no setup needed)' +
+        '</div>' +
+      '</div>' +
+
+      // ── Traffic Sources ───────────────────────────────────────
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px">' +
-        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Traffic Sources</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Tag your smartlink URLs with <code style="background:var(--card2);padding:1px 6px;border-radius:3px;font-size:11px">?src=SOURCE_ID</code> to track traffic by source.</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+          '<div style="font-size:15px;font-weight:700">Traffic Sources</div>' +
+          '<button onclick="openAddSourceModal()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:6px;padding:6px 14px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer">+ Add Source</button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">' +
+          'Tag URLs with <code style="background:var(--card2);padding:1px 6px;border-radius:3px;font-size:11px">?src=SOURCE_ID</code> to track traffic by source. Built-in sources can be overridden; custom sources can be edited or deleted.' +
+        '</div>' +
         '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;overflow:hidden">' +
           '<table style="width:100%;border-collapse:collapse">' +
             '<thead><tr style="background:rgba(0,0,0,0.2)">' +
               '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Name</th>' +
-              '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">ID (use in src)</th>' +
+              '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">ID (?src=)</th>' +
               '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Type</th>' +
+              '<th style="padding:8px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Actions</th>' +
             '</tr></thead>' +
             '<tbody>' + srcRows + '</tbody>' +
           '</table>' +
         '</div>' +
+        '<div style="margin-top:12px;font-size:11px;color:var(--muted)">' +
+          '<strong style="color:var(--text)">Type legend:</strong> ' +
+          '<span style="color:var(--accent)">paid</span> = ad platforms &bull; ' +
+          '<span style="color:var(--green)">organic</span> = unpaid traffic &bull; ' +
+          '<span style="color:var(--purple)">content</span> = social/community &bull; ' +
+          '<span style="color:var(--orange)">spam</span> = DM/spam campaigns' +
+        '</div>' +
       '</div>' +
 
+    '</div>' +
+
+    // ── Add/Edit Source Modal ─────────────────────────────────
+    '<div id="srcModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:3000;align-items:center;justify-content:center">' +
+      '<div style="background:#111113;border:1px solid var(--border-bright);border-radius:12px;padding:28px;width:440px;max-width:95vw">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:18px" id="srcModalTitle">Add Traffic Source</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Display Name</label>' +
+            '<input id="srcModal-name" placeholder="e.g. Google Ads" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">ID (lowercase, no spaces)</label>' +
+            '<input id="srcModal-id" placeholder="e.g. google" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Type</label>' +
+            '<select id="srcModal-type" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none">' +
+              '<option value="paid">paid</option>' +
+              '<option value="organic">organic</option>' +
+              '<option value="content">content</option>' +
+              '<option value="spam">spam</option>' +
+            '</select></div>' +
+          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Color</label>' +
+            '<div style="display:flex;gap:8px;align-items:center">' +
+              '<input id="srcModal-color" type="color" value="#4285F4" style="width:40px;height:36px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:2px">' +
+              '<input id="srcModal-color-hex" placeholder="#4285F4" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;font-family:var(--font-mono);outline:none">' +
+            '</div></div>' +
+        '</div>' +
+        '<div id="srcModalErr" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none"></div>' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+          '<button onclick="closeSrcModal()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:8px 18px;color:var(--muted);font-size:13px;cursor:pointer">Cancel</button>' +
+          '<button onclick="saveSrcModal()" style="background:rgba(255,255,255,0.08);border:1px solid var(--border-bright);border-radius:6px;padding:8px 18px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer">Save Source</button>' +
+        '</div>' +
+      '</div>' +
     '</div>';
+
+  // Sync hex ↔ color picker
+  var colorPicker = document.getElementById('srcModal-color');
+  var colorHex    = document.getElementById('srcModal-color-hex');
+  if (colorPicker && colorHex) {
+    colorPicker.addEventListener('input', function(){ colorHex.value = colorPicker.value; });
+    colorHex.addEventListener('input', function(){
+      var v = colorHex.value.trim();
+      if (/^#[0-9A-Fa-f]{6}$/.test(v)) colorPicker.value = v;
+    });
+  }
+}
+
+var _srcModalEditId = null; // null = adding new, string = editing existing
+
+function openAddSourceModal() {
+  _srcModalEditId = null;
+  var m = document.getElementById('srcModal');
+  if (!m) { renderSettingsPage(); m = document.getElementById('srcModal'); }
+  if (!m) return;
+  document.getElementById('srcModalTitle').textContent = 'Add Traffic Source';
+  document.getElementById('srcModal-name').value = '';
+  document.getElementById('srcModal-id').value = '';
+  document.getElementById('srcModal-type').value = 'paid';
+  document.getElementById('srcModal-color').value = '#4285F4';
+  document.getElementById('srcModal-color-hex').value = '#4285F4';
+  document.getElementById('srcModal-id').disabled = false;
+  var err = document.getElementById('srcModalErr'); if (err) err.style.display = 'none';
+  m.style.display = 'flex';
+}
+
+function overrideTrafficSource(id) {
+  var src = getTrafficSources().find(function(s){ return s.id === id; });
+  if (!src) return;
+  _srcModalEditId = id;
+  var m = document.getElementById('srcModal');
+  if (!m) { renderSettingsPage(); m = document.getElementById('srcModal'); }
+  document.getElementById('srcModalTitle').textContent = 'Override Built-in Source';
+  document.getElementById('srcModal-name').value = src.name;
+  document.getElementById('srcModal-id').value = src.id;
+  document.getElementById('srcModal-type').value = src.type;
+  document.getElementById('srcModal-color').value = src.color;
+  document.getElementById('srcModal-color-hex').value = src.color;
+  document.getElementById('srcModal-id').disabled = true;
+  var err = document.getElementById('srcModalErr'); if (err) err.style.display = 'none';
+  m.style.display = 'flex';
+}
+
+function editTrafficSource(id) {
+  var src = customTrafficSources.find(function(s){ return s.id === id; });
+  if (!src) return;
+  _srcModalEditId = id;
+  var m = document.getElementById('srcModal');
+  if (!m) { renderSettingsPage(); m = document.getElementById('srcModal'); }
+  document.getElementById('srcModalTitle').textContent = 'Edit Traffic Source';
+  document.getElementById('srcModal-name').value = src.name;
+  document.getElementById('srcModal-id').value = src.id;
+  document.getElementById('srcModal-type').value = src.type;
+  document.getElementById('srcModal-color').value = src.color;
+  document.getElementById('srcModal-color-hex').value = src.color;
+  document.getElementById('srcModal-id').disabled = true;
+  var err = document.getElementById('srcModalErr'); if (err) err.style.display = 'none';
+  m.style.display = 'flex';
+}
+
+function deleteTrafficSource(id) {
+  if (!confirm('Delete custom source "' + id + '"? Built-in sources will show again.')) return;
+  customTrafficSources = customTrafficSources.filter(function(s){ return s.id !== id; });
+  saveToFirebase();
+  renderSettingsPage();
+}
+
+function closeSrcModal() {
+  var m = document.getElementById('srcModal');
+  if (m) m.style.display = 'none';
+}
+
+function saveSrcModal() {
+  var name  = (document.getElementById('srcModal-name').value || '').trim();
+  var id    = (document.getElementById('srcModal-id').value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  var type  = document.getElementById('srcModal-type').value;
+  var colorHexEl = document.getElementById('srcModal-color-hex');
+  var colorPickEl = document.getElementById('srcModal-color');
+  var color = (colorHexEl && /^#[0-9A-Fa-f]{6}$/.test(colorHexEl.value.trim())) ? colorHexEl.value.trim() : (colorPickEl ? colorPickEl.value : '#808080');
+  var err = document.getElementById('srcModalErr');
+
+  if (!name) { err.textContent = 'Name is required.'; err.style.display = 'block'; return; }
+  if (!id) { err.textContent = 'ID is required.'; err.style.display = 'block'; return; }
+
+  // Check for duplicate id (only when adding new)
+  if (!_srcModalEditId) {
+    var existingIds = getTrafficSources().map(function(s){ return s.id; });
+    if (existingIds.indexOf(id) !== -1) {
+      err.textContent = 'ID "' + id + '" already exists. Use Override to modify a built-in source, or choose a different ID.';
+      err.style.display = 'block'; return;
+    }
+  }
+
+  var entry = { id: id, name: name, type: type, color: color };
+  var existIdx = customTrafficSources.findIndex(function(s){ return s.id === (_srcModalEditId || id); });
+  if (existIdx !== -1) {
+    customTrafficSources[existIdx] = entry;
+  } else {
+    customTrafficSources.push(entry);
+  }
+  saveToFirebase();
+  closeSrcModal();
+  renderSettingsPage();
 }
 
 function saveMetaSettings() {
@@ -4659,6 +5588,11 @@ var builderCampaign   = '';
 var builderCasinoUrl  = '';
 var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | 'affilika' | 'ftdgallery' | 'padrino'
 var builderGenerated  = false;
+var kitFunnel         = 'Dark';
+var kitSource         = 'meta';
+var pbPlatform        = 'cellxpert';   // cellxpert | cellxpert_afp1 | affilika
+var pbFunnel          = 'Dark';
+var pbCpaAmount       = 0;
 
 // Funnels with a landing page (Dark/Slotio/Scanio have LPs; SpinGPT/Shadow go direct)
 function funnelHasLp(f) { return !!(FUNNEL_LP_DOMAIN[f !== undefined ? f : builderFunnel]); }
@@ -4670,7 +5604,7 @@ var BUILDER_NETWORKS = [
   { id: '',           label: 'Auto-detect from URL' },
   { id: 'cellxpert',  label: 'CellXpert',  clickMacro: '[afp]',       src1: 'afp2', src2: 'afp3' },
   { id: 'affilika',   label: 'Affilika',   clickMacro: '{visit_id}',  src1: 'sub1', src2: 'sub2' },
-  { id: 'casinobet',  label: 'CasinoBet',  clickMacro: '{click_id}',  src1: 'sub1', src2: 'sub2' }
+  { id: 'custom',     label: 'Custom',     clickMacro: '',            src1: 'sub1', src2: 'sub2' }
 ];
 
 function builderGetNetwork() {
@@ -4680,8 +5614,8 @@ function builderGetNetwork() {
   }
   var auto = detectNetwork(builderCasinoUrl);
   if (auto) {
-    // CellXpert-platform networks use afp2/afp3; others (Affilika, CasinoBet) use sub1/sub2
-    var usesSub = auto.name === 'affilika' || auto.name === 'casinobet';
+    // CellXpert-platform networks use afp2/afp3; others (Affilika, Custom) use sub1/sub2
+    var usesSub = auto.name === 'affilika' || auto.name === 'custom';
     auto.src1 = usesSub ? 'sub1' : 'afp2';
     auto.src2 = usesSub ? 'sub2' : 'afp3';
   }
@@ -4691,12 +5625,12 @@ function builderGetNetwork() {
 function saveLinkHistory(entry) {
   linkHistory.unshift(entry);
   if (linkHistory.length > 50) linkHistory.length = 50;
-  localStorage.setItem('linkHistory', JSON.stringify(linkHistory));
+  debouncedSaveToFirebase();
 }
 
 function clearLinkHistory() {
   linkHistory = [];
-  localStorage.removeItem('linkHistory');
+  saveToFirebase();
   renderBuilderPage();
 }
 
@@ -4748,11 +5682,25 @@ function builderGenerate() {
   renderBuilderPage();
 }
 
+function kitCopyAll() {
+  var ids = ['kit-lp', 'kit-bot', 'kit-sl', 'kit-sl-ad'];
+  var lines = [];
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && el.value) lines.push(el.value);
+  });
+  if (!lines.length) return;
+  navigator.clipboard.writeText(lines.join('\n')).then(function() {
+    var msg = document.getElementById('kit-copy-msg');
+    if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2000); }
+  });
+}
+
 function renderBuilderPage() {
   var container = document.getElementById('builderPage');
   if (!container) return;
 
-  var srcLabel    = (TRAFFIC_SOURCES.find(function(s){ return s.id === builderSource; }) || {}).name || builderSource;
+  var srcLabel    = (getTrafficSources().find(function(s){ return s.id === builderSource; }) || {}).name || builderSource;
   var bot         = FUNNEL_TO_BOT[builderFunnel];
   var smartlinkUrl = builderGetDirectUrl();
   var lpAdUrl     = builderGetLpAdUrl();
@@ -4831,7 +5779,7 @@ function renderBuilderPage() {
   var histRows = linkHistory.length === 0
     ? '<div style="color:var(--muted);font-size:12px;padding:12px 0">No links generated yet.</div>'
     : linkHistory.slice(0, 20).map(function(h, i) {
-        var srcN = (TRAFFIC_SOURCES.find(function(s){ return s.id === h.src; }) || {}).name || h.src;
+        var srcN = (getTrafficSources().find(function(s){ return s.id === h.src; }) || {}).name || h.src;
         var dt   = h.ts ? h.ts.substring(0, 16).replace('T', ' ') : '';
         var hid  = 'hist-url-' + i;
         var displayUrl = h.url || h.casinoUrl || '';
@@ -4843,74 +5791,126 @@ function renderBuilderPage() {
         '</div>';
       }).join('');
 
+  // ── Campaign Kit (instant, no generate needed) ──
+  var kitLpDomain   = FUNNEL_LP_DOMAIN[kitFunnel] || '';
+  var kitBot        = FUNNEL_TO_BOT[kitFunnel] || {};
+  var kitSlDomain   = smartlinkHostedUrls[kitFunnel] || (FUNNEL_SMARTLINK_DOMAIN[kitFunnel] ? 'https://' + FUNNEL_SMARTLINK_DOMAIN[kitFunnel] : '');
+  var kitHasLp      = !!kitLpDomain;
+  var kitHasTg      = FUNNEL_CTA[kitFunnel] === 'tg';
+  var kitSrcLabel   = (getTrafficSources().find(function(s){ return s.id === kitSource; }) || {}).name || kitSource;
+  var kitLpLink     = kitHasLp  ? 'https://' + kitLpDomain + '/?src=' + encodeURIComponent(kitSource) : '';
+  var kitBotLink    = kitHasTg  ? (kitBot.tme || ('https://t.me/' + (kitBot.username||''))) + '?start=' + encodeURIComponent(kitSource) : '';
+  var kitSlLink     = kitSlDomain ? kitSlDomain + (kitSlDomain.indexOf('?') !== -1 ? '&' : '?') + 'src=' + encodeURIComponent(kitSource) : '';
+  var kitFunnelColor = FUNNEL_COLORS[kitFunnel] || 'var(--accent)';
+
+  function kitRow(label, val, id, desc) {
+    if (!val) return '';
+    return '<div style="margin-bottom:14px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
+        '<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">' + label + '</span>' +
+        '<span style="font-size:10px;color:var(--muted);font-style:italic">' + desc + '</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input id="' + id + '" type="text" readonly value="' + escHtml(val) + '" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:.45rem .65rem;font-size:.72rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+        '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + id + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--accent);flex-shrink:0">&#128203;</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var kitFunnelOpts = FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (kitFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('');
+  var kitSrcOpts    = getTrafficSources().map(function(s){ return '<option value="' + s.id + '"' + (kitSource === s.id ? ' selected' : '') + '>' + s.name + '</option>'; }).join('');
+
   container.innerHTML =
     '<div style="padding:28px 32px 40px;max-width:860px">' +
       '<div style="font-size:20px;font-weight:800;margin-bottom:4px">Link Builder</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Paste a casino affiliate link, choose funnel/source/campaign — get tagged links, postback URLs, LP ad link and TG deep link in one shot.</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">' +
+        '<span style="color:var(--accent);font-weight:700">&#9889; Campaign Kit</span> gives all tracking links instantly. ' +
+        '<span style="color:#f97316;font-weight:700">&#128279; Postback Builder</span> generates reg/FTD/QFTD URLs to paste in affiliate platforms.' +
+      '</div>' +
 
-      // ── INPUT CARD ──
-      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
-
-        // Casino URL + Platform selector
-        '<div style="display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:18px;align-items:end">' +
+      // ── CAMPAIGN KIT ──
+      '<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + kitFunnelColor + ';border-radius:10px;padding:22px 24px;margin-bottom:20px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">' +
           '<div>' +
-            '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Casino Affiliate Link <span style="font-weight:400;text-transform:none;letter-spacing:0">(paste raw tracking URL — optional)</span></label>' +
-            '<input id="bl-casino-url" type="text" value="' + escHtml(builderCasinoUrl) + '" placeholder="https://clickspinorhino.com/abc123  or  https://track.7ladies.com/visit/?bta=..." oninput="builderCasinoUrl=this.value.trim();builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:12px;font-family:var(--font-mono);box-sizing:border-box">' +
+            '<div style="font-size:14px;font-weight:800;letter-spacing:.02em;color:var(--accent)">&#9889; Campaign Link Builder</div>' +
+            '<div style="font-size:11px;color:var(--muted);margin-top:2px">Pick funnel + source — all tracking links ready instantly</div>' +
           '</div>' +
-          '<div>' +
-            '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Platform</label>' +
-            '<select id="bl-network" onchange="builderNetwork=this.value;builderGenerated=false;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 10px;color:var(--text);font-size:13px;white-space:nowrap">' +
-            BUILDER_NETWORKS.map(function(n){ return '<option value="' + n.id + '"' + (builderNetwork === n.id ? ' selected' : '') + '>' + n.label + '</option>'; }).join('') +
-            '</select>' +
+          '<div style="display:flex;gap:10px;align-items:center">' +
+            '<select onchange="kitFunnel=this.value;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer">' + kitFunnelOpts + '</select>' +
+            '<select onchange="kitSource=this.value;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer">' + kitSrcOpts + '</select>' +
           '</div>' +
         '</div>' +
-        (!builderNetwork && builderCasinoUrl && !resolvedNet
-          ? '<div style="font-size:11px;color:#f0b429;padding:6px 10px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.2);border-radius:6px;margin-bottom:12px">&#9888; Could not auto-detect platform from URL — select manually above.</div>'
-          : '') +
 
-        // Funnel / Source / Campaign
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px">' +
-          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Funnel</label>' +
-            '<select id="bl-funnel" onchange="builderFunnel=this.value;builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
-            FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (builderFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
-            '</select></div>' +
-          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Traffic Source</label>' +
-            '<select id="bl-source" onchange="builderSource=this.value;builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
-            TRAFFIC_SOURCES.map(function(s){ return '<option value="' + s.id + '"' + (builderSource === s.id ? ' selected' : '') + '>' + s.name + '</option>'; }).join('') +
-            '</select></div>' +
-          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Campaign Name</label>' +
-            '<input id="bl-campaign" type="text" value="' + escHtml(builderCampaign) + '" placeholder="summer_de_promo" oninput="builderCampaign=this.value.trim().replace(/\\s+/g,\'_\');builderGenerated=false" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
+        // Flow label
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:6px 10px;background:rgba(255,255,255,0.03);border-radius:5px">' +
+          (kitHasLp && kitHasTg
+            ? 'Ad &#8594; <strong style="color:var(--text)">' + kitLpDomain + '</strong> &#8594; <strong style="color:#29b6f6">t.me/' + (kitBot.username||'bot') + '</strong> &#8594; Smartlink &#8594; Casino'
+            : kitHasLp
+              ? 'Ad &#8594; <strong style="color:var(--text)">' + kitLpDomain + '</strong> &#8594; Smartlink &#8594; Casino'
+              : 'Ad &#8594; Smartlink &#8594; Casino') +
+          ' &nbsp;·&nbsp; Source: <strong style="color:' + kitFunnelColor + '">' + escHtml(kitSrcLabel) + '</strong>' +
         '</div>' +
 
-        // Flow indicator (auto-derived from funnel)
-        (function(){
-          var lpd  = FUNNEL_LP_DOMAIN[builderFunnel];
-          var botU = (FUNNEL_TO_BOT[builderFunnel] || {}).username || '';
-          var sld  = FUNNEL_SMARTLINK_DOMAIN[builderFunnel] || 'smartlink';
-          var hasTgLocal = FUNNEL_CTA[builderFunnel] === 'tg';
-          var flowStr;
-          if (!lpd) {
-            flowStr = 'Ad &#8594; <strong>' + escHtml(sld) + '</strong> &#8594; Casino';
-          } else if (hasTgLocal) {
-            flowStr = 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; t.me/' + escHtml(botU) + ' &#8594; ' + escHtml(sld) + ' &#8594; Casino';
-          } else {
-            flowStr = 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; ' + escHtml(sld) + ' &#8594; Casino';
-          }
-          return '<div style="margin-bottom:20px;padding:9px 13px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-radius:7px;font-size:12px;color:var(--muted)">' +
-            '<span style="color:var(--text);font-weight:600;margin-right:6px">Flow:</span>' + flowStr +
-          '</div>';
-        })() +
+        (kitHasLp  ? kitRow('Ad destination / LP Link', kitLpLink,  'kit-lp',  'paste this in Meta / TikTok ad') : '') +
+        (kitHasTg  ? kitRow('Bot deep link',            kitBotLink, 'kit-bot', 'LP CTA button · or paste in TG group/channel promo') : '') +
+        (kitHasLp  ? kitRow('Casino smartlink',         kitSlLink,  'kit-sl',  kitHasTg ? 'bot sends this link to users after scan' : 'LP CTA button — geo-routes visitor to casino') : '') +
+        (!kitHasLp && kitSlLink ? kitRow('Ad destination (smartlink)', kitSlLink, 'kit-sl', 'paste directly in ad — no LP, goes straight to casino') : '') +
 
-        (noSmartlink
-          ? '<div style="color:#f0b429;font-size:12px;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px;margin-bottom:14px">&#9888; No smartlink URL configured for ' + escHtml(builderFunnel) + '. Add it in Manage &#8594; Funnel Config.</div>'
-          : '') +
-
-        '<button onclick="builderGenerate()" style="background:var(--accent);border:none;border-radius:6px;padding:9px 24px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">&#9654; Generate Package</button>' +
+        // Copy all button
+        '<div style="margin-top:6px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center">' +
+          '<button onclick="kitCopyAll()" style="background:var(--accent);border:none;border-radius:6px;padding:7px 18px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Copy All Links</button>' +
+          '<span id="kit-copy-msg" style="font-size:12px;color:var(--green);display:none">Copied ✓</span>' +
+        '</div>' +
 
       '</div>' +
 
-      // ── OUTPUT ──
-      outputHtml +
+      // ── POSTBACK BUILDER ──
+      (function(){
+        var pbNetworks = [
+          { id: 'cellxpert',      label: 'CellXpert',               obj: { name: 'cellxpert', clickMacro: '[afp]'      } },
+          { id: 'cellxpert_afp1', label: 'CellXpert (IVYBET / afp1)',obj: { name: 'cellxpert', clickMacro: '[afp1]'     } },
+          { id: 'affilika',       label: 'Affilika',                 obj: { name: 'affilika',  clickMacro: '{visit_id}' } },
+        ];
+        var pbNet    = (pbNetworks.find(function(n){ return n.id === pbPlatform; }) || pbNetworks[0]).obj;
+        var pbUrls   = buildPostbackUrls(pbNet, pbFunnel, pbCpaAmount);
+        var pbNetOpts= pbNetworks.map(function(n){ return '<option value="' + n.id + '"' + (pbPlatform === n.id ? ' selected' : '') + '>' + n.label + '</option>'; }).join('');
+        var pbFnOpts = FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (pbFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('');
+
+        function pbRow(label, val, id) {
+          return '<div style="margin-bottom:12px">' +
+            '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px">' + label + '</div>' +
+            '<div style="display:flex;gap:8px;align-items:center">' +
+              '<input id="' + id + '" type="text" readonly value="' + escHtml(val) + '" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:.45rem .65rem;font-size:.68rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+              '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + id + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--orange,#f97316);flex-shrink:0">&#128203;</button>' +
+            '</div>' +
+          '</div>';
+        }
+
+        var cpaNote = pbCpaAmount > 0
+          ? '<span style="font-size:11px;color:var(--green)">FTD revenue hardcoded to €' + pbCpaAmount + '</span>'
+          : '<span style="font-size:11px;color:var(--muted)">Set CPA to hardcode FTD revenue</span>';
+
+        return '<div style="background:var(--card);border:1px solid rgba(249,115,22,0.35);border-left:3px solid #f97316;border-radius:10px;padding:22px 24px;margin-bottom:20px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+            '<div>' +
+              '<div style="font-size:14px;font-weight:800;letter-spacing:.02em;color:#f97316">&#128279; Postback Builder</div>' +
+              '<div style="font-size:11px;color:var(--muted);margin-top:2px">Generate reg / FTD / QFTD postback URLs — paste into affiliate platform</div>' +
+            '</div>' +
+            cpaNote +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:12px;margin-bottom:18px">' +
+            '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Platform</label>' +
+              '<select onchange="pbPlatform=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;cursor:pointer">' + pbNetOpts + '</select></div>' +
+            '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Funnel</label>' +
+              '<select onchange="pbFunnel=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;cursor:pointer">' + pbFnOpts + '</select></div>' +
+            '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">CPA (€)</label>' +
+              '<input type="number" min="0" value="' + (pbCpaAmount || '') + '" placeholder="0" oninput="pbCpaAmount=parseFloat(this.value)||0;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
+          '</div>' +
+          pbRow('Registration', pbUrls.reg,  'pb2-reg') +
+          pbRow('First Deposit (FTD)', pbUrls.ftd, 'pb2-ftd') +
+          pbRow('Qualified CPA / QFTD', pbUrls.qftd, 'pb2-qftd') +
+        '</div>';
+      })() +
 
       // ── HISTORY ──
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 24px">' +
@@ -4925,6 +5925,196 @@ function renderBuilderPage() {
 }
 
 // ── Analytics: Sources Tab ─────────────────────────────────────────────────
+// ── Analytics: Deals Performance Tab ────────────────────────────────────────
+var dealsAnalyticsDays = 30;
+var dealsAnalyticsFunnel = '';
+var _dealsAnalyticsSortCol = 'ftds';
+var _dealsAnalyticsSortDir = -1; // -1 = desc
+
+function renderDealsAnalyticsTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  var funnelOpts = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){
+    return '<option value="' + f + '"' + (dealsAnalyticsFunnel === f ? ' selected' : '') + '>' + f + '</option>';
+  }).join('');
+  var daysOpts = [['1','Today'],['7','Last 7 days'],['30','Last 30 days'],['0','All time']].map(function(o){
+    return '<option value="' + o[0] + '"' + (dealsAnalyticsDays === +o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+  }).join('');
+
+  body.innerHTML =
+    '<div style="padding:24px 32px 0">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+        '<div><div style="font-size:18px;font-weight:700">Deal Performance</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:3px">Compare casino deals by clicks, conversions, and revenue</div></div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<select onchange="dealsAnalyticsFunnel=this.value;loadDealsAnalytics()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + funnelOpts + '</select>' +
+          '<select onchange="dealsAnalyticsDays=+this.value;loadDealsAnalytics()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
+          '<button onclick="loadDealsAnalytics()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div id="dealsAnalBody" style="padding:0 32px 32px"><div style="font-size:13px;color:var(--muted);padding:20px 0">Loading...</div></div>';
+  loadDealsAnalytics();
+}
+
+function loadDealsAnalytics() {
+  var body = document.getElementById('dealsAnalBody');
+  if (!body) return;
+  body.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:20px 0">Loading click and conversion data...</div>';
+
+  var cutoff = null;
+  if (dealsAnalyticsDays > 0) {
+    cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - dealsAnalyticsDays);
+    cutoff.setHours(0,0,0,0);
+  }
+  var cutoffStr = cutoff ? cutoff.toISOString().split('T')[0] : null;
+
+  Promise.all([
+    db.collection('clicks').orderBy('ts','desc').limit(5000).get(),
+    db.collection('conversions').get()
+  ]).then(function(results) {
+    var clickSnap = results[0], convSnap = results[1];
+
+    // Build deal-name → deal map
+    var dealByName = {};
+    deals.forEach(function(d) { dealByName[d.name.toLowerCase()] = d; });
+    // Also index by URL fragments
+    var dealByUrlFrag = {};
+    deals.forEach(function(d) {
+      try {
+        var h = new URL(d.url).hostname.replace('www.','').replace('track.','').split('.')[0].toLowerCase();
+        dealByUrlFrag[h] = d;
+      } catch(e) {}
+    });
+
+    function resolveCasinoToDeal(casino) {
+      if (!casino) return null;
+      var key = casino.toLowerCase();
+      if (dealByName[key]) return dealByName[key];
+      if (dealByUrlFrag[key]) return dealByUrlFrag[key];
+      // Try partial
+      for (var k in dealByName) { if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) return dealByName[k]; }
+      for (var k in dealByUrlFrag) { if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) return dealByUrlFrag[k]; }
+      return null;
+    }
+
+    // Aggregate clicks per deal
+    var clicksByDeal = {}; // dealId → count
+    clickSnap.forEach(function(doc) {
+      var d = doc.data();
+      var ts = d.ts ? new Date(d.ts) : null;
+      if (cutoff && ts && ts < cutoff) return;
+      if (dealsAnalyticsFunnel && d.funnel !== dealsAnalyticsFunnel) return;
+      var casino = d.casino || '';
+      // Resolve casino field to deal name
+      if (casino.indexOf('http') === 0) {
+        try { casino = new URL(casino).hostname.replace('www.','').replace('track.','').split('.')[0].toUpperCase(); } catch(e) {}
+      }
+      var deal = resolveCasinoToDeal(casino);
+      var did = deal ? deal.id : ('unknown_' + casino);
+      clicksByDeal[did] = (clicksByDeal[did] || 0) + 1;
+    });
+
+    // Aggregate conversions per deal — conversions store funnel-level, not deal-level
+    // We use the casino field from clicks as the best proxy; conversions don't have deal granularity yet
+    // So show deal clicks + placeholder for FTDs (future: postbacks with deal tag)
+    var convsByFunnel = {};
+    convSnap.forEach(function(doc) {
+      var d = doc.data();
+      if (cutoffStr && d.date < cutoffStr) return;
+      if (dealsAnalyticsFunnel && d.funnel !== dealsAnalyticsFunnel) return;
+      var f = d.funnel || '';
+      if (!convsByFunnel[f]) convsByFunnel[f] = { regs: 0, ftds: 0, revenue: 0 };
+      convsByFunnel[f].regs += +(d.regs||0);
+      convsByFunnel[f].ftds += +(d.ftds||0);
+      convsByFunnel[f].revenue += +(d.revenue||0);
+    });
+
+    // Build deal rows — only deals with clicks or assigned to funnels
+    var rows = deals.filter(function(d) {
+      if (d.status === 'archived') return false;
+      if (dealsAnalyticsFunnel) return (assignments[dealsAnalyticsFunnel]||[]).indexOf(d.id) !== -1;
+      return true;
+    }).map(function(d) {
+      var clicks = clicksByDeal[d.id] || 0;
+      var assignedFunnels = FUNNEL_NAMES.filter(function(f){ return (assignments[f]||[]).indexOf(d.id) !== -1; });
+      // Weight share within each assigned funnel
+      var totalWeight = 0;
+      assignedFunnels.forEach(function(f) {
+        var w = dealWeights[f] ? +(dealWeights[f][String(d.id)] || 0) : 0;
+        totalWeight += w;
+      });
+      var avgWeight = assignedFunnels.length > 0 ? (totalWeight / assignedFunnels.length) : 0;
+      return { deal: d, clicks: clicks, funnels: assignedFunnels, avgWeight: avgWeight };
+    }).sort(function(a,b) {
+      if (_dealsAnalyticsSortCol === 'clicks') return _dealsAnalyticsSortDir * (b.clicks - a.clicks);
+      if (_dealsAnalyticsSortCol === 'weight') return _dealsAnalyticsSortDir * (b.avgWeight - a.avgWeight);
+      if (_dealsAnalyticsSortCol === 'funnels') return _dealsAnalyticsSortDir * (b.funnels.length - a.funnels.length);
+      return _dealsAnalyticsSortDir * (b.clicks - a.clicks); // default
+    });
+
+    var maxClicks = rows.length > 0 ? Math.max.apply(null, rows.map(function(r){ return r.clicks; })) || 1 : 1;
+
+    function sortTh(col, label) {
+      var active = _dealsAnalyticsSortCol === col;
+      var arrow = active ? (_dealsAnalyticsSortDir === -1 ? ' ↓' : ' ↑') : '';
+      return '<th onclick="_dealsAnalyticsSortCol=\'' + col + '\';_dealsAnalyticsSortDir*=-1;loadDealsAnalytics()" style="padding:9px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:' + (active ? 'var(--text)' : 'var(--muted)') + ';cursor:pointer;white-space:nowrap;user-select:none">' + label + escHtml(arrow) + '</th>';
+    }
+
+    var tableRows = rows.map(function(r) {
+      var d = r.deal;
+      var net = d.network || getNetworkId(d.url);
+      var clickBarPct = maxClicks > 0 ? Math.round(r.clicks / maxClicks * 100) : 0;
+      var statusColor = d.status === 'active' ? 'var(--green)' : d.status === 'paused' ? 'var(--yellow)' : 'var(--muted)';
+      var funnelChips = r.funnels.map(function(f){
+        var fc = FUNNEL_COLORS[f] || 'var(--muted)';
+        return '<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(255,255,255,0.04);color:' + fc + ';border:1px solid rgba(255,255,255,0.08)">' + f + '</span>';
+      }).join(' ');
+      var highlight = r.clicks === 0 && r.funnels.length > 0 ? ';background:rgba(212,112,128,0.03)' : r.clicks === maxClicks && maxClicks > 0 ? ';background:rgba(126,191,154,0.03)' : '';
+      return '<tr style="border-bottom:1px solid var(--border)' + highlight + '">' +
+        '<td style="padding:10px 12px">' +
+          '<div style="font-weight:700;font-size:13px;color:var(--text)">' + escHtml(d.name) + '</div>' +
+          '<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">' + (funnelChips || '<span style="font-size:10px;color:var(--muted)">unassigned</span>') + '</div>' +
+        '</td>' +
+        '<td style="padding:10px 12px">' + networkBadge(net) + '</td>' +
+        '<td style="padding:10px 12px">' + dealTypeBadge(d) + '</td>' +
+        '<td style="padding:10px 12px;text-align:right">' +
+          '<div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--accent)">' + r.clicks + '</div>' +
+          '<div style="height:3px;background:var(--card2);border-radius:2px;margin-top:4px;width:80px;margin-left:auto">' +
+            '<div style="height:3px;background:var(--accent);border-radius:2px;width:' + clickBarPct + '%"></div>' +
+          '</div>' +
+        '</td>' +
+        '<td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--muted)">' + (r.funnels.length > 0 ? Math.round(r.avgWeight) + '%' : '—') + '</td>' +
+        '<td style="padding:10px 12px;text-align:right"><span style="color:' + statusColor + ';font-size:11px;font-weight:700">' + (d.status||'active') + '</span></td>' +
+        '<td style="padding:10px 12px;text-align:right"><button onclick="dealsSubTab=\'deals\';setPage(\'deals\')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;color:var(--accent);font-size:11px;cursor:pointer">Manage</button></td>' +
+      '</tr>';
+    }).join('');
+
+    body.innerHTML =
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+        '<div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)">Deal Performance — ' + rows.length + ' deals</div>' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:var(--card2)">' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Deal</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Network</th>' +
+            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Type</th>' +
+            sortTh('clicks', 'Clicks') +
+            sortTh('weight', 'Avg Weight') +
+            '<th style="padding:9px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Status</th>' +
+            '<th style="padding:9px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)"></th>' +
+          '</tr></thead>' +
+          '<tbody>' + tableRows + '</tbody>' +
+        '</table></div>' +
+        '<div style="padding:10px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)">' +
+          '<span style="color:var(--green)">● Green row</span> = most clicks &nbsp;&nbsp; <span style="color:var(--red)">● Red tint</span> = assigned but 0 clicks &nbsp;&nbsp; Click Avg Weight to sort by rotation share' +
+        '</div>' +
+      '</div>';
+  }).catch(function(err) {
+    document.getElementById('dealsAnalBody').innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0">Failed to load: ' + escHtml(err.message) + '</div>';
+  });
+}
+
 var sourcesFilterDays = 7;
 var sourcesFilterSource = '';
 
@@ -4934,7 +6124,7 @@ function renderSourcesTab() {
   var daysOpts = [['1','Today'],['7','Last 7 days'],['30','Last 30 days'],['0','All time']].map(function(o){
     return '<option value="' + o[0] + '"' + (sourcesFilterDays === +o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
   }).join('');
-  var srcOpts = '<option value="">All Sources</option>' + TRAFFIC_SOURCES.map(function(s){
+  var srcOpts = '<option value="">All Sources</option>' + getTrafficSources().map(function(s){
     return '<option value="' + s.id + '"' + (sourcesFilterSource === s.id ? ' selected' : '') + '>' + s.name + '</option>';
   }).join('');
 
@@ -4947,6 +6137,7 @@ function renderSourcesTab() {
           '<select onchange="sourcesFilterSource=this.value;loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + srcOpts + '</select>' +
           '<select onchange="sourcesFilterDays=+this.value;loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' + daysOpts + '</select>' +
           '<button onclick="loadSourcesData()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Refresh</button>' +
+          '<button onclick="exportSourcesCSV()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--green);font-size:12px;cursor:pointer">&#8595; CSV</button>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -4971,7 +6162,7 @@ function loadSourcesData() {
       var d = doc.data();
       var ts = d.ts ? new Date(d.ts) : null;
       if (cutoff && ts && ts < cutoff) return;
-      var src = d.src || d.sub1 || 'unknown';
+      var src = d.src || 'NoSource';
       if (sourcesFilterSource && src !== sourcesFilterSource) return;
       if (!bySource[src]) bySource[src] = { clicks: 0, name: src };
       bySource[src].clicks++;
@@ -4979,7 +6170,7 @@ function loadSourcesData() {
     });
     // Resolve names
     Object.keys(bySource).forEach(function(sid) {
-      var s = TRAFFIC_SOURCES.find(function(ts) { return ts.id === sid; });
+      var s = getTrafficSources().find(function(ts) { return ts.id === sid; });
       if (s) bySource[sid].name = s.name;
     });
 
@@ -5008,6 +6199,7 @@ function loadSourcesData() {
 }
 
 function renderSourcesData(container, bySource, bySourceConv, total) {
+  _lastSourcesData = { bySource: bySource, bySourceConv: bySourceConv, total: total };
   var allSids = {};
   Object.keys(bySource).forEach(function(k) { allSids[k] = 1; });
   Object.keys(bySourceConv).forEach(function(k) { allSids[k] = 1; });
@@ -5021,7 +6213,7 @@ function renderSourcesData(container, bySource, bySourceConv, total) {
   }
 
   var rows = sids.map(function(sid) {
-    var src = TRAFFIC_SOURCES.find(function(s) { return s.id === sid; });
+    var src = getTrafficSources().find(function(s) { return s.id === sid; });
     var color = src ? src.color : 'var(--muted)';
     var name = src ? src.name : sid;
     var clicks = (bySource[sid]||{}).clicks || 0;
@@ -5057,6 +6249,26 @@ function renderSourcesData(container, bySource, bySourceConv, total) {
     '</div>';
 }
 
+var _lastSourcesData = { bySource: {}, bySourceConv: {}, total: 0 };
+
+function exportSourcesCSV() {
+  var d = _lastSourcesData;
+  var allSids = {};
+  Object.keys(d.bySource).forEach(function(k){ allSids[k]=1; });
+  Object.keys(d.bySourceConv).forEach(function(k){ allSids[k]=1; });
+  var rows = [['Source ID', 'Source Name', 'Clicks', 'Share %', 'Regs', 'FTDs', 'Revenue (€)', 'Reg→FTD %']];
+  Object.keys(allSids).forEach(function(sid) {
+    var src = getTrafficSources().find(function(s){ return s.id === sid; });
+    var clicks = (d.bySource[sid]||{}).clicks || 0;
+    var conv = d.bySourceConv[sid] || { regs:0, ftds:0, revenue:0 };
+    var pct = d.total > 0 ? (clicks/d.total*100).toFixed(1) : '0';
+    var r2f = conv.regs > 0 ? (conv.ftds/conv.regs*100).toFixed(0) : '';
+    rows.push([sid, src ? src.name : sid, clicks, pct, conv.regs, conv.ftds, conv.revenue.toFixed(2), r2f]);
+  });
+  var label = sourcesFilterDays ? sourcesFilterDays + 'd' : 'all';
+  downloadCSV('sources_' + label + '_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+}
+
 // ── Analytics: ROI Tab ─────────────────────────────────────────────────────
 var roiFilterDays = 30;
 var roiFilterSource = '';
@@ -5068,7 +6280,7 @@ function renderRoiTab() {
   var daysOpts = [['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days'],['0','All time']].map(function(o){
     return '<option value="' + o[0] + '"' + (roiFilterDays === +o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
   }).join('');
-  var srcOpts = '<option value="">All Sources</option>' + TRAFFIC_SOURCES.map(function(s){
+  var srcOpts = '<option value="">All Sources</option>' + getTrafficSources().map(function(s){
     return '<option value="' + s.id + '"' + (roiFilterSource === s.id ? ' selected' : '') + '>' + s.name + '</option>';
   }).join('');
   var funnelOpts2 = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){
@@ -5099,7 +6311,7 @@ function renderRoiTab() {
             '<input type="date" id="roi-date" value="' + new Date().toISOString().split('T')[0] + '" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;outline:none"></div>' +
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Source</label>' +
             '<select id="roi-source" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
-              TRAFFIC_SOURCES.map(function(s){ return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('') +
+              getTrafficSources().map(function(s){ return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('') +
             '</select></div>' +
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Funnel</label>' +
             '<select id="roi-funnel" style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
@@ -5111,7 +6323,7 @@ function renderRoiTab() {
         '</div>' +
       '</div>' +
       (!hasMetaConfig
-        ? '<div style="background:rgba(61,142,240,0.06);border:1px solid rgba(61,142,240,0.2);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--muted)">' +
+        ? '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--muted)">' +
             '💡 <a href="#" onclick="setPage(\'settings\')" style="color:var(--accent)">Configure Meta Ads API in Settings</a> to automatically pull Meta spend data.' +
           '</div>'
         : '') +
@@ -5212,7 +6424,7 @@ function renderRoiSummary(container, revenue, ftds, regs, totalSpend, metaSpend,
   }
 
   var spendRows = spendEntries.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).map(function(e) {
-    var src = TRAFFIC_SOURCES.find(function(s) { return s.id === e.source; });
+    var src = getTrafficSources().find(function(s) { return s.id === e.source; });
     var srcName = src ? src.name : e.source;
     return '<tr style="border-bottom:1px solid var(--border)">' +
       '<td style="padding:8px 12px;font-size:12px;font-family:var(--font-mono);color:var(--muted)">' + e.date + '</td>' +
