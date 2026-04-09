@@ -2569,7 +2569,7 @@ function detectNetwork(url) {
   return null;
 }
 
-function buildPostbackUrls(network, funnelOverride, cpaAmount) {
+function buildPostbackUrls(network, funnelOverride) {
   // Source/campaign macros vary by network
   var srcParams;
   if (network.name === 'affilika' || network.name === 'casinobet') {
@@ -2586,17 +2586,10 @@ function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   } else {
     funnelParam = '[trackingcode]';
   }
-  // Revenue for QFTD: use deal's configured cpaAmount if provided, else fall back to platform macro
-  var qftdRevenue;
-  if (cpaAmount && cpaAmount > 0) {
-    qftdRevenue = cpaAmount;
-  } else if (network.name === 'affilika') {
-    qftdRevenue = '{payout}';
-  } else if (network.name === 'casinobet') {
-    qftdRevenue = '{deposits_sum}';
-  } else {
-    qftdRevenue = '[commissionamount]';
-  }
+  // Revenue only recorded if platform sends [commissionamount] — otherwise 0
+  var qftdRevenue = network.name === 'affilika'
+    ? '{payout}'
+    : (network.name === 'casinobet' ? '{deposits_sum}' : '[commissionamount]');
   var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=' + funnelParam + '&offer=' + network.name;
   return {
     reg:  base + '&status=Registration&type=Registration&revenue=0',
@@ -2617,7 +2610,7 @@ function openPostbackModal(dealId) {
     return;
   }
 
-  var urls = buildPostbackUrls(net, null, deal.cpaAmount || 0);
+  var urls = buildPostbackUrls(net);
   var networkLabel = net.name.toUpperCase();
   if (net.clickMacro === '[afp1]') networkLabel += ' (uses [afp1])';
   var trackingNote = (net.name === 'cellxpert' || net.name === 'ftdgallery' || net.name === 'padrino')
@@ -2625,9 +2618,7 @@ function openPostbackModal(dealId) {
     : 'These URLs use the current network macros shown above. If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.';
   var macroNote = net.name === 'affilika'
     ? 'Paste these in your affiliate platform\'s postback settings. For Affilika, <code style="color:var(--accent)">{campaign_id}</code> maps the funnel, <code style="color:var(--accent)">{first_deposit}</code> is used for FTD value, and <code style="color:var(--accent)">{payout}</code> is used for Qualified CPA.'
-    : (deal.cpaAmount > 0
-        ? 'Paste these in your affiliate platform\'s postback settings. QFTD revenue is hardcoded to <code style="color:var(--green)">€' + deal.cpaAmount + '</code> from this deal\'s CPA amount.'
-        : 'Paste these in your affiliate platform\'s postback settings. Set a CPA amount on this deal to hardcode revenue in the QFTD URL.');
+    : 'Paste these in your affiliate platform\'s postback settings. <code style="color:var(--accent)">[trackingcode]</code> and <code style="color:var(--accent)">[commissionamount]</code> are replaced by the network automatically. Revenue is only recorded when the platform sends a commission value.';
 
   function row(label, url) {
     var id = 'pburl-' + label.toLowerCase().replace(/ /g, '-') + '-' + dealId;
@@ -4629,7 +4620,6 @@ var builderSource     = 'meta';
 var builderCampaign   = '';
 var builderCasinoUrl  = '';
 var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | 'affilika' | 'ftdgallery' | 'padrino'
-var builderCpaAmount  = 0;
 var builderGenerated  = false;
 
 // Funnels with a landing page (Dark/Slotio/Scanio have LPs; SpinGPT/Shadow go direct)
@@ -4754,7 +4744,7 @@ function renderBuilderPage() {
   if (builderGenerated) {
     var postbackSection = '';
     if (resolvedNet) {
-      var pbUrls = buildPostbackUrls(resolvedNet, builderFunnel, builderCpaAmount || 0);
+      var pbUrls = buildPostbackUrls(resolvedNet, builderFunnel);
       var netBadge = networkBadge(resolvedNet.name);
       var netNote  = resolvedNet.name === 'affilika' ? '<span style="font-size:10px;color:#f0b429;margin-left:8px">&#9888; Funnel uses {campaign_id}; source/campaign macros still need confirmation if you want source-level Affilika reporting</span>' : '';
       postbackSection =
@@ -4840,8 +4830,8 @@ function renderBuilderPage() {
           ? '<div style="font-size:11px;color:#f0b429;padding:6px 10px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.2);border-radius:6px;margin-bottom:12px">&#9888; Could not auto-detect platform from URL — select manually above.</div>'
           : '') +
 
-        // Funnel / Source / Campaign / CPA Amount
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 110px;gap:16px;margin-bottom:18px">' +
+        // Funnel / Source / Campaign
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px">' +
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Funnel</label>' +
             '<select id="bl-funnel" onchange="builderFunnel=this.value;builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
             FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (builderFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
@@ -4852,8 +4842,6 @@ function renderBuilderPage() {
             '</select></div>' +
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Campaign Name</label>' +
             '<input id="bl-campaign" type="text" value="' + escHtml(builderCampaign) + '" placeholder="summer_de_promo" oninput="builderCampaign=this.value.trim().replace(/\\s+/g,\'_\');builderGenerated=false" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
-          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">CPA (€)</label>' +
-            '<input id="bl-cpa" type="number" min="0" value="' + (builderCpaAmount || '') + '" placeholder="0" oninput="builderCpaAmount=parseFloat(this.value)||0;builderGenerated=false" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
         '</div>' +
 
         // Flow indicator (auto-derived from funnel)
