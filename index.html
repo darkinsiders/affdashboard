@@ -4891,6 +4891,9 @@ var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | '
 var builderGenerated  = false;
 var kitFunnel         = 'Dark';
 var kitSource         = 'meta';
+var pbPlatform        = 'cellxpert';   // cellxpert | cellxpert_afp1 | affilika
+var pbFunnel          = 'Dark';
+var pbCpaAmount       = 0;
 
 // Funnels with a landing page (Dark/Slotio/Scanio have LPs; SpinGPT/Shadow go direct)
 function funnelHasLp(f) { return !!(FUNNEL_LP_DOMAIN[f !== undefined ? f : builderFunnel]); }
@@ -5121,14 +5124,17 @@ function renderBuilderPage() {
   container.innerHTML =
     '<div style="padding:28px 32px 40px;max-width:860px">' +
       '<div style="font-size:20px;font-weight:800;margin-bottom:4px">Link Builder</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Campaign Kit gives you all links instantly. Use the Casino URL builder below for postback URLs on specific deals.</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">' +
+        '<span style="color:var(--accent);font-weight:700">&#9889; Campaign Kit</span> gives all tracking links instantly. ' +
+        '<span style="color:#f97316;font-weight:700">&#128279; Postback Builder</span> generates reg/FTD/QFTD URLs to paste in affiliate platforms.' +
+      '</div>' +
 
       // ── CAMPAIGN KIT ──
       '<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + kitFunnelColor + ';border-radius:10px;padding:22px 24px;margin-bottom:20px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">' +
           '<div>' +
-            '<div style="font-size:14px;font-weight:800;letter-spacing:.02em">&#9889; Campaign Kit</div>' +
-            '<div style="font-size:11px;color:var(--muted);margin-top:2px">Pick funnel + source — all links ready instantly, no generate needed</div>' +
+            '<div style="font-size:14px;font-weight:800;letter-spacing:.02em;color:var(--accent)">&#9889; Campaign Link Builder</div>' +
+            '<div style="font-size:11px;color:var(--muted);margin-top:2px">Pick funnel + source — all tracking links ready instantly</div>' +
           '</div>' +
           '<div style="display:flex;gap:10px;align-items:center">' +
             '<select onchange="kitFunnel=this.value;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer">' + kitFunnelOpts + '</select>' +
@@ -5146,10 +5152,10 @@ function renderBuilderPage() {
           ' &nbsp;·&nbsp; Source: <strong style="color:' + kitFunnelColor + '">' + escHtml(kitSrcLabel) + '</strong>' +
         '</div>' +
 
-        kitRow('Ad destination / LP Link', kitLpLink,  'kit-lp',  'paste in Meta / TikTok ad') +
-        kitRow('Bot deep link',            kitBotLink, 'kit-bot', 'LP CTA button, or direct TG promo link') +
-        kitRow('Casino smartlink',         kitSlLink,  'kit-sl',  'bot sends this to users · geo-routes to casino') +
-        (!kitHasLp && kitSlLink ? kitRow('Ad destination (no LP)', kitSlLink, 'kit-sl-ad', 'put directly in ad for funnels without LP') : '') +
+        (kitHasLp  ? kitRow('Ad destination / LP Link', kitLpLink,  'kit-lp',  'paste this in Meta / TikTok ad') : '') +
+        (kitHasTg  ? kitRow('Bot deep link',            kitBotLink, 'kit-bot', 'LP CTA button · or paste in TG group/channel promo') : '') +
+        (kitHasLp  ? kitRow('Casino smartlink',         kitSlLink,  'kit-sl',  kitHasTg ? 'bot sends this link to users after scan' : 'LP CTA button — geo-routes visitor to casino') : '') +
+        (!kitHasLp && kitSlLink ? kitRow('Ad destination (smartlink)', kitSlLink, 'kit-sl', 'paste directly in ad — no LP, goes straight to casino') : '') +
 
         // Copy all button
         '<div style="margin-top:6px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center">' +
@@ -5159,69 +5165,53 @@ function renderBuilderPage() {
 
       '</div>' +
 
-      // ── INPUT CARD ──
-      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+      // ── POSTBACK BUILDER ──
+      (function(){
+        var pbNetworks = [
+          { id: 'cellxpert',      label: 'CellXpert',               obj: { name: 'cellxpert', clickMacro: '[afp]'      } },
+          { id: 'cellxpert_afp1', label: 'CellXpert (IVYBET / afp1)',obj: { name: 'cellxpert', clickMacro: '[afp1]'     } },
+          { id: 'affilika',       label: 'Affilika',                 obj: { name: 'affilika',  clickMacro: '{visit_id}' } },
+        ];
+        var pbNet    = (pbNetworks.find(function(n){ return n.id === pbPlatform; }) || pbNetworks[0]).obj;
+        var pbUrls   = buildPostbackUrls(pbNet, pbFunnel, pbCpaAmount);
+        var pbNetOpts= pbNetworks.map(function(n){ return '<option value="' + n.id + '"' + (pbPlatform === n.id ? ' selected' : '') + '>' + n.label + '</option>'; }).join('');
+        var pbFnOpts = FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (pbFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('');
 
-        // Casino URL + Platform selector
-        '<div style="display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:18px;align-items:end">' +
-          '<div>' +
-            '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Casino Affiliate Link <span style="font-weight:400;text-transform:none;letter-spacing:0">(paste raw tracking URL — optional)</span></label>' +
-            '<input id="bl-casino-url" type="text" value="' + escHtml(builderCasinoUrl) + '" placeholder="https://clickspinorhino.com/abc123  or  https://track.7ladies.com/visit/?bta=..." oninput="builderCasinoUrl=this.value.trim();builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:12px;font-family:var(--font-mono);box-sizing:border-box">' +
-          '</div>' +
-          '<div>' +
-            '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Platform</label>' +
-            '<select id="bl-network" onchange="builderNetwork=this.value;builderGenerated=false;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:9px 10px;color:var(--text);font-size:13px;white-space:nowrap">' +
-            BUILDER_NETWORKS.map(function(n){ return '<option value="' + n.id + '"' + (builderNetwork === n.id ? ' selected' : '') + '>' + n.label + '</option>'; }).join('') +
-            '</select>' +
-          '</div>' +
-        '</div>' +
-        (!builderNetwork && builderCasinoUrl && !resolvedNet
-          ? '<div style="font-size:11px;color:#f0b429;padding:6px 10px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.2);border-radius:6px;margin-bottom:12px">&#9888; Could not auto-detect platform from URL — select manually above.</div>'
-          : '') +
-
-        // Funnel / Source / Campaign
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px">' +
-          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Funnel</label>' +
-            '<select id="bl-funnel" onchange="builderFunnel=this.value;builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
-            FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (builderFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
-            '</select></div>' +
-          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Traffic Source</label>' +
-            '<select id="bl-source" onchange="builderSource=this.value;builderGenerated=false;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px">' +
-            TRAFFIC_SOURCES.map(function(s){ return '<option value="' + s.id + '"' + (builderSource === s.id ? ' selected' : '') + '>' + s.name + '</option>'; }).join('') +
-            '</select></div>' +
-          '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Campaign Name</label>' +
-            '<input id="bl-campaign" type="text" value="' + escHtml(builderCampaign) + '" placeholder="summer_de_promo" oninput="builderCampaign=this.value.trim().replace(/\\s+/g,\'_\');builderGenerated=false" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
-        '</div>' +
-
-        // Flow indicator (auto-derived from funnel)
-        (function(){
-          var lpd  = FUNNEL_LP_DOMAIN[builderFunnel];
-          var botU = (FUNNEL_TO_BOT[builderFunnel] || {}).username || '';
-          var sld  = FUNNEL_SMARTLINK_DOMAIN[builderFunnel] || 'smartlink';
-          var hasTgLocal = FUNNEL_CTA[builderFunnel] === 'tg';
-          var flowStr;
-          if (!lpd) {
-            flowStr = 'Ad &#8594; <strong>' + escHtml(sld) + '</strong> &#8594; Casino';
-          } else if (hasTgLocal) {
-            flowStr = 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; t.me/' + escHtml(botU) + ' &#8594; ' + escHtml(sld) + ' &#8594; Casino';
-          } else {
-            flowStr = 'Ad &#8594; <strong>' + escHtml(lpd) + '</strong> &#8594; ' + escHtml(sld) + ' &#8594; Casino';
-          }
-          return '<div style="margin-bottom:20px;padding:9px 13px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-radius:7px;font-size:12px;color:var(--muted)">' +
-            '<span style="color:var(--text);font-weight:600;margin-right:6px">Flow:</span>' + flowStr +
+        function pbRow(label, val, id) {
+          return '<div style="margin-bottom:12px">' +
+            '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px">' + label + '</div>' +
+            '<div style="display:flex;gap:8px;align-items:center">' +
+              '<input id="' + id + '" type="text" readonly value="' + escHtml(val) + '" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:.45rem .65rem;font-size:.68rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+              '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + id + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--orange,#f97316);flex-shrink:0">&#128203;</button>' +
+            '</div>' +
           '</div>';
-        })() +
+        }
 
-        (noSmartlink
-          ? '<div style="color:#f0b429;font-size:12px;padding:8px 12px;background:rgba(240,180,41,.07);border:1px solid rgba(240,180,41,.25);border-radius:6px;margin-bottom:14px">&#9888; No smartlink URL configured for ' + escHtml(builderFunnel) + '. Add it in Manage &#8594; Funnel Config.</div>'
-          : '') +
+        var cpaNote = pbCpaAmount > 0
+          ? '<span style="font-size:11px;color:var(--green)">FTD revenue hardcoded to €' + pbCpaAmount + '</span>'
+          : '<span style="font-size:11px;color:var(--muted)">Set CPA to hardcode FTD revenue</span>';
 
-        '<button onclick="builderGenerate()" style="background:var(--accent);border:none;border-radius:6px;padding:9px 24px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">&#9654; Generate Package</button>' +
-
-      '</div>' +
-
-      // ── OUTPUT ──
-      outputHtml +
+        return '<div style="background:var(--card);border:1px solid rgba(249,115,22,0.35);border-left:3px solid #f97316;border-radius:10px;padding:22px 24px;margin-bottom:20px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+            '<div>' +
+              '<div style="font-size:14px;font-weight:800;letter-spacing:.02em;color:#f97316">&#128279; Postback Builder</div>' +
+              '<div style="font-size:11px;color:var(--muted);margin-top:2px">Generate reg / FTD / QFTD postback URLs — paste into affiliate platform</div>' +
+            '</div>' +
+            cpaNote +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:12px;margin-bottom:18px">' +
+            '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Platform</label>' +
+              '<select onchange="pbPlatform=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;cursor:pointer">' + pbNetOpts + '</select></div>' +
+            '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Funnel</label>' +
+              '<select onchange="pbFunnel=this.value;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;cursor:pointer">' + pbFnOpts + '</select></div>' +
+            '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">CPA (€)</label>' +
+              '<input type="number" min="0" value="' + (pbCpaAmount || '') + '" placeholder="0" oninput="pbCpaAmount=parseFloat(this.value)||0;renderBuilderPage()" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box"></div>' +
+          '</div>' +
+          pbRow('Registration', pbUrls.reg,  'pb2-reg') +
+          pbRow('First Deposit (FTD)', pbUrls.ftd, 'pb2-ftd') +
+          pbRow('Qualified CPA / QFTD', pbUrls.qftd, 'pb2-qftd') +
+        '</div>';
+      })() +
 
       // ── HISTORY ──
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 24px">' +
