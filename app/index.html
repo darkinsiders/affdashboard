@@ -118,6 +118,41 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
+  /* TOAST NOTIFICATIONS */
+  #toastContainer {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+  .toast {
+    background: rgba(8,8,10,0.95);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 260px;
+    max-width: 360px;
+    backdrop-filter: blur(20px);
+    pointer-events: all;
+    animation: toast-in 0.3s ease;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .toast-ftd { border-left: 3px solid var(--green); }
+  .toast-reg { border-left: 3px solid var(--accent); }
+  .toast-alert { border-left: 3px solid var(--red); }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes toast-out {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(20px); }
+  }
+
   /* SCROLLBAR */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -1206,6 +1241,7 @@
 </style>
 </head>
 <body>
+<div id="toastContainer"></div>
 
 <div class="header">
   <div style="display:flex;align-items:center;gap:16px">
@@ -2156,6 +2192,8 @@ var sortDir = 1;    // 1 = desc, -1 = asc
 var currentFunnel = null; // null = Universal
 var metaToken = '';
 var metaAccountId = '';
+var tgAdminBotToken = '';   // Cloudflare Worker env — stored in wrangler secrets, not here
+var tgAdminChatId = '';     // Your personal Telegram chat ID for alerts
 var manualSpendEntries = [];
 
 // ── Assignments ────────────────────────────────────────────────────────────
@@ -3817,6 +3855,8 @@ DOC_REF.onSnapshot(function(doc) {
     renderConflictBadges();
     renderSmartlinks();
     renderFunnelGeoBar();
+    // Start real-time postback listener for toast notifications
+    startPostbackListener();
     return;
   }
 
@@ -3846,6 +3886,56 @@ DOC_REF.onSnapshot(function(doc) {
   var overlay = document.getElementById('loadingOverlay');
   if (overlay) overlay.innerHTML = '<div style="font-size:16px;color:#f85149">Failed to connect to database</div><div style="font-size:13px;color:#7d8590;margin-top:8px">' + e.message + '</div>';
 });
+
+// ── Toast Notifications ──────────────────────────────────────────────────────
+function showToast(message, type, duration) {
+  type = type || 'ftd'; // 'ftd' | 'reg' | 'alert'
+  duration = duration || 6000;
+  var container = document.getElementById('toastContainer');
+  if (!container) return;
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.innerHTML = message;
+  container.appendChild(t);
+  setTimeout(function() {
+    t.style.animation = 'toast-out 0.3s ease forwards';
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 320);
+  }, duration);
+}
+
+var _postbackListenerStartTime = null;
+
+function startPostbackListener() {
+  _postbackListenerStartTime = new Date().toISOString();
+  db.collection('postbacks')
+    .orderBy('ts', 'desc')
+    .limit(1)
+    .onSnapshot(function(snap) {
+      if (!_postbackListenerStartTime) return;
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        if (!d.ts || d.ts <= _postbackListenerStartTime) return; // Only new events after page load
+        var et = d.eventType || d.rawEvent || '';
+        var funnel = d.funnelKey || d.funnel || '';
+        var src = d.source || d.src || '';
+        var rev = (et === 'ftd' && d.revenue > 0) ? ' · <span style="color:var(--green);font-weight:700">€' + parseFloat(d.revenue).toFixed(0) + '</span>' : '';
+        var srcBadge = src ? ' · <span style="color:var(--muted);font-size:11px">' + escHtml(src) + '</span>' : '';
+        if (et === 'ftd') {
+          showToast(
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--green);margin-bottom:4px">💰 New FTD</div>' +
+            '<div style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(funnel) + rev + srcBadge + '</div>',
+            'ftd', 8000
+          );
+        } else if (et === 'reg') {
+          showToast(
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--accent);margin-bottom:4px">📋 New Registration</div>' +
+            '<div style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(funnel) + srcBadge + '</div>',
+            'reg', 5000
+          );
+        }
+      });
+    }, function(err) { console.warn('Postback listener error:', err.message); });
+}
 
 // ── Analytics ───────────────────────────────────────────────────────────────
 var analyticsFilterFunnel = '';
@@ -5291,6 +5381,24 @@ function renderSettingsPage() {
           'Affiliate Dashboard \u203a Casino Deals \u203a Postback URLs' +
         '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-top:12px">The worker endpoint stays the same, but the macros differ by network. Using the deal-level generator avoids broken partner setups.</div>' +
+      '</div>' +
+
+      // ── Telegram Alerts ───────────────────────────────────────
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Telegram Admin Alerts</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:16px">Get notified on your phone when FTDs and Regs arrive. Configure once in your Cloudflare Worker secrets.</div>' +
+        '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:14px">' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:10px">One-time Setup</div>' +
+          '<ol style="font-size:12px;color:var(--text);padding-left:18px;line-height:2;margin:0">' +
+            '<li>Create a bot via <a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> \u2192 copy the token</li>' +
+            '<li>Get your chat ID: message <a href="https://t.me/userinfobot" target="_blank" style="color:var(--accent)">@userinfobot</a></li>' +
+            '<li>In Cloudflare dashboard \u2192 Worker \u2192 Settings \u2192 Variables, add: <code style="background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:3px;font-size:11px;color:var(--yellow)">TG_BOT_TOKEN</code> and <code style="background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:3px;font-size:11px;color:var(--yellow)">TG_CHAT_ID</code></li>' +
+            '<li>Redeploy the worker (or it picks up secrets automatically)</li>' +
+          '</ol>' +
+        '</div>' +
+        '<div style="background:rgba(126,191,154,0.06);border:1px solid rgba(126,191,154,0.2);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--green)">' +
+          '\u2713 Browser toast notifications are active \u2014 new FTDs/Regs show as pop-ups in this tab (no setup needed)' +
+        '</div>' +
       '</div>' +
 
       // ── Traffic Sources ───────────────────────────────────────
