@@ -2585,10 +2585,11 @@ function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   } else {
     funnelParam = '[trackingcode]';
   }
-  // Revenue only on QFTD (qualified CPA event) — FTD just records the deposit, no revenue, to avoid double-counting
+  // Revenue on FTD only — hardcoded per deal so the correct CPA is recorded regardless of what the platform sends
+  // QFTD records €0 (not all platforms have QFTD, and we don't want double-counting)
   var cpa = (cpaAmount && cpaAmount > 0) ? cpaAmount : 0;
-  var ftdRevenue  = network.name === 'affilika' ? '{first_deposit}' : 0;
-  var qftdRevenue = network.name === 'affilika' ? '{payout}' : (network.name === 'casinobet' ? '{deposits_sum}' : cpa);
+  var ftdRevenue  = network.name === 'affilika' ? '{first_deposit}' : cpa;
+  var qftdRevenue = 0;
   var base = WORKER + '?token=' + PBK_TOKEN + '&clickid=' + network.clickMacro + srcParams + '&funnel=' + funnelParam + '&offer=' + network.name;
   return {
     reg:  base + '&status=Registration&type=Registration&revenue=0',
@@ -2616,10 +2617,10 @@ function openPostbackModal(dealId) {
     ? 'These URLs now include source tracking (<code>[afp2]</code>/<code>[afp3]</code>). If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.'
     : 'These URLs use the current network macros shown above. If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.';
   var cpaNote = (deal.cpaAmount > 0)
-    ? 'Revenue is hardcoded to <code style="color:var(--green)">€' + deal.cpaAmount + '</code> per FTD/QFTD from this deal\'s CPA amount. Update the deal\'s CPA to regenerate.'
-    : '<span style="color:#f0b429">&#9888; No CPA amount set on this deal — revenue will record as €0. Set a CPA amount in the deal to fix this.</span>';
+    ? 'Revenue of <code style="color:var(--green)">€' + deal.cpaAmount + '</code> is recorded on <strong>FTD</strong>. QFTD URL records €0 — only paste it if your platform requires it. Update the deal\'s CPA amount to regenerate these URLs.'
+    : '<span style="color:#f0b429">&#9888; No CPA amount set on this deal — FTD will record €0 revenue. Set a CPA amount on the deal first, then re-paste the FTD URL.</span>';
   var macroNote = net.name === 'affilika'
-    ? 'Paste these in your affiliate platform\'s postback settings. For Affilika, <code style="color:var(--accent)">{campaign_id}</code> maps the funnel, <code style="color:var(--accent)">{first_deposit}</code> is used for FTD value, and <code style="color:var(--accent)">{payout}</code> is used for Qualified CPA.'
+    ? 'Paste these in your affiliate platform\'s postback settings. For Affilika, <code style="color:var(--accent)">{campaign_id}</code> maps the funnel, <code style="color:var(--accent)">{first_deposit}</code> is used for FTD value.'
     : 'Paste these in your affiliate platform\'s postback settings. ' + cpaNote;
 
   function row(label, url) {
