@@ -3734,6 +3734,15 @@ DOC_REF.onSnapshot(function(doc) {
         delete smartlinkHostedUrls.Spin;
         changed = true;
       }
+      // Seed landing pages if empty
+      if (!landingPages || landingPages.length === 0) {
+        landingPages = [
+          { id: 1, name: 'Dark — Main', url: 'https://darkspins.com', funnel: 'Dark', source: 'meta', status: 'live', notes: 'wAppDark' },
+          { id: 2, name: 'Slotio — Main', url: 'https://slotioai.com', funnel: 'Slotio', source: 'meta', status: 'live', notes: '' },
+          { id: 3, name: 'Scanio — Main', url: 'https://scanioai.com', funnel: 'Scanio', source: 'meta', status: 'live', notes: '' },
+        ];
+        changed = true;
+      }
       // Migrate deal objects with new fields
       deals.forEach(function(d) {
         var seed = seedMap[d.id];
@@ -3843,7 +3852,7 @@ function renderAnalyticsPage() {
 // ── Analytics: Overview Tab ──────────────────────────────────────────────────
 var FUNNEL_COLORS = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: '#f97316', SpinGPT: 'var(--red)', Shadow: 'var(--purple)' };
 
-// ── HOME PAGE ─────────────────────────────────────────────────────────────────
+// ── HOME PAGE ──────────────────────────────────────────────────────────────────
 function renderHomePage() {
   var el = document.getElementById('homePage');
   if (!el) return;
@@ -3851,134 +3860,114 @@ function renderHomePage() {
   var hour = now.getHours();
   var greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   var dateStr = now.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  var activeCount = (deals || []).filter(function(d){ return d.status === 'active'; }).length;
 
-  // Count active deals
-  var activeDeals = (deals || []).filter(function(d){ return d.status === 'active'; });
-  var activeDealCount = activeDeals.length;
-
-  // Quick actions definition
-  var actions = [
-    { icon:'🔗', label:'Link Builder',   sub:'Campaign + postback URLs', fn:"setPage('builder')", color:'var(--yellow)' },
-    { icon:'🎰', label:'Casino Deals',    sub:activeDealCount + ' active deals',  fn:"setPage('deals')",   color:'var(--green)' },
-    { icon:'📊', label:'Analytics',       sub:'Clicks, FTDs, revenue',   fn:"analyticsTab='clicks';setPage('analytics')", color:'var(--accent)' },
-    { icon:'⚙️', label:'Funnel Config',   sub:'Routes & smartlinks',     fn:"setPage('funnels')",  color:'var(--purple)' },
-    { icon:'🤖', label:'Bot Content',     sub:'Glitch templates',         fn:"setPage('tools')",   color:'var(--orange)' },
-    { icon:'🌐', label:'All Deals Table', sub:'Universal view',           fn:"setFunnel(null)",    color:'var(--muted)' },
-  ];
-
-  var actionCards = actions.map(function(a) {
-    return '<div onclick="' + a.fn + '" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden" ' +
-      'onmouseover="this.style.borderColor=\'' + a.color + '\';this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.transform=\'\'">' +
-      '<div style="font-size:20px;line-height:1">' + a.icon + '</div>' +
-      '<div style="font-size:12px;font-weight:700;color:var(--text)">' + a.label + '</div>' +
-      '<div style="font-size:11px;color:var(--muted)">' + a.sub + '</div>' +
+  var funnelCardsHtml = FUNNEL_NAMES.map(function(f) {
+    var color = FUNNEL_COLORS[f] || 'var(--muted)';
+    var fAssigned = !!(dealWeights[f] && dealWeights[f].length > 0);
+    return '<div id="hfc-' + f + '" onclick="setFunnel(\'' + escHtml(f) + '\')" ' +
+      'style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color 0.15s">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:7px">' +
+          '<span style="width:7px;height:7px;border-radius:50%;background:' + color + ';flex-shrink:0;box-shadow:0 0 5px ' + color + '"></span>' +
+          '<span style="font-family:var(--font-display);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">' + escHtml(f) + '</span>' +
+        '</div>' +
+        '<span style="font-size:9px;font-weight:700;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;background:' + (fAssigned ? 'var(--green-glow)' : 'var(--red-glow)') + ';color:' + (fAssigned ? 'var(--green)' : 'var(--red)') + '">' + (fAssigned ? 'LIVE' : 'EMPTY') + '</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center">' +
+        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--text)" id="hfc-clicks-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Clicks</div></div>' +
+        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--green)" id="hfc-ftds-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">FTDs</div></div>' +
+        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)" id="hfc-rev-' + f + '">—</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">Rev</div></div>' +
+      '</div>' +
     '</div>';
   }).join('');
 
-  // Funnel cards (will be populated after data loads)
-  var funnelCardsHtml = FUNNEL_NAMES.map(function(f) {
-    var color = FUNNEL_COLORS[f] || 'var(--muted)';
-    var fAssigned = (dealWeights[f] && dealWeights[f].length > 0);
-    return '<div id="hfc-' + f + '" onclick="setFunnel(\'' + escHtml(f) + '\')" style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + color + ';border-radius:10px;padding:16px 18px;cursor:pointer;transition:all 0.15s;position:relative;overflow:hidden" ' +
-      'onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'var(--card)\'">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-          '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';box-shadow:0 0 6px ' + color + '"></span>' +
-          '<span style="font-family:var(--font-display);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">' + escHtml(f) + '</span>' +
-        '</div>' +
-        '<span style="font-size:9px;font-family:var(--font-mono);color:' + (fAssigned ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' + (fAssigned ? 'LIVE' : 'NO DEALS') + '</span>' +
-      '</div>' +
-      '<div id="hfc-data-' + f + '" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' +
-        '<div style="text-align:center"><div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--text)" id="hfc-clicks-' + f + '">—</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">Clicks</div></div>' +
-        '<div style="text-align:center"><div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--green)" id="hfc-ftds-' + f + '">—</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">FTDs</div></div>' +
-        '<div style="text-align:center"><div style="font-size:16px;font-weight:700;font-family:var(--font-mono);color:var(--yellow)" id="hfc-rev-' + f + '">—</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">Revenue</div></div>' +
-      '</div>' +
+  var actions = [
+    { icon:'🔗', label:'Link Builder',   fn:"setPage('builder')" },
+    { icon:'🎰', label:'Casino Deals',    fn:"dealsSubTab='deals';setPage('deals')" },
+    { icon:'🌐', label:'Landing Pages',   fn:"dealsSubTab='lps';setPage('deals')" },
+    { icon:'📊', label:'Analytics',       fn:"analyticsTab='clicks';setPage('analytics')" },
+    { icon:'⚙️', label:'Funnel Config',   fn:"setPage('funnels')" },
+    { icon:'🤖', label:'Bot Content',     fn:"setPage('tools')" },
+  ];
+  var actionGrid = actions.map(function(a) {
+    return '<div onclick="' + a.fn + '" ' +
+      'style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;transition:all 0.15s" ' +
+      'onmouseover="this.style.background=\'rgba(255,255,255,0.05)\'" onmouseout="this.style.background=\'var(--card)\'">' +
+      '<span style="font-size:20px;line-height:1">' + a.icon + '</span>' +
+      '<span style="font-size:9px;font-weight:700;color:var(--text);font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em;line-height:1.3">' + a.label + '</span>' +
     '</div>';
   }).join('');
 
   el.innerHTML =
-    '<div style="padding:28px 32px 40px;max-width:1800px;margin:0 auto;position:relative;z-index:1">' +
+    '<div style="padding:24px 32px 40px;max-width:1800px;margin:0 auto;position:relative;z-index:1">' +
 
-      // ── Page header
-      '<div style="margin-bottom:28px">' +
-        '<div style="font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:6px">' + greeting + ' · ' + escHtml(dateStr) + '</div>' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
-          '<h1 style="font-family:var(--font-display);font-size:26px;font-weight:800;letter-spacing:-0.01em;color:rgba(255,255,255,0.85)">Command Center</h1>' +
-          '<div style="display:flex;gap:8px;align-items:center">' +
-            '<select id="homeFilterDays" onchange="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer;font-family:var(--font-body)">' +
-              '<option value="1">Today</option>' +
-              '<option value="7" selected>Last 7 days</option>' +
-              '<option value="30">Last 30 days</option>' +
-              '<option value="0">All time</option>' +
-            '</select>' +
-            '<button onclick="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;color:var(--muted);font-size:12px;cursor:pointer;transition:color 0.15s" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">↻ Refresh</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-
-      // ── KPI strip
-      '<div id="homeKpis" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px">' +
-        homeKpiCard('homeKpi-clicks', 'Clicks', '—', 'smartlink visits','var(--accent)') +
-        homeKpiCard('homeKpi-regs',   'Regs',   '—', 'registrations',  'var(--purple)') +
-        homeKpiCard('homeKpi-ftds',   'FTDs',   '—', 'first deposits', 'var(--green)') +
-        homeKpiCard('homeKpi-rev',    'Revenue','—', 'from FTDs',      'var(--yellow)') +
-        homeKpiCard('homeKpi-cr',     'CR%',    '—', 'click→FTD rate', 'var(--orange)') +
-      '</div>' +
-
-      // ── Main grid: Funnels + Quick Actions
-      '<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;margin-bottom:16px">' +
-
-        // Funnels grid
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
         '<div>' +
-          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:10px">Funnels (7d)</div>' +
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px" id="homeFunnelCards">' +
-            funnelCardsHtml +
-          '</div>' +
+          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:3px">' + greeting + ' · ' + escHtml(dateStr) + '</div>' +
+          '<div style="font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-0.01em;color:rgba(255,255,255,0.85)">Command Center</div>' +
         '</div>' +
-
-        // Quick actions
-        '<div>' +
-          '<div style="font-family:var(--font-display);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:10px">Quick Access</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' + actionCards + '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+          '<select id="homeFilterDays" onchange="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+            '<option value="1">Today</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="0">All time</option>' +
+          '</select>' +
+          '<button onclick="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:14px;cursor:pointer;transition:color 0.15s" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#8635;</button>' +
         '</div>' +
-
       '</div>' +
 
-      // ── Bottom grid: Sources + Recent Events
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
-
-        // Traffic sources
-        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
-          '<div style="padding:14px 18px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">Traffic Sources</div>' +
-          '<div id="homeSources" style="padding:14px 18px"><div style="color:var(--muted);font-size:12px">Loading...</div></div>' +
-        '</div>' +
-
-        // Recent events
-        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
-          '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
-            '<span style="font-family:var(--font-display);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text)">Live Events</span>' +
-            '<span style="font-size:10px;color:var(--muted);font-family:var(--font-mono)">latest 12</span>' +
+      '<div style="background:var(--card);border:1px solid rgba(126,191,154,0.2);border-top:3px solid var(--green);border-radius:14px;padding:26px 30px;margin-bottom:12px;position:relative;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+        '<div style="position:absolute;inset:0;background:radial-gradient(ellipse 55% 140% at 0% 50%,var(--green-glow) 0%,transparent 70%);pointer-events:none"></div>' +
+        '<div style="position:relative">' +
+          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--green);margin-bottom:10px">Total Revenue</div>' +
+          '<div style="display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap">' +
+            '<div id="homeHeroRevenue" style="font-family:var(--font-mono);font-size:54px;font-weight:800;color:rgba(255,255,255,0.9);line-height:1;letter-spacing:-0.02em">€0</div>' +
+            '<div style="padding-bottom:7px;display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end">' +
+              '<div><div id="homeHero-ftds" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--green)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">FTDs</div></div>' +
+              '<div><div id="homeHero-clicks" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--text)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Clicks</div></div>' +
+              '<div><div id="homeHero-avgrev" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--yellow)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Avg/FTD</div></div>' +
+              '<div><div id="homeHero-cr" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--orange)">—</div><div style="font-size:10px;color:var(--muted);margin-top:1px">CR%</div></div>' +
+              '<div><div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--accent)">' + activeCount + '</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Active Deals</div></div>' +
+            '</div>' +
           '</div>' +
-          '<div id="homeEvents" style="padding:0"><div style="padding:14px 18px;color:var(--muted);font-size:12px">Loading...</div></div>' +
         '</div>' +
+      '</div>' +
 
+      '<div style="display:grid;grid-template-columns:1fr 214px;gap:10px;margin-bottom:10px">' +
+        '<div>' +
+          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:7px">Funnels · <span id="homeFunnelPeriod">7d</span></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px" id="homeFunnelCards">' + funnelCardsHtml + '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:7px">Quick Access</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' + actionGrid + '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+          '<div style="padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Traffic Sources</div>' +
+          '<div id="homeSources" style="padding:14px 16px"><div style="color:var(--muted);font-size:12px">Loading…</div></div>' +
+        '</div>' +
+        '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+          '<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
+            '<span style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Live Events</span>' +
+            '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">latest 12</span>' +
+          '</div>' +
+          '<div id="homeEvents"><div style="padding:14px 16px;color:var(--muted);font-size:12px">Loading…</div></div>' +
+        '</div>' +
       '</div>' +
     '</div>';
 
   loadHomeData();
 }
 
-function homeKpiCard(id, label, val, sub, color) {
-  return '<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + color + ';border-radius:10px;padding:16px 18px;position:relative;overflow:hidden">' +
-    '<div style="font-family:var(--font-display);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:8px">' + label + '</div>' +
-    '<div id="' + id + '" style="font-family:var(--font-mono);font-size:24px;font-weight:800;color:' + color + ';line-height:1">' + val + '</div>' +
-    '<div style="font-size:10px;color:var(--muted);margin-top:4px">' + sub + '</div>' +
-  '</div>';
-}
-
 function loadHomeData() {
   var daysSel = document.getElementById('homeFilterDays');
   var days = daysSel ? +daysSel.value : 7;
+  var pLabel = days === 0 ? 'all' : days === 1 ? '1d' : days + 'd';
+  var pEl = document.getElementById('homeFunnelPeriod');
+  if (pEl) pEl.textContent = pLabel;
+
   var cutoffTs = null, cutoffDate = null;
   if (days > 0) {
     var cd = new Date(); cd.setDate(cd.getDate() - days);
@@ -3993,9 +3982,7 @@ function loadHomeData() {
   ]).then(function(results) {
     var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
 
-    // Clicks
-    var totalClicks = 0;
-    var clicksByFunnel = {}, clicksBySrc = {};
+    var totalClicks = 0, clicksByFunnel = {}, clicksBySrc = {};
     clickSnap.forEach(function(doc) {
       var d = doc.data();
       var ts = d.ts ? new Date(d.ts) : null;
@@ -4003,105 +3990,88 @@ function loadHomeData() {
       totalClicks++;
       var f = d.funnel || 'Unknown';
       clicksByFunnel[f] = (clicksByFunnel[f] || 0) + 1;
-      var src = d.src || 'NoSource';
-      clicksBySrc[src] = (clicksBySrc[src] || 0) + 1;
+      var s = d.src || 'NoSource';
+      clicksBySrc[s] = (clicksBySrc[s] || 0) + 1;
     });
 
-    // Conversions
-    var totalRegs = 0, totalFtds = 0, totalRevenue = 0;
-    var byFunnel = {};
+    var totalRegs = 0, totalFtds = 0, totalRevenue = 0, byFunnel = {};
     convSnap.forEach(function(doc) {
       var d = doc.data();
       if (cutoffDate && d.date < cutoffDate) return;
       var f = d.funnel || 'Unknown';
       if (!byFunnel[f]) byFunnel[f] = { regs:0, ftds:0, revenue:0 };
-      byFunnel[f].regs += +(d.regs || 0);
-      byFunnel[f].ftds += +(d.ftds || 0);
+      byFunnel[f].regs    += +(d.regs    || 0);
+      byFunnel[f].ftds    += +(d.ftds    || 0);
       byFunnel[f].revenue += +(d.revenue || 0);
-      totalRegs += +(d.regs || 0);
-      totalFtds += +(d.ftds || 0);
+      totalRegs    += +(d.regs    || 0);
+      totalFtds    += +(d.ftds    || 0);
       totalRevenue += +(d.revenue || 0);
     });
 
-    // Update KPIs
-    var cr = totalClicks > 0 ? (totalFtds / totalClicks * 100).toFixed(1) + '%' : '0%';
-    function setKpi(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
-    setKpi('homeKpi-clicks', totalClicks);
-    setKpi('homeKpi-regs',   totalRegs);
-    setKpi('homeKpi-ftds',   totalFtds);
-    setKpi('homeKpi-rev',    totalRevenue > 0 ? '€' + totalRevenue.toFixed(0) : '€0');
-    setKpi('homeKpi-cr',     cr);
+    function hset(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
 
-    // Update funnel cards
+    var avgRev = totalFtds > 0 ? '€' + (totalRevenue / totalFtds).toFixed(0) : '—';
+    var cr = totalClicks > 0 ? (totalFtds / totalClicks * 100).toFixed(1) + '%' : '0%';
+    hset('homeHeroRevenue', '€' + totalRevenue.toFixed(0));
+    hset('homeHero-ftds',   totalFtds);
+    hset('homeHero-clicks', totalClicks);
+    hset('homeHero-avgrev', avgRev);
+    hset('homeHero-cr',     cr);
+
     FUNNEL_NAMES.forEach(function(f) {
-      var clicks = clicksByFunnel[f] || 0;
       var conv = byFunnel[f] || { regs:0, ftds:0, revenue:0 };
-      function setEl(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
-      setEl('hfc-clicks-' + f, clicks);
-      setEl('hfc-ftds-' + f, conv.ftds);
-      setEl('hfc-rev-' + f, conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—');
+      hset('hfc-clicks-' + f, clicksByFunnel[f] || 0);
+      hset('hfc-ftds-' + f, conv.ftds);
+      hset('hfc-rev-' + f, conv.revenue > 0 ? '€' + conv.revenue.toFixed(0) : '—');
     });
 
-    // Traffic sources
     var srcList = Object.keys(clicksBySrc).sort(function(a,b){ return clicksBySrc[b]-clicksBySrc[a]; }).slice(0,6);
-    var maxC = srcList.reduce(function(m,s){ return Math.max(m, clicksBySrc[s]); }, 1);
-    var sourcesEl = document.getElementById('homeSources');
-    if (sourcesEl) {
-      if (!srcList.length) {
-        sourcesEl.innerHTML = '<div style="color:var(--muted);font-size:12px">No click data yet</div>';
-      } else {
-        sourcesEl.innerHTML = srcList.map(function(sid) {
-          var sc = TRAFFIC_SOURCES.find(function(ts){ return ts.id === sid; });
-          var label = sc ? sc.name : sid;
-          var clicks = clicksBySrc[sid];
-          var pct = Math.round(clicks / maxC * 100);
-          return '<div style="margin-bottom:12px">' +
-            '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
-              '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(label) + '</span>' +
-              '<span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">' + clicks + '</span>' +
-            '</div>' +
-            '<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">' +
-              '<div style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:3px;transition:width 0.5s ease"></div>' +
-            '</div>' +
-          '</div>';
-        }).join('');
-      }
+    var maxC = Math.max(1, clicksBySrc[srcList[0]] || 0);
+    var srcEl = document.getElementById('homeSources');
+    if (srcEl) {
+      srcEl.innerHTML = srcList.length ? srcList.map(function(sid) {
+        var sc = TRAFFIC_SOURCES.find(function(ts){ return ts.id === sid; });
+        var n = clicksBySrc[sid];
+        var pct = Math.round(n / maxC * 100);
+        return '<div style="margin-bottom:11px">' +
+          '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
+            '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(sc ? sc.name : sid) + '</span>' +
+            '<span style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">' + n + '</span>' +
+          '</div>' +
+          '<div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">' +
+            '<div style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:2px;transition:width 0.5s ease"></div>' +
+          '</div></div>';
+      }).join('') : '<div style="color:var(--muted);font-size:12px">No click data yet</div>';
     }
 
-    // Live events
-    var eventsEl = document.getElementById('homeEvents');
-    if (eventsEl) {
+    var evEl = document.getElementById('homeEvents');
+    if (evEl) {
       var evs = [];
       pbSnap.forEach(function(doc) { evs.push(doc.data()); });
-      if (!evs.length) {
-        eventsEl.innerHTML = '<div style="padding:14px 18px;color:var(--muted);font-size:12px;text-align:center">No events yet</div>';
-      } else {
-        eventsEl.innerHTML = evs.map(function(d) {
-          var isFtd = d.eventType === 'ftd';
-          var isReg = d.eventType === 'reg';
-          var badgeColor = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
-          var badgeLabel = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType || '?').toUpperCase();
-          var ts = d.ts ? new Date(d.ts) : null;
-          var timeStr = ts ? ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + ' ' + ts.toLocaleDateString([],{month:'short',day:'numeric'}) : '—';
-          var funnel = d.funnelKey || d.funnel || '?';
-          var fColor = FUNNEL_COLORS[funnel] || 'var(--muted)';
-          var src = d.source || d.src || 'NoSource';
-          return '<div style="display:flex;align-items:center;gap:10px;padding:9px 18px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-            '<div style="font-size:9px;font-family:var(--font-mono);color:var(--muted);white-space:nowrap;min-width:80px">' + timeStr + '</div>' +
-            '<span style="font-size:10px;font-weight:800;letter-spacing:0.5px;color:' + badgeColor + ';background:' + badgeColor + '1a;padding:2px 7px;border-radius:4px;border:1px solid ' + badgeColor + '44;white-space:nowrap">' + badgeLabel + '</span>' +
-            '<span style="font-size:11px;font-weight:700;color:' + fColor + ';min-width:52px">' + escHtml(funnel) + '</span>' +
-            '<span style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(src) + '</span>' +
-            (d.revenue > 0 ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--yellow);white-space:nowrap">€' + (+d.revenue).toFixed(0) + '</span>' : '') +
-          '</div>';
-        }).join('');
-      }
+      evEl.innerHTML = evs.length ? evs.map(function(d) {
+        var isFtd = d.eventType === 'ftd', isReg = d.eventType === 'reg';
+        var bc = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
+        var bl = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType || '?').toUpperCase();
+        var ts = d.ts ? new Date(d.ts) : null;
+        var tStr = ts ? ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + ' ' + ts.toLocaleDateString([],{month:'short',day:'numeric'}) : '—';
+        var f = d.funnelKey || d.funnel || '?';
+        var fc = FUNNEL_COLORS[f] || 'var(--muted)';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+          '<div style="font-size:9px;font-family:var(--font-mono);color:var(--muted);white-space:nowrap;min-width:76px">' + tStr + '</div>' +
+          '<span style="font-size:9px;font-weight:800;letter-spacing:0.04em;color:' + bc + ';background:' + bc + '1a;padding:2px 6px;border-radius:3px;border:1px solid ' + bc + '44;white-space:nowrap">' + bl + '</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + fc + ';white-space:nowrap">' + escHtml(f) + '</span>' +
+          '<span style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(d.source || d.src || 'NoSource') + '</span>' +
+          (d.revenue > 0 ? '<span style="font-size:11px;font-family:var(--font-mono);color:var(--yellow);white-space:nowrap">€' + (+d.revenue).toFixed(0) + '</span>' : '') +
+        '</div>';
+      }).join('') : '<div style="padding:14px 16px;color:var(--muted);font-size:12px;text-align:center">No events yet</div>';
     }
 
   }).catch(function(err) {
-    var sourcesEl = document.getElementById('homeSources');
-    if (sourcesEl) sourcesEl.innerHTML = '<div style="color:var(--red);font-size:12px">Error: ' + escHtml(err.message) + '</div>';
+    var h = document.getElementById('homeHeroRevenue');
+    if (h) h.textContent = 'Error';
   });
 }
+
 
 function renderOverviewTab() {
   var body = document.getElementById('analyticsTabBody');
@@ -4873,54 +4843,44 @@ function renderLandingPagesTab() {
   var body = document.getElementById('dealsSubBody');
   if (!body) return;
 
-  var srcOpts = '<option value="">All Sources</option>' + TRAFFIC_SOURCES.map(function(s){
-    return '<option value="' + s.id + '">' + s.name + '</option>';
-  }).join('');
-  var funnelOpts2 = '<option value="">All Funnels</option>' + FUNNEL_NAMES.map(function(f){
-    return '<option value="' + f + '">' + f + '</option>';
-  }).join('');
-
-  var rows = landingPages.map(function(lp) {
+  var cards = landingPages.map(function(lp) {
     var src = TRAFFIC_SOURCES.find(function(s) { return s.id === lp.source; });
-    var srcColor = src ? src.color : 'var(--muted)';
     var srcName = src ? src.name : (lp.source || '—');
     var fcol = FUNNEL_COLORS[lp.funnel] || 'var(--muted)';
-    var statusCol = lp.status === 'live' ? 'var(--green)' : 'var(--yellow)';
-    return '<tr style="border-bottom:1px solid var(--border)">' +
-      '<td style="padding:9px 12px;font-weight:600;font-size:13px">' + escHtml(lp.name) + '</td>' +
-      '<td style="padding:9px 12px"><a href="' + escHtml(lp.url) + '" target="_blank" style="color:var(--accent);font-size:11px;font-family:var(--font-mono);text-decoration:none;max-width:280px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(lp.url) + '</a></td>' +
-      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + fcol + '">' + escHtml(lp.funnel||'—') + '</span></td>' +
-      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + srcColor + '">' + escHtml(srcName) + '</span></td>' +
-      '<td style="padding:9px 12px"><span style="font-size:11px;font-weight:700;color:' + statusCol + '">' + (lp.status === 'live' ? '● Live' : '○ Paused') + '</span></td>' +
-      '<td style="padding:9px 12px;font-size:12px;color:var(--muted)">' + escHtml(lp.notes||'') + '</td>' +
-      '<td style="padding:9px 12px"><div style="display:flex;gap:6px">' +
-        '<button onclick="openLpModal(' + lp.id + ')" style="background:none;border:1px solid var(--border);border-radius:4px;padding:3px 9px;color:var(--text);font-size:11px;cursor:pointer">Edit</button>' +
-        '<button onclick="deleteLp(' + lp.id + ')" style="background:none;border:1px solid rgba(217,62,62,0.3);border-radius:4px;padding:3px 9px;color:var(--red);font-size:11px;cursor:pointer">Del</button>' +
-      '</div></td>' +
-    '</tr>';
+    var isLive = lp.status === 'live';
+    var domain = '';
+    try { domain = new URL(lp.url).hostname.replace('www.',''); } catch(e) { domain = lp.url; }
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
+      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:' + fcol + ';opacity:0.6"></div>' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(lp.name) + '</div>' +
+          '<a href="' + escHtml(lp.url) + '" target="_blank" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">' + escHtml(domain) + ' ↗</a>' +
+        '</div>' +
+        '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;margin-left:10px;background:' + (isLive ? 'var(--green-glow)' : 'var(--yellow-glow)') + ';color:' + (isLive ? 'var(--green)' : 'var(--yellow)') + ';border:1px solid ' + (isLive ? 'rgba(126,191,154,0.3)' : 'rgba(229,192,123,0.3)') + '">' + (isLive ? '● Live' : '○ Paused') + '</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
+        (lp.funnel ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08)">' + escHtml(lp.funnel) + '</span>' : '') +
+        (srcName !== '—' ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border)">' + escHtml(srcName) + '</span>' : '') +
+        (lp.notes ? '<span style="font-size:10px;color:var(--muted);padding:2px 8px">' + escHtml(lp.notes) + '</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:6px">' +
+        '<a href="' + escHtml(lp.url) + '" target="_blank" style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.04)\'">Open ↗</a>' +
+        '<button onclick="openLpModal(' + lp.id + ')" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.04)\'">Edit</button>' +
+        '<button onclick="deleteLp(' + lp.id + ')" style="background:var(--red-glow);border:1px solid rgba(212,112,128,0.3);border-radius:6px;padding:6px 10px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer">Del</button>' +
+      '</div>' +
+    '</div>';
   }).join('');
 
   body.innerHTML =
-    '<div style="display:flex;justify-content:flex-end;margin-bottom:16px">' +
-      '<button onclick="openLpModal(null)" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add Landing Page</button>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+      '<div style="font-size:13px;color:var(--muted)">' + landingPages.length + ' landing page' + (landingPages.length !== 1 ? 's' : '') + '</div>' +
+      '<button onclick="openLpModal(null)" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:0.06em">+ Add</button>' +
     '</div>' +
     (landingPages.length === 0
-      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:40px;text-align:center;color:var(--muted);font-size:13px">No landing pages yet. Add your first one to track where traffic lands before converting.</div>'
-      : '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
-          '<thead><tr style="background:var(--card2)">' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Name</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">URL</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Funnel</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Status</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Notes</th>' +
-            '<th style="padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Actions</th>' +
-          '</tr></thead>' +
-          '<tbody>' + rows + '</tbody>' +
-        '</table></div></div>'
-    ) +
-    // LP Modal placeholder
-    '';
+      ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:48px;text-align:center;color:var(--muted);font-size:13px">No landing pages yet. Click <strong style="color:var(--text)">+ Add</strong> to add your first one.</div>'
+      : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">' + cards + '</div>'
+    );
 }
 
 function openLpModal(id) {
