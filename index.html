@@ -4889,6 +4889,8 @@ var builderCampaign   = '';
 var builderCasinoUrl  = '';
 var builderNetwork    = '';       // '' = auto-detect from URL | 'cellxpert' | 'affilika' | 'ftdgallery' | 'padrino'
 var builderGenerated  = false;
+var kitFunnel         = 'Dark';
+var kitSource         = 'meta';
 
 // Funnels with a landing page (Dark/Slotio/Scanio have LPs; SpinGPT/Shadow go direct)
 function funnelHasLp(f) { return !!(FUNNEL_LP_DOMAIN[f !== undefined ? f : builderFunnel]); }
@@ -4976,6 +4978,20 @@ function builderGenerate() {
     saveLinkHistory({ src: builderSource, campaign: builderCampaign, funnel: builderFunnel, url: directUrl, casinoUrl: builderCasinoUrl, tgUrl: tgUrl, ts: new Date().toISOString() });
   }
   renderBuilderPage();
+}
+
+function kitCopyAll() {
+  var ids = ['kit-lp', 'kit-bot', 'kit-sl', 'kit-sl-ad'];
+  var lines = [];
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && el.value) lines.push(el.value);
+  });
+  if (!lines.length) return;
+  navigator.clipboard.writeText(lines.join('\n')).then(function() {
+    var msg = document.getElementById('kit-copy-msg');
+    if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2000); }
+  });
 }
 
 function renderBuilderPage() {
@@ -5073,10 +5089,75 @@ function renderBuilderPage() {
         '</div>';
       }).join('');
 
+  // ── Campaign Kit (instant, no generate needed) ──
+  var kitLpDomain   = FUNNEL_LP_DOMAIN[kitFunnel] || '';
+  var kitBot        = FUNNEL_TO_BOT[kitFunnel] || {};
+  var kitSlDomain   = smartlinkHostedUrls[kitFunnel] || (FUNNEL_SMARTLINK_DOMAIN[kitFunnel] ? 'https://' + FUNNEL_SMARTLINK_DOMAIN[kitFunnel] : '');
+  var kitHasLp      = !!kitLpDomain;
+  var kitHasTg      = FUNNEL_CTA[kitFunnel] === 'tg';
+  var kitSrcLabel   = (TRAFFIC_SOURCES.find(function(s){ return s.id === kitSource; }) || {}).name || kitSource;
+  var kitLpLink     = kitHasLp  ? 'https://' + kitLpDomain + '/?src=' + encodeURIComponent(kitSource) : '';
+  var kitBotLink    = kitHasTg  ? (kitBot.tme || ('https://t.me/' + (kitBot.username||''))) + '?start=' + encodeURIComponent(kitSource) : '';
+  var kitSlLink     = kitSlDomain ? kitSlDomain + (kitSlDomain.indexOf('?') !== -1 ? '&' : '?') + 'src=' + encodeURIComponent(kitSource) : '';
+  var kitFunnelColor = FUNNEL_COLORS[kitFunnel] || 'var(--accent)';
+
+  function kitRow(label, val, id, desc) {
+    if (!val) return '';
+    return '<div style="margin-bottom:14px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
+        '<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">' + label + '</span>' +
+        '<span style="font-size:10px;color:var(--muted);font-style:italic">' + desc + '</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input id="' + id + '" type="text" readonly value="' + escHtml(val) + '" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:.45rem .65rem;font-size:.72rem;font-family:var(--font-mono);color:var(--fg);min-width:0">' +
+        '<button class="btn-icon" onclick="copyToClipboard(document.getElementById(\'' + id + '\').value, this, \'&#128203;\')" title="Copy" style="color:var(--accent);flex-shrink:0">&#128203;</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var kitFunnelOpts = FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '"' + (kitFunnel === f ? ' selected' : '') + '>' + f + '</option>'; }).join('');
+  var kitSrcOpts    = TRAFFIC_SOURCES.map(function(s){ return '<option value="' + s.id + '"' + (kitSource === s.id ? ' selected' : '') + '>' + s.name + '</option>'; }).join('');
+
   container.innerHTML =
     '<div style="padding:28px 32px 40px;max-width:860px">' +
       '<div style="font-size:20px;font-weight:800;margin-bottom:4px">Link Builder</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Paste a casino affiliate link, choose funnel/source/campaign — get tagged links, postback URLs, LP ad link and TG deep link in one shot.</div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:24px">Campaign Kit gives you all links instantly. Use the Casino URL builder below for postback URLs on specific deals.</div>' +
+
+      // ── CAMPAIGN KIT ──
+      '<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ' + kitFunnelColor + ';border-radius:10px;padding:22px 24px;margin-bottom:20px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">' +
+          '<div>' +
+            '<div style="font-size:14px;font-weight:800;letter-spacing:.02em">&#9889; Campaign Kit</div>' +
+            '<div style="font-size:11px;color:var(--muted);margin-top:2px">Pick funnel + source — all links ready instantly, no generate needed</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:10px;align-items:center">' +
+            '<select onchange="kitFunnel=this.value;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer">' + kitFunnelOpts + '</select>' +
+            '<select onchange="kitSource=this.value;renderBuilderPage()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer">' + kitSrcOpts + '</select>' +
+          '</div>' +
+        '</div>' +
+
+        // Flow label
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:6px 10px;background:rgba(255,255,255,0.03);border-radius:5px">' +
+          (kitHasLp && kitHasTg
+            ? 'Ad &#8594; <strong style="color:var(--text)">' + kitLpDomain + '</strong> &#8594; <strong style="color:#29b6f6">t.me/' + (kitBot.username||'bot') + '</strong> &#8594; Smartlink &#8594; Casino'
+            : kitHasLp
+              ? 'Ad &#8594; <strong style="color:var(--text)">' + kitLpDomain + '</strong> &#8594; Smartlink &#8594; Casino'
+              : 'Ad &#8594; Smartlink &#8594; Casino') +
+          ' &nbsp;·&nbsp; Source: <strong style="color:' + kitFunnelColor + '">' + escHtml(kitSrcLabel) + '</strong>' +
+        '</div>' +
+
+        kitRow('Ad destination / LP Link', kitLpLink,  'kit-lp',  'paste in Meta / TikTok ad') +
+        kitRow('Bot deep link',            kitBotLink, 'kit-bot', 'LP CTA button, or direct TG promo link') +
+        kitRow('Casino smartlink',         kitSlLink,  'kit-sl',  'bot sends this to users · geo-routes to casino') +
+        (!kitHasLp && kitSlLink ? kitRow('Ad destination (no LP)', kitSlLink, 'kit-sl-ad', 'put directly in ad for funnels without LP') : '') +
+
+        // Copy all button
+        '<div style="margin-top:6px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center">' +
+          '<button onclick="kitCopyAll()" style="background:var(--accent);border:none;border-radius:6px;padding:7px 18px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Copy All Links</button>' +
+          '<span id="kit-copy-msg" style="font-size:12px;color:var(--green);display:none">Copied ✓</span>' +
+        '</div>' +
+
+      '</div>' +
 
       // ── INPUT CARD ──
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
@@ -5201,7 +5282,7 @@ function loadSourcesData() {
       var d = doc.data();
       var ts = d.ts ? new Date(d.ts) : null;
       if (cutoff && ts && ts < cutoff) return;
-      var src = d.src || d.sub1 || 'unknown';
+      var src = d.src || 'NoSource';
       if (sourcesFilterSource && src !== sourcesFilterSource) return;
       if (!bySource[src]) bySource[src] = { clicks: 0, name: src };
       bySource[src].clicks++;
