@@ -1821,19 +1821,38 @@ var firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
+
+// Enable offline persistence — queues writes if network drops, syncs on reconnect
+db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
+  if (err.code === 'failed-precondition') {
+    // Multiple tabs open — persistence only works in one tab at a time, that's fine
+  } else if (err.code === 'unimplemented') {
+    console.warn('Offline persistence not supported in this browser');
+  }
+});
+
 var DOC_REF = db.collection('dashboard').doc('data');
 
 var STORAGE_KEY = 'affiliate_deals';
 
 // ── Debounce utility ───────────────────────────────────────────────────────
+var _pendingDebounces = [];
 function debounce(fn, ms) {
   var timer;
+  var entry = { flush: function() { clearTimeout(timer); fn(); } };
+  _pendingDebounces.push(entry);
   return function() {
     var args = arguments;
     clearTimeout(timer);
     timer = setTimeout(function() { fn.apply(null, args); }, ms);
+    entry.flush = function() { clearTimeout(timer); fn.apply(null, args); };
   };
 }
+
+// Flush all pending debounced saves before page unload
+window.addEventListener('beforeunload', function() {
+  _pendingDebounces.forEach(function(e) { try { e.flush(); } catch(_) {} });
+});
 
 // ── Save indicator ─────────────────────────────────────────────────────────
 var saveIndicatorTimer = null;
@@ -3811,7 +3830,8 @@ function saveToFirebase() {
     showSaveIndicator('saved', 'Saved ✓');
   }).catch(function(e) {
     console.error('Firebase save error:', e);
-    showSaveIndicator('error', 'Save failed');
+    showSaveIndicator('error', 'Save failed ✗');
+    if (typeof showToast === 'function') showToast('Firebase save failed — check your connection. Changes may not persist.', 'alert', 8000);
   });
   saveRoutesToFirebase();
 }
@@ -9852,8 +9872,8 @@ function saveProjectData() {
     showSaveIndicator('saved', 'Saved ✓');
   }).catch(function(e) {
     console.error('Project save error:', e);
-    showSaveIndicator('error', 'Save failed');
-    showToast('Failed to save tasks', 'alert', 3000);
+    showSaveIndicator('error', 'Save failed ✗');
+    showToast('Failed to save tasks — check connection. Changes may not persist.', 'alert', 8000);
   });
 }
 
@@ -10569,7 +10589,8 @@ function saveEmployeeData(silent) {
     if (!silent) empShowToast('Saved', 'success');
   }).catch(function(e) {
     console.error('HR save error:', e);
-    empShowToast('Save failed', 'error');
+    empShowToast('Save failed — check connection', 'error');
+    if (typeof showToast === 'function') showToast('Failed to save team data — check connection. Changes may not persist.', 'alert', 8000);
   });
 }
 
