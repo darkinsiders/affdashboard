@@ -1523,7 +1523,7 @@
 
   <!-- Home (standalone) -->
   <div class="nav-group" id="navgrp-home">
-    <button class="nav-group-btn grp-home" id="tab-homeNav" onclick="navGo(function(){setPage('home')})">
+    <button class="nav-group-btn grp-home" id="tab-homeNavBtn" onclick="navGo(function(){setPage('home')})">
       <span class="nav-active-dot"></span>
       <span class="ni-icon">⌂</span> Home
     </button>
@@ -2199,6 +2199,11 @@ function setNavActive(tabId, groupName) {
   if (item) item.classList.add('active');
   var grpBtn = document.querySelector('#navgrp-' + groupName + ' .nav-group-btn');
   if (grpBtn) grpBtn.classList.add('active');
+  // Also highlight the standalone Home button when on home
+  if (groupName === 'home') {
+    var homeBtn = document.getElementById('tab-homeNavBtn');
+    if (homeBtn) homeBtn.classList.add('active');
+  }
 }
 
 function updateBreadcrumb(group, label) {
@@ -2248,7 +2253,7 @@ function setPage(page) {
   } else if (page === 'analytics') {
     var el = document.getElementById('analyticsPage');
     if (el) el.style.display = '';
-    var subLabel = {clicks:'Clicks',performance:'Performance',deals:'Deals',sources:'Sources',roi:'ROI & Spend'}[analyticsTab] || 'Analytics';
+    var subLabel = {clicks:'Clicks',performance:'Performance',deals:'Deals',sources:'Sources',roi:'ROI & Spend',overview:'Overview',report:'Reports'}[analyticsTab] || 'Analytics';
     setNavActive(analyticsTab, 'analytics');
     updateBreadcrumb('Analytics', subLabel);
     renderAnalyticsPage();
@@ -2258,7 +2263,7 @@ function setPage(page) {
     if (el) el.style.display = '';
     var tabId = dealsSubTab === 'lps' ? 'lps' : 'deals';
     setNavActive(tabId, 'content');
-    updateBreadcrumb('Content', dealsSubTab === 'lps' ? 'Landing Pages' : 'Casino Deals');
+    updateBreadcrumb('Resources', dealsSubTab === 'lps' ? 'Landing Pages' : 'Casino Deals');
     renderDealsPage();
   } else if (page === 'funnels') {
     var el = document.getElementById('funnelsPage');
@@ -2282,7 +2287,7 @@ function setPage(page) {
     var el = document.getElementById('toolsPage');
     if (el) el.style.display = '';
     setNavActive('tools', 'content');
-    updateBreadcrumb('Content', 'Bot Content');
+    updateBreadcrumb('Resources', 'Bot Content');
     renderGlitch();
     renderSlotValues();
   } else if (page === 'metaCampaigns') {
@@ -2307,13 +2312,13 @@ function setPage(page) {
     var el = document.getElementById('projectPage');
     if (el) el.style.display = '';
     setNavActive('project', 'business');
-    updateBreadcrumb('Business', 'Projects');
+    updateBreadcrumb('Team', 'Projects');
     if (typeof renderProjectPage === 'function') renderProjectPage();
   } else if (page === 'employees') {
     var el = document.getElementById('employeesPage');
     if (el) el.style.display = '';
     setNavActive('employees', 'business');
-    updateBreadcrumb('Business', 'Team');
+    updateBreadcrumb('Team', 'Employees');
     if (typeof renderEmployeesPage === 'function') renderEmployeesPage();
   } else if (page === 'manage') {
     var el = document.getElementById('funnelsPage');
@@ -4336,7 +4341,7 @@ function startPostbackListener() {
 var analyticsFilterFunnel = '';
 var analyticsFilterDays = 7;
 var analyticsFilterGeo = '';
-var analyticsTab = 'overview';
+var analyticsTab = 'clicks';
 var overviewFilterDays = 7;
 var perfFilterDays = 7;
 var perfFilterFunnel = '';
@@ -7675,10 +7680,10 @@ function loadMetaCampaigns() {
       }
       metaCampaignsData = data.data || [];
       // Persist to Firebase
-      db.collection('meta_campaigns').doc('snapshot').set({
+      db.collection('meta_campaigns').doc('snapshot').set(cleanForFirestore({
         campaigns: metaCampaignsData,
         updatedAt: new Date().toISOString()
-      }).catch(function(e) { console.warn('Firebase meta_campaigns save error:', e); });
+      })).catch(function(e) { console.warn('Firebase meta_campaigns save error:', e); });
 
       renderMetaCampaignsTable(metaCampaignsData);
     })
@@ -8454,7 +8459,7 @@ function loadPhoneFarmData(callback) {
 function pfSave(docId, field, data) {
   var obj = {}; obj[field] = data;
   showSaveIndicator('saving', 'Saving…');
-  db.collection('phone_farm').doc(docId).set(obj, {merge:true})
+  db.collection('phone_farm').doc(docId).set(cleanForFirestore(obj), {merge:true})
     .then(function(){ showSaveIndicator('saved', 'Saved ✓'); })
     .catch(function(e){ showSaveIndicator('error', 'Save failed ✗'); showToast('Phone farm save error: '+e.message,'alert',3000); });
 }
