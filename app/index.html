@@ -2023,9 +2023,8 @@ var LOGIN_MEMBERS = [
 ];
 
 // Default PIN hash — change via Settings → Access Code
-// Default code is: DarkIntel2026
 var _PIN_SALT = ':di26x';
-var _DEFAULT_PIN_HASH = btoa('DarkIntel2026' + _PIN_SALT);
+var _DEFAULT_PIN_HASH = btoa('Desc123$' + _PIN_SALT);
 
 function _pinHash(pin) { return btoa(pin + _PIN_SALT); }
 function _pinOk(pin) {
@@ -6433,7 +6432,7 @@ function renderSettingsPage() {
       // ── Access Code ───────────────────────────────────────────
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
         '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Team Access Code</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:18px">The code team members enter on the login screen. Stored locally in each browser. Default: <code style="color:var(--accent);background:var(--card2);padding:1px 6px;border-radius:4px">DarkIntel2026</code></div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:18px">The code team members enter on the login screen. Stored locally in each browser. Change it below if needed.</div>' +
         '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">New Access Code</label>' +
             '<input id="settings-pin-new" type="password" placeholder="Enter new code" autocomplete="new-password" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
