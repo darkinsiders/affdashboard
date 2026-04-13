@@ -5105,6 +5105,140 @@ function renderPerformanceData(container, rows) {
           '</table></div>' +
         '</div>'
     );
+
+  // Auto-inject fallback diagnostics if any Fallback rows exist
+  var hasFallback = rows.some(function(r){ return r.funnel === 'Fallback'; });
+  if (hasFallback) {
+    var diagDiv = document.createElement('div');
+    diagDiv.id = 'fallbackDiagPanel';
+    diagDiv.style.cssText = 'margin-top:20px;background:rgba(212,112,128,0.07);border:1px solid rgba(212,112,128,0.3);border-radius:10px;overflow:hidden';
+    diagDiv.innerHTML =
+      '<div style="padding:12px 16px;border-bottom:1px solid rgba(212,112,128,0.2);display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:12px;color:var(--red)">&#9888;</span>' +
+          '<span style="font-size:12px;font-weight:700;color:var(--red)">Fallback Funnel Diagnostics</span>' +
+        '</div>' +
+        '<span style="font-size:11px;color:var(--muted)">querying raw postbacks…</span>' +
+      '</div>' +
+      '<div id="fallbackDiagBody" style="padding:14px 16px;font-size:12px;color:var(--muted)">Loading…</div>';
+    container.appendChild(diagDiv);
+    _loadFallbackDiagnostics();
+  }
+}
+
+function _loadFallbackDiagnostics() {
+  var body = document.getElementById('fallbackDiagBody');
+  if (!body) return;
+  db.collection('postbacks').orderBy('ts', 'desc').limit(200).get().then(function(snap) {
+    var hits = [];
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if ((d.funnelKey || '').toLowerCase() === 'fallback') {
+        var raw = {};
+        try { raw = JSON.parse(d.raw || '{}'); } catch(e) {}
+        hits.push({
+          ts:       d.ts         || '',
+          network:  d.network    || raw.offer || '—',
+          event:    d.rawEvent   || '—',
+          type:     d.eventType  || '—',
+          revenue:  d.revenue    || 0,
+          funnel:   raw.funnel   || d.funnelKey || '—',
+          clickid:  raw.clickid  || raw.clickId || raw.sub1 || d.sub1 || '—',
+          source:   raw.source   || d.source    || '—',
+          campaign: raw.campaign || d.campaign  || '—',
+          rawFull:  d.raw        || ''
+        });
+      }
+    });
+
+    var panel = document.getElementById('fallbackDiagPanel');
+    var note = panel ? panel.querySelector('span:last-child') : null;
+    if (note) note.textContent = hits.length + ' raw hit(s) found';
+
+    if (!hits.length) {
+      body.innerHTML = '<div style="color:var(--muted);font-size:12px">No raw postback records found for Fallback funnel in last 200 entries. The source may be older — check Firebase console directly.</div>';
+      return;
+    }
+
+    // Summarise by network+offer
+    var byNetwork = {};
+    hits.forEach(function(h) {
+      var key = h.network || 'unknown';
+      if (!byNetwork[key]) byNetwork[key] = { count: 0, events: {}, ftds: 0, sample: h };
+      byNetwork[key].count++;
+      byNetwork[key].events[h.event] = (byNetwork[key].events[h.event] || 0) + 1;
+      if (h.type === 'ftd') byNetwork[key].ftds++;
+    });
+
+    var summaryHtml = '<div style="margin-bottom:14px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--red);margin-bottom:8px">Source Summary</div>' +
+      Object.keys(byNetwork).map(function(net) {
+        var nb = byNetwork[net];
+        var evStr = Object.keys(nb.events).map(function(e){ return e + ' ×' + nb.events[e]; }).join(', ');
+        return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:10px 14px;margin-bottom:8px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+            '<span style="font-weight:700;color:var(--red);font-size:13px">' + escHtml(net) + '</span>' +
+            '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + nb.count + ' postback(s) — ' + nb.ftds + ' FTD-type</span>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--muted)">Events: ' + escHtml(evStr) + '</div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:4px">Sample funnel param: <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px;color:var(--red)">' + escHtml(nb.sample.funnel) + '</code> &nbsp; clickid: <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">' + escHtml(nb.sample.clickid) + '</code></div>' +
+          (nb.sample.source !== '—' ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">Source: ' + escHtml(nb.sample.source) + ' &nbsp; Campaign: ' + escHtml(nb.sample.campaign) + '</div>' : '') +
+        '</div>';
+      }).join('') +
+    '</div>';
+
+    var tableRows = hits.slice(0, 20).map(function(h) {
+      var dt = h.ts ? h.ts.replace('T',' ').slice(0,16) : '—';
+      return '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap">' + escHtml(dt) + '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--red)">' + escHtml(h.network) + '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(h.event) + '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;color:var(--muted);font-family:var(--font-mono);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(h.clickid) + '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(h.source) + '</td>' +
+        '<td style="padding:7px 10px">' +
+          '<button onclick="_showRawPostback(' + JSON.stringify(h.rawFull) + ')" style="background:var(--card2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer">raw</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    body.innerHTML = summaryHtml +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:8px">Recent Raw Hits (last 20)</div>' +
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+        '<thead><tr style="background:var(--card2)">' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Time</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Network</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Event</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Click ID</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
+          '<th style="padding:6px 10px"></th>' +
+        '</tr></thead>' +
+        '<tbody>' + tableRows + '</tbody>' +
+      '</table></div>' +
+      '<div style="margin-top:12px;padding:10px 14px;background:rgba(255,180,0,0.06);border:1px solid rgba(255,180,0,0.2);border-radius:7px;font-size:11px;color:#f0b429;line-height:1.6">' +
+        '<strong>How to fix:</strong> Go to CellXpert (or the network shown above) &rarr; find the campaign/creative that has the postback URL pasted &rarr; check the <strong>Tracking Code</strong> field. It is set to <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">fallback</code> (or blank, which defaults to fallback). Change it to the correct funnel name: <strong>Dark</strong>, <strong>Slotio</strong>, or <strong>Scanio</strong>. Alternatively re-paste the postback URL with <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">&amp;funnel=Dark</code> hardcoded instead of <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">[trackingcode]</code>.' +
+      '</div>';
+
+  }).catch(function(err) {
+    var b2 = document.getElementById('fallbackDiagBody');
+    if (b2) b2.innerHTML = '<div style="color:var(--red);font-size:12px">Error loading postbacks: ' + escHtml(err.message) + '</div>';
+  });
+}
+
+function _showRawPostback(raw) {
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.onclick = function(e){ if(e.target===modal) document.body.removeChild(modal); };
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto';
+  var formatted = '';
+  try { formatted = JSON.stringify(JSON.parse(raw), null, 2); } catch(e) { formatted = raw; }
+  box.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+    '<span style="font-size:13px;font-weight:700;color:var(--text)">Raw Postback Params</span>' +
+    '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">&times;</button>' +
+    '</div>' +
+    '<pre style="font-family:var(--font-mono);font-size:11px;color:var(--text);white-space:pre-wrap;word-break:break-all;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:12px">' + escHtml(formatted) + '</pre>';
+  modal.appendChild(box);
+  document.body.appendChild(modal);
 }
 
 // ── Network ID detection (returns string ID for badges/filtering) ───────────
