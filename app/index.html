@@ -10029,7 +10029,7 @@ function loadProjectData(cb) {
 function saveProjectData() {
   if (!projectLoaded) return;
   showSaveIndicator('saving', 'Saving…');
-  db.collection('projects').doc('tasks').set({ tasks: projectTasks }).then(function() {
+  db.collection('projects').doc('tasks').set(cleanForFirestore({ tasks: projectTasks })).then(function() {
     showSaveIndicator('saved', 'Saved ✓');
   }).catch(function(e) {
     console.error('Project save error:', e);
@@ -10750,10 +10750,10 @@ function loadEmployeeData(cb) {
 
 function saveEmployeeData(silent) {
   if (!employeeLoaded) return;
-  db.collection('hr').doc('data').set({
+  db.collection('hr').doc('data').set(cleanForFirestore({
     employees: employees,
     timeLogs: timeLogs
-  }).then(function() {
+  })).then(function() {
     if (!silent) empShowToast('Saved', 'success');
   }).catch(function(e) {
     console.error('HR save error:', e);
