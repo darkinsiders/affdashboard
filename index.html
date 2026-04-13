@@ -2807,7 +2807,7 @@ function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   } else if (network.name === 'affilika') {
     funnelParam = '{campaign_id}';
   } else {
-    funnelParam = '[trackingcode]';
+    funnelParam = '[afp4]';
   }
   // Revenue on FTD only — hardcoded per deal so the correct CPA is recorded regardless of what the platform sends
   // QFTD records €0 (not all platforms have QFTD, and we don't want double-counting)
@@ -2834,25 +2834,12 @@ function openPostbackModal(dealId) {
     return;
   }
 
-  // Find which funnel this deal is assigned to so the postback URL has the
-  // funnel hardcoded (e.g. &funnel=Dark) instead of relying on [trackingcode]
-  // which resolves to "fallback" in CellXpert when no tracking code is set.
-  var assignedFunnel = null;
-  if (typeof assignments !== 'undefined') {
-    FUNNEL_NAMES.forEach(function(f) {
-      if ((assignments[f] || []).indexOf(deal.id) !== -1) assignedFunnel = f;
-    });
-  }
-
-  var urls = buildPostbackUrls(net, assignedFunnel, deal.cpaAmount || 0);
+  var urls = buildPostbackUrls(net, null, deal.cpaAmount || 0);
   var networkLabel = net.name.toUpperCase();
   if (net.clickMacro === '[afp1]') networkLabel += ' (uses [afp1])';
-  var funnelNote = assignedFunnel
-    ? 'Funnel is hardcoded as <strong style="color:var(--green)">' + assignedFunnel + '</strong> in these URLs. '
-    : '<strong style="color:var(--yellow)">&#9888; This deal is not assigned to any funnel — funnel will fall back to <code>[trackingcode]</code> which may not resolve correctly in CellXpert. Assign the deal to a funnel first.</strong> ';
   var trackingNote = (net.name === 'cellxpert' || net.name === 'ftdgallery' || net.name === 'padrino')
-    ? funnelNote + 'If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.'
-    : funnelNote + 'If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.';
+    ? 'Funnel is tracked automatically via <code>[afp4]</code> — the smartlink injects <code>afp4=Dark/Slotio/Scanio</code> into the casino URL at click time, so one postback URL works for all your funnels. Re-paste these URLs in the affiliate platform if you haven\'t already.'
+    : 'These URLs use the current network macros. If you previously set postback URLs in the affiliate platform, re-paste the updated versions above.';
   var cpaNote = (deal.cpaAmount > 0)
     ? 'Revenue of <code style="color:var(--green)">€' + deal.cpaAmount + '</code> is recorded on <strong>FTD</strong>. QFTD URL records €0 — only paste it if your platform requires it. Update the deal\'s CPA amount to regenerate these URLs.'
     : '<span style="color:#f0b429">&#9888; No CPA amount set on this deal — FTD will record €0 revenue. Set a CPA amount on the deal first, then re-paste the FTD URL.</span>';
@@ -3271,16 +3258,18 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '      } catch(e) {}\n' +
     '    }\n\n' +
     '    function injectTracking(url) {\n' +
-    '      if (!url || !src) return url;\n' +
+    '      if (!url) return url;\n' +
     '      var isCellXpert = /7ladies|cosmobetpartners|rollettoaffiliate|velobetpartners|cellxpert|ftdgallery|padrino|needforslots/.test(url);\n' +
     '      var p1 = isCellXpert ? \'afp2\' : \'sub1\';\n' +
     '      var p2 = isCellXpert ? \'afp3\' : \'sub2\';\n' +
     '      var u = url;\n' +
-    '      var re1 = new RegExp(\'([?&])\' + p1 + \'=[^&#]*\');\n' +
-    '      if (re1.test(u)) {\n' +
-    '        u = u.replace(re1, \'$1\' + p1 + \'=\' + encodeURIComponent(src));\n' +
-    '      } else {\n' +
-    '        u += (u.indexOf(\'?\') !== -1 ? \'&\' : \'?\') + p1 + \'=\' + encodeURIComponent(src);\n' +
+    '      if (src) {\n' +
+    '        var re1 = new RegExp(\'([?&])\' + p1 + \'=[^&#]*\');\n' +
+    '        if (re1.test(u)) {\n' +
+    '          u = u.replace(re1, \'$1\' + p1 + \'=\' + encodeURIComponent(src));\n' +
+    '        } else {\n' +
+    '          u += (u.indexOf(\'?\') !== -1 ? \'&\' : \'?\') + p1 + \'=\' + encodeURIComponent(src);\n' +
+    '        }\n' +
     '      }\n' +
     '      if (campaign) {\n' +
     '        var re2 = new RegExp(\'([?&])\' + p2 + \'=[^&#]*\');\n' +
@@ -3288,6 +3277,14 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '          u = u.replace(re2, \'$1\' + p2 + \'=\' + encodeURIComponent(campaign));\n' +
     '        } else {\n' +
     '          u += \'&\' + p2 + \'=\' + encodeURIComponent(campaign);\n' +
+    '        }\n' +
+    '      }\n' +
+    '      if (isCellXpert && FUNNEL) {\n' +
+    '        var re4 = /([?&])afp4=[^&#]*/;\n' +
+    '        if (re4.test(u)) {\n' +
+    '          u = u.replace(re4, \'$1afp4=\' + encodeURIComponent(FUNNEL));\n' +
+    '        } else {\n' +
+    '          u += \'&afp4=\' + encodeURIComponent(FUNNEL);\n' +
     '        }\n' +
     '      }\n' +
     '      return u;\n' +
