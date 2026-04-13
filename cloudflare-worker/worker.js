@@ -61,12 +61,42 @@ export default {
       return new Response(`Auth error: ${e.message}`, { status: 500 });
     }
 
-    // Log raw postback
+    // ── Deduplication — same clickid+eventType should only count once ──────────
+    // Uses a Firestore dedup doc with precondition exists:false.
+    // If the doc already exists the commit throws → isDuplicate = true.
+    let isDuplicate = false;
+    if (sub1 && eventType) {
+      const safeId   = sub1.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+      const dedupId  = `${safeId}-${eventType}`;
+      const dedupDoc = `projects/${PROJECT_ID}/databases/(default)/documents/dedup/${dedupId}`;
+      try {
+        await firestoreCommit(PROJECT_ID, [{
+          update: {
+            name: dedupDoc,
+            fields: {
+              clickid:   { stringValue: sub1 },
+              eventType: { stringValue: eventType },
+              funnelKey: { stringValue: funnelKey },
+              createdAt: { stringValue: ts },
+            },
+          },
+          currentDocument: { exists: false },   // fails if already exists
+        }], accessToken);
+      } catch (_) {
+        isDuplicate = true;
+      }
+    }
+
+    // Log raw postback (always — includes duplicate flag so we can audit)
     try { await addDoc(PROJECT_ID, "postbacks", {
       ts, funnelKey, network, sub1, source, campaign,
       rawEvent, eventType: eventType || "unknown", revenue,
+      isDuplicate,
       raw: JSON.stringify(p),
     }, accessToken); } catch(e) { return new Response(`Firestore log error: ${e.message}`, { status: 500 }); }
+
+    // Skip counters and alerts for duplicates — just acknowledge
+    if (isDuplicate) return new Response("OK", { status: 200 });
 
     // Telegram admin alert (fire-and-forget, never blocks response)
     if (env.TG_BOT_TOKEN && env.TG_CHAT_ID && eventType) {
