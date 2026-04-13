@@ -160,6 +160,69 @@
   ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   * { scrollbar-width: thin; scrollbar-color: var(--border-bright) transparent; }
 
+  /* ── LOGIN SCREEN ──────────────────────────────────────────────────────── */
+  #loginScreen {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 48px;
+    transition: opacity 0.35s ease;
+  }
+  #loginScreen.hiding { opacity: 0; pointer-events: none; }
+  .login-logo {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .login-logo-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(160,160,200,0.1));
+    border: 1px solid rgba(99,102,241,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; color: var(--accent);
+    box-shadow: 0 0 32px rgba(99,102,241,0.15);
+  }
+  .login-logo h1 { font-size: 22px; font-weight: 700; color: var(--text); margin: 0; letter-spacing: -0.02em; }
+  .login-logo p  { font-size: 12px; color: var(--muted); margin: 0; text-transform: uppercase; letter-spacing: 0.12em; }
+  .login-prompt {
+    font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; text-align: center;
+  }
+  .login-members {
+    display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; max-width: 680px;
+  }
+  .login-card {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px; padding: 24px 28px; cursor: pointer; min-width: 110px;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+  }
+  .login-card:hover {
+    background: rgba(255,255,255,0.07); border-color: rgba(99,102,241,0.4);
+    transform: translateY(-3px); box-shadow: 0 12px 32px rgba(99,102,241,0.12);
+  }
+  .login-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff;
+    letter-spacing: -0.02em;
+  }
+  .login-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .login-role { font-size: 11px; color: var(--muted); }
+
+  /* User chip in nav */
+  .user-chip {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 4px 10px 4px 5px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s; margin-left: 8px;
+  }
+  .user-chip:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+  .user-chip-av {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #fff;
+  }
+  .user-chip-name { font-size: 11px; font-weight: 600; color: var(--text); }
+
   /* ── GLOBAL SELECT ─────────────────────────────────────────────────────── */
   select {
     background: #0f0f12;
@@ -1274,6 +1337,17 @@
 <body>
 <div id="toastContainer"></div>
 
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-logo">
+    <div class="login-logo-icon">&#9824;</div>
+    <h1>Dark Intel</h1>
+    <p>Casino Partner Dashboard</p>
+  </div>
+  <div class="login-prompt">Who are you?</div>
+  <div class="login-members" id="loginMembers"></div>
+</div>
+
 <div class="header">
   <div style="display:flex;align-items:center;gap:16px">
     <div class="header-icon">&#9824;</div>
@@ -1553,6 +1627,7 @@
 
   <!-- Breadcrumb (right side) -->
   <div class="nav-breadcrumb" id="navBreadcrumb"></div>
+  <div id="navUserChip"></div>
 </div>
 
 
@@ -1859,6 +1934,75 @@ db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
 var DOC_REF = db.collection('dashboard').doc('data');
 
 var STORAGE_KEY = 'affiliate_deals';
+
+// ── USER LOGIN ─────────────────────────────────────────────────────────────
+var LOGIN_MEMBERS = [
+  { name: 'Nai',    role: 'Team Member', color: '#6366f1' },
+  { name: 'Zan',    role: 'Team Member', color: '#10b981' },
+  { name: 'Mlinc',  role: 'Team Member', color: '#f59e0b' },
+  { name: 'Marenk', role: 'Team Member', color: '#ef4444' },
+  { name: 'Cipe',   role: 'Team Member', color: '#8b5cf6' },
+];
+
+var currentUser = (function() {
+  try { return JSON.parse(localStorage.getItem('dashCurrentUser')); } catch(_) { return null; }
+})();
+
+function _loginInitScreen() {
+  var wrap = document.getElementById('loginMembers');
+  if (!wrap) return;
+  wrap.innerHTML = LOGIN_MEMBERS.map(function(m) {
+    var initials = m.name.slice(0, 2).toUpperCase();
+    return '<div class="login-card" onclick="loginAs(' + JSON.stringify(m.name) + ')">'
+      + '<div class="login-avatar" style="background:' + m.color + '33;border:1.5px solid ' + m.color + '66;color:' + m.color + '">' + initials + '</div>'
+      + '<div class="login-name">' + m.name + '</div>'
+      + '<div class="login-role">' + m.role + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function loginAs(name) {
+  var member = LOGIN_MEMBERS.find(function(m) { return m.name === name; });
+  if (!member) return;
+  currentUser = member;
+  localStorage.setItem('dashCurrentUser', JSON.stringify(member));
+  var screen = document.getElementById('loginScreen');
+  if (screen) {
+    screen.classList.add('hiding');
+    setTimeout(function() { screen.style.display = 'none'; }, 360);
+  }
+  _renderUserChip();
+}
+
+function switchUser() {
+  currentUser = null;
+  localStorage.removeItem('dashCurrentUser');
+  var screen = document.getElementById('loginScreen');
+  if (screen) { screen.style.opacity = ''; screen.classList.remove('hiding'); screen.style.display = ''; }
+  _renderUserChip();
+}
+
+function _renderUserChip() {
+  var el = document.getElementById('navUserChip');
+  if (!el) return;
+  if (!currentUser) { el.innerHTML = ''; return; }
+  var m = LOGIN_MEMBERS.find(function(x) { return x.name === currentUser.name; }) || { color: '#6366f1' };
+  var initials = currentUser.name.slice(0, 2).toUpperCase();
+  el.innerHTML = '<div class="user-chip" onclick="switchUser()" title="Switch user">'
+    + '<div class="user-chip-av" style="background:' + m.color + '44;color:' + m.color + '">' + initials + '</div>'
+    + '<span class="user-chip-name">' + currentUser.name + '</span>'
+    + '</div>';
+}
+
+// Init login on load
+(function() {
+  _loginInitScreen();
+  if (currentUser) {
+    var screen = document.getElementById('loginScreen');
+    if (screen) screen.style.display = 'none';
+    _renderUserChip();
+  }
+})();
 
 // ── Debounce utility ───────────────────────────────────────────────────────
 var _pendingDebounces = [];
@@ -10842,9 +10986,12 @@ function _renderLogTimeForm() {
   });
 
   var empOptions = '';
+  var _loggedInEmpId = null;
   employees.forEach(function(e) {
     if (e.status !== 'inactive') {
-      empOptions += '<option value="' + empEscHtml(e.id) + '">' + empEscHtml(e.name) + ' — ' + empEscHtml(e.role) + '</option>';
+      var isSelf = currentUser && e.name.toLowerCase() === currentUser.name.toLowerCase();
+      if (isSelf && !_loggedInEmpId) _loggedInEmpId = e.id;
+      empOptions += '<option value="' + empEscHtml(e.id) + '"' + (isSelf ? ' selected' : '') + '>' + empEscHtml(e.name) + ' — ' + empEscHtml(e.role) + '</option>';
     }
   });
 
@@ -10867,9 +11014,11 @@ function _renderLogTimeForm() {
     // Employee
     + '<div>'
     + '<label style="display:block;font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;">Employee</label>'
-    + '<select id="tl_employee" required style="width:100%;padding:9px 11px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--font-body);">'
-    + empOptions
-    + '</select>'
+    + (currentUser && _loggedInEmpId && !isEdit
+        ? '<input type="hidden" id="tl_employee" value="' + empEscHtml(_loggedInEmpId) + '">'
+          + '<div style="padding:9px 11px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;opacity:0.8">' + empEscHtml(currentUser.name) + '</div>'
+        : '<select id="tl_employee" required style="width:100%;padding:9px 11px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--font-body);">' + empOptions + '</select>'
+      )
     + '</div>'
 
     // Date
