@@ -6,6 +6,7 @@
 <title>Universal Deals</title>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap');
 
@@ -1397,8 +1398,29 @@
       <p>Casino Partner Dashboard</p>
     </div>
     <div class="login-divider"></div>
-    <div class="login-prompt" id="loginGreeting">Select your profile</div>
-    <div class="login-members" id="loginMembers"></div>
+
+    <!-- Step 1: PIN -->
+    <div id="loginPinStep">
+      <div class="login-prompt">Enter team access code</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:8px">
+        <input id="loginPinInput" type="password" placeholder="Access code"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')submitPin()"
+          style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:12px 18px;color:#e8e8f0;font-size:15px;font-family:var(--font-mono);letter-spacing:0.15em;text-align:center;width:220px;outline:none;transition:border-color 0.2s;">
+        <button onclick="submitPin()"
+          style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);border-radius:10px;padding:10px 32px;color:#818cf8;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s,border-color 0.15s;letter-spacing:0.04em"
+          onmouseover="this.style.background='rgba(99,102,241,0.32)'" onmouseout="this.style.background='rgba(99,102,241,0.2)'">
+          Continue →
+        </button>
+        <div id="loginPinError" style="display:none;font-size:12px;color:var(--red);font-family:var(--font-mono)">Incorrect access code</div>
+      </div>
+    </div>
+
+    <!-- Step 2: Member pick (hidden until PIN correct) -->
+    <div id="loginMemberStep" style="display:none;flex-direction:column;align-items:center;gap:28px">
+      <div class="login-prompt" id="loginGreeting">Select your profile</div>
+      <div class="login-members" id="loginMembers"></div>
+    </div>
   </div>
 </div>
 
@@ -1975,7 +1997,8 @@ var firebaseConfig = {
   appId: "1:1066401093922:web:baf13dcde3aaf99e60ed7b"
 };
 firebase.initializeApp(firebaseConfig);
-var db = firebase.firestore();
+var db   = firebase.firestore();
+var auth = firebase.auth();
 
 // Enable offline persistence — queues writes if network drops, syncs on reconnect
 db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
@@ -1999,6 +2022,34 @@ var LOGIN_MEMBERS = [
   { name: 'Cipe',   role: 'Team Member', color: '#8b5cf6' },
 ];
 
+// Default PIN hash — change via Settings → Access Code
+// Default code is: DarkIntel2026
+var _PIN_SALT = ':di26x';
+var _DEFAULT_PIN_HASH = btoa('DarkIntel2026' + _PIN_SALT);
+
+function _pinHash(pin) { return btoa(pin + _PIN_SALT); }
+function _pinOk(pin) {
+  var stored = localStorage.getItem('dashPinHash') || _DEFAULT_PIN_HASH;
+  return _pinHash(pin.trim()) === stored;
+}
+
+function submitPin() {
+  var input = document.getElementById('loginPinInput');
+  var err   = document.getElementById('loginPinError');
+  var pin   = input ? input.value : '';
+  if (!pin) return;
+  if (_pinOk(pin)) {
+    var pinStep    = document.getElementById('loginPinStep');
+    var memberStep = document.getElementById('loginMemberStep');
+    if (pinStep)    pinStep.style.display    = 'none';
+    if (memberStep) memberStep.style.display = 'flex';
+    _loginInitScreen();
+  } else {
+    if (input) { input.value = ''; input.style.borderColor = 'var(--red)'; setTimeout(function(){ input.style.borderColor = ''; }, 1800); }
+    if (err)   { err.style.display = ''; setTimeout(function(){ err.style.display = 'none'; }, 2500); }
+  }
+}
+
 var currentUser = (function() {
   try { return JSON.parse(localStorage.getItem('dashCurrentUser')); } catch(_) { return null; }
 })();
@@ -2006,12 +2057,10 @@ var currentUser = (function() {
 function _loginInitScreen() {
   var wrap = document.getElementById('loginMembers');
   if (!wrap) return;
-  // Set greeting based on time of day
   var h = new Date().getHours();
   var greeting = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
   var greetEl = document.getElementById('loginGreeting');
   if (greetEl) greetEl.textContent = greeting + ' — who\'s working today?';
-
   wrap.innerHTML = LOGIN_MEMBERS.map(function(m) {
     var initials = m.name.slice(0, 2).toUpperCase();
     var hex = m.color;
@@ -2029,6 +2078,8 @@ function loginAs(name) {
   if (!member) return;
   currentUser = member;
   localStorage.setItem('dashCurrentUser', JSON.stringify(member));
+  // Sign in anonymously — required for Firestore rules
+  auth.signInAnonymously().catch(function(e) { console.warn('Auth warning:', e.message); });
   var screen = document.getElementById('loginScreen');
   if (screen) {
     screen.classList.add('hiding');
@@ -2040,8 +2091,15 @@ function loginAs(name) {
 function switchUser() {
   currentUser = null;
   localStorage.removeItem('dashCurrentUser');
-  var screen = document.getElementById('loginScreen');
-  if (screen) { screen.style.opacity = ''; screen.classList.remove('hiding'); screen.style.display = ''; }
+  // Re-show login at PIN step
+  var screen     = document.getElementById('loginScreen');
+  var pinStep    = document.getElementById('loginPinStep');
+  var memberStep = document.getElementById('loginMemberStep');
+  var pinInput   = document.getElementById('loginPinInput');
+  if (screen)     { screen.style.opacity = ''; screen.classList.remove('hiding'); screen.style.display = ''; }
+  if (pinStep)     pinStep.style.display    = '';
+  if (memberStep)  memberStep.style.display = 'none';
+  if (pinInput)    pinInput.value = '';
   _renderUserChip();
 }
 
@@ -2057,10 +2115,11 @@ function _renderUserChip() {
     + '</div>';
 }
 
-// Init login on load
+// Init on load — if already logged in, re-authenticate silently
 (function() {
   _loginInitScreen();
   if (currentUser) {
+    auth.signInAnonymously().catch(function(){});
     var screen = document.getElementById('loginScreen');
     if (screen) screen.style.display = 'none';
     _renderUserChip();
@@ -6371,6 +6430,20 @@ function renderSettingsPage() {
   container.innerHTML =
     '<div style="padding:28px 32px 40px;max-width:820px">' +
 
+      // ── Access Code ───────────────────────────────────────────
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Team Access Code</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:18px">The code team members enter on the login screen. Stored locally in each browser. Default: <code style="color:var(--accent);background:var(--card2);padding:1px 6px;border-radius:4px">DarkIntel2026</code></div>' +
+        '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
+          '<div style="flex:1;min-width:200px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">New Access Code</label>' +
+            '<input id="settings-pin-new" type="password" placeholder="Enter new code" autocomplete="new-password" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
+          '<div style="flex:1;min-width:200px"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Confirm Code</label>' +
+            '<input id="settings-pin-confirm" type="password" placeholder="Repeat code" autocomplete="new-password" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
+          '<button onclick="saveTeamPin()" style="background:var(--accent);border:none;border-radius:6px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Update Code</button>' +
+        '</div>' +
+        '<span id="pinSaveMsg" style="display:none;font-size:12px;color:var(--green);margin-top:8px;display:block">&nbsp;</span>' +
+      '</div>' +
+
       // ── Meta Ads API ──────────────────────────────────────────
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
         '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Meta Ads API</div>' +
@@ -6583,6 +6656,19 @@ function saveSrcModal() {
   saveToFirebase();
   closeSrcModal();
   renderSettingsPage();
+}
+
+function saveTeamPin() {
+  var n = (document.getElementById('settings-pin-new') || {}).value || '';
+  var c = (document.getElementById('settings-pin-confirm') || {}).value || '';
+  var msg = document.getElementById('pinSaveMsg');
+  if (!n) { if (msg) { msg.textContent = 'Enter a new code'; msg.style.color = 'var(--red)'; msg.style.display = 'block'; } return; }
+  if (n !== c) { if (msg) { msg.textContent = 'Codes do not match'; msg.style.color = 'var(--red)'; msg.style.display = 'block'; } return; }
+  if (n.length < 4) { if (msg) { msg.textContent = 'Code must be at least 4 characters'; msg.style.color = 'var(--red)'; msg.style.display = 'block'; } return; }
+  localStorage.setItem('dashPinHash', _pinHash(n));
+  if (document.getElementById('settings-pin-new')) document.getElementById('settings-pin-new').value = '';
+  if (document.getElementById('settings-pin-confirm')) document.getElementById('settings-pin-confirm').value = '';
+  if (msg) { msg.textContent = 'Access code updated ✓ — share the new code with your team'; msg.style.color = 'var(--green)'; msg.style.display = 'block'; setTimeout(function(){ msg.style.display = 'none'; }, 4000); }
 }
 
 function saveMetaSettings() {
