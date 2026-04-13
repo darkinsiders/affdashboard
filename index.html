@@ -388,7 +388,8 @@
   .nav-group-btn.active.grp-business  .nav-active-dot { background: var(--purple); box-shadow: 0 0 5px var(--purple); }
   .nav-group-btn.active.grp-home      { color: var(--text); border-color: var(--border-bright); }
   .nav-group-btn.active.grp-home      .nav-active-dot { background: var(--text); }
-  .ni-icon { font-size: 12px; opacity: 0.7; margin-right: 1px; }
+  .ni-icon { display:inline-flex; align-items:center; opacity:0.75; margin-right:4px; flex-shrink:0; }
+  .ni-icon svg { width:13px; height:13px; display:block; }
 
   /* Dropdown panel */
   .nav-dropdown {
@@ -1548,7 +1549,7 @@
   <div class="nav-group" id="navgrp-home">
     <button class="nav-group-btn grp-home" id="tab-homeNavBtn" onclick="navGo(function(){setPage('home')})">
       <span class="nav-active-dot"></span>
-      <span class="ni-icon">⌂</span> Home
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5L8 2l6 4.5V14a.5.5 0 0 1-.5.5H10V10H6v4.5H2.5A.5.5 0 0 1 2 14V6.5z"/></svg></span> Home
     </button>
   </div>
 
@@ -1556,7 +1557,7 @@
   <div class="nav-group" id="navgrp-analytics">
     <button class="nav-group-btn grp-analytics" onclick="toggleNavGroup('analytics')">
       <span class="nav-active-dot"></span>
-      <span class="ni-icon">📊</span> Analytics
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,12 5.5,7.5 9,9.5 14,3"/><line x1="2" y1="14" x2="14" y2="14"/></svg></span> Analytics
       <span class="nav-arrow">▾</span>
     </button>
     <div class="nav-dropdown">
@@ -1591,7 +1592,7 @@
   <div class="nav-group" id="navgrp-funnels">
     <button class="nav-group-btn grp-funnels" onclick="toggleNavGroup('funnels')">
       <span class="nav-active-dot"></span>
-      <span class="ni-icon">⚡</span> Funnels
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2.5h12L9.5 8.5v4l-3-1v-3L2 2.5z"/></svg></span> Funnels
       <span id="funnels-conflict-badge" style="display:none;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:8px;background:rgba(217,62,62,0.25);color:var(--red);font-size:9px;font-weight:700;padding:0 4px;font-family:var(--font-mono)"></span>
       <span class="nav-arrow">▾</span>
     </button>
@@ -1634,7 +1635,7 @@
   <div class="nav-group" id="navgrp-campaigns">
     <button class="nav-group-btn grp-campaigns" onclick="toggleNavGroup('campaigns')">
       <span class="nav-active-dot"></span>
-      <span class="ni-icon">🎯</span> Campaigns
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="2"/><line x1="8" y1="1" x2="8" y2="3.5"/><line x1="8" y1="12.5" x2="8" y2="15"/><line x1="1" y1="8" x2="3.5" y2="8"/><line x1="12.5" y1="8" x2="15" y2="8"/></svg></span> Campaigns
       <span class="nav-arrow">▾</span>
     </button>
     <div class="nav-dropdown">
@@ -1657,7 +1658,7 @@
   <div class="nav-group" id="navgrp-content">
     <button class="nav-group-btn grp-content" onclick="toggleNavGroup('content')">
       <span class="nav-active-dot"></span>
-      <span class="ni-icon">📁</span> Resources
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,5.5 8,2.5 14,5.5 8,8.5 2,5.5"/><polyline points="2,9.5 8,12.5 14,9.5"/></svg></span> Resources
       <span class="nav-arrow">▾</span>
     </button>
     <div class="nav-dropdown">
@@ -1680,7 +1681,7 @@
   <div class="nav-group" id="navgrp-business">
     <button class="nav-group-btn grp-business" onclick="toggleNavGroup('business')">
       <span class="nav-active-dot"></span>
-      <span class="ni-icon">👥</span> Team
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2.5"/><path d="M1.5 14c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5"/><circle cx="12" cy="5.5" r="2"/><path d="M10.5 14h4c0-2-1.5-3.5-3.5-3.5"/></svg></span> Team
       <span class="nav-arrow">▾</span>
     </button>
     <div class="nav-dropdown">
@@ -1699,7 +1700,7 @@
   <div class="nav-group" id="navgrp-settings">
     <button class="nav-group-btn grp-settings" id="tab-settings" onclick="navGo(function(){setPage('settings')})">
       <span class="nav-active-dot"></span>
-      <span class="ni-icon">⚙</span> Settings
+      <span class="ni-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><circle cx="6" cy="4" r="1.7" fill="currentColor" stroke="none"/><line x1="2" y1="8" x2="14" y2="8"/><circle cx="10" cy="8" r="1.7" fill="currentColor" stroke="none"/><line x1="2" y1="12" x2="14" y2="12"/><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/></svg></span> Settings
     </button>
   </div>
 
@@ -4378,13 +4379,13 @@ function startPostbackListener() {
         var srcBadge = src ? ' · <span style="color:var(--muted);font-size:11px">' + escHtml(src) + '</span>' : '';
         if (et === 'ftd') {
           showToast(
-            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--green);margin-bottom:4px">💰 New FTD</div>' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--green);margin-bottom:4px"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px"><circle cx="8" cy="8" r="6"/><line x1="8" y1="5" x2="8" y2="5.01"/><path d="M6 8h2.5a1.5 1.5 0 0 1 0 3H6"/><line x1="6" y1="11" x2="10" y2="11"/></svg>New FTD</div>' +
             '<div style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(funnel) + rev + srcBadge + '</div>',
             'ftd', 8000
           );
         } else if (et === 'reg') {
           showToast(
-            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--accent);margin-bottom:4px">📋 New Registration</div>' +
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--accent);margin-bottom:4px"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><rect x="4" y="1.5" width="8" height="13" rx="1"/><line x1="6" y1="5.5" x2="10" y2="5.5"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="6" y1="10.5" x2="8.5" y2="10.5"/></svg>New Registration</div>' +
             '<div style="font-size:13px;font-weight:600;color:var(--text)">' + escHtml(funnel) + srcBadge + '</div>',
             'reg', 5000
           );
@@ -8062,7 +8063,7 @@ function mcCopyConfig() {
   state.landingUrl = mcBuildUtm(state.funnel, state.name, state.geos);
   var json = JSON.stringify(state, null, 2);
   navigator.clipboard.writeText(json).then(function() {
-    showToast('<div style="font-size:12px;color:var(--text)">📋 Campaign config copied as JSON.</div>', 'reg', 3000);
+    showToast('<div style="font-size:12px;color:var(--text)">Copied campaign config as JSON.</div>', 'reg', 3000);
   }).catch(function() {
     showToast('<div style="font-size:12px;color:var(--yellow)">⚠ Clipboard access denied.</div>', 'alert', 3000);
   });
@@ -8149,7 +8150,7 @@ function renderCreativesGrid() {
       thumb +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">' +
         '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,0.06);color:' + color + '">' + escHtml(c.funnel || '—') + '</span>' +
-        '<button onclick="navigator.clipboard.writeText(\'' + escHtml(c.url || '') + '\');showToast(\'<div style=\\\"font-size:12px\\\">📋 URL copied</div>\',\'reg\',2000)" ' +
+        '<button onclick="navigator.clipboard.writeText(\'' + escHtml(c.url || '') + '\');showToast(\'<div style=\\\"font-size:12px\\\">URL copied</div>\',\'reg\',2000)" ' +
           'style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">Copy URL</button>' +
       '</div>' +
       '<div style="font-size:9px;font-family:var(--font-mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(c.url || '') + '">' + escHtml((c.url || '').replace(/^https?:\/\//, '').substring(0, 48)) + '</div>' +
@@ -8351,7 +8352,7 @@ function renderMetaCampaignsPage() {
             '<label style="' + LABEL + '">UTM Preview <span style="color:var(--muted);font-weight:400;text-transform:none">(auto-built)</span></label>',
             '<div style="display:flex;gap:8px;align-items:center">',
               '<input id="mc_utm_preview" type="text" readonly value="' + escHtml(initUtm) + '" style="' + IS_MONO + ';flex:1;color:var(--muted);background:rgba(0,0,0,0.5);font-size:10px">',
-              '<button onclick="copyToClipboard(document.getElementById(\'mc_utm_preview\').value, this, \'📋\')" style="flex-shrink:0;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card2);color:var(--muted);cursor:pointer;font-size:13px">📋</button>',
+              '<button onclick="copyToClipboard(document.getElementById(\'mc_utm_preview\').value, this, ICON_COPY)" style="flex-shrink:0;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card2);color:var(--muted);cursor:pointer;display:flex;align-items:center">' + ICON_COPY + '</button>',
             '</div>',
           '</div>',
         '</div>',
