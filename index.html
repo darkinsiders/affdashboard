@@ -2807,7 +2807,7 @@ function buildPostbackUrls(network, funnelOverride, cpaAmount) {
   } else if (network.name === 'affilika') {
     funnelParam = '{campaign_id}';
   } else {
-    funnelParam = '[afp4]';
+    funnelParam = '[trackingcode]';
   }
   // Revenue on FTD only — hardcoded per deal so the correct CPA is recorded regardless of what the platform sends
   // QFTD records €0 (not all platforms have QFTD, and we don't want double-counting)
@@ -3258,18 +3258,16 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '      } catch(e) {}\n' +
     '    }\n\n' +
     '    function injectTracking(url) {\n' +
-    '      if (!url) return url;\n' +
+    '      if (!url || !src) return url;\n' +
     '      var isCellXpert = /7ladies|cosmobetpartners|rollettoaffiliate|velobetpartners|cellxpert|ftdgallery|padrino|needforslots/.test(url);\n' +
     '      var p1 = isCellXpert ? \'afp2\' : \'sub1\';\n' +
     '      var p2 = isCellXpert ? \'afp3\' : \'sub2\';\n' +
     '      var u = url;\n' +
-    '      if (src) {\n' +
-    '        var re1 = new RegExp(\'([?&])\' + p1 + \'=[^&#]*\');\n' +
-    '        if (re1.test(u)) {\n' +
-    '          u = u.replace(re1, \'$1\' + p1 + \'=\' + encodeURIComponent(src));\n' +
-    '        } else {\n' +
-    '          u += (u.indexOf(\'?\') !== -1 ? \'&\' : \'?\') + p1 + \'=\' + encodeURIComponent(src);\n' +
-    '        }\n' +
+    '      var re1 = new RegExp(\'([?&])\' + p1 + \'=[^&#]*\');\n' +
+    '      if (re1.test(u)) {\n' +
+    '        u = u.replace(re1, \'$1\' + p1 + \'=\' + encodeURIComponent(src));\n' +
+    '      } else {\n' +
+    '        u += (u.indexOf(\'?\') !== -1 ? \'&\' : \'?\') + p1 + \'=\' + encodeURIComponent(src);\n' +
     '      }\n' +
     '      if (campaign) {\n' +
     '        var re2 = new RegExp(\'([?&])\' + p2 + \'=[^&#]*\');\n' +
@@ -3277,14 +3275,6 @@ function generateRedirectHtml(funnel, urlToCasino) {
     '          u = u.replace(re2, \'$1\' + p2 + \'=\' + encodeURIComponent(campaign));\n' +
     '        } else {\n' +
     '          u += \'&\' + p2 + \'=\' + encodeURIComponent(campaign);\n' +
-    '        }\n' +
-    '      }\n' +
-    '      if (isCellXpert && FUNNEL) {\n' +
-    '        var re4 = /([?&])afp4=[^&#]*/;\n' +
-    '        if (re4.test(u)) {\n' +
-    '          u = u.replace(re4, \'$1afp4=\' + encodeURIComponent(FUNNEL));\n' +
-    '        } else {\n' +
-    '          u += \'&afp4=\' + encodeURIComponent(FUNNEL);\n' +
     '        }\n' +
     '      }\n' +
     '      return u;\n' +
