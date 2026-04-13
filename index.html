@@ -2012,6 +2012,7 @@ function setPage(page) {
     setNavActive('home', 'home');
     updateBreadcrumb('Home', '');
     renderHomePage();
+    if (isDataStale('home')) loadHomeData();
   } else if (page === 'analytics') {
     var el = document.getElementById('analyticsPage');
     if (el) el.style.display = '';
@@ -2019,6 +2020,7 @@ function setPage(page) {
     setNavActive(analyticsTab, 'analytics');
     updateBreadcrumb('Analytics', subLabel);
     renderAnalyticsPage();
+    if (isDataStale('analytics')) { _dataLoadedAt.analytics = Date.now(); renderAnalyticsPage(); }
   } else if (page === 'deals') {
     var el = document.getElementById('dealsPage');
     if (el) el.style.display = '';
@@ -3854,6 +3856,19 @@ function saveToFirebase() {
 
 var debouncedSaveToFirebase = debounce(saveToFirebase, 600);
 
+// ── Auto-refresh: stale data detection ─────────────────────────────────────
+var _dataLoadedAt = { home: 0, analytics: 0 };
+var _STALE_MS = 5 * 60 * 1000; // 5 minutes
+function markDataFresh(key) { _dataLoadedAt[key] = Date.now(); }
+function isDataStale(key) { return (Date.now() - (_dataLoadedAt[key] || 0)) > _STALE_MS; }
+// Reset stale flags when the user returns to this tab after being away
+window.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    _dataLoadedAt.home = 0;
+    _dataLoadedAt.analytics = 0;
+  }
+});
+
 function saveRoutesToFirebase() {
   FUNNEL_NAMES.forEach(function(f) {
     var multiMap = buildMultiRouteMap(f);
@@ -4529,6 +4544,7 @@ function loadHomeData() {
         : '<div style="padding:12px 16px;color:var(--muted);font-size:12px;text-align:center">No events yet</div>';
     }
 
+    markDataFresh('home');
   }).catch(function(err) {
     var h = document.getElementById('homeHeroRevenue');
     if (h) h.textContent = 'Error';
@@ -5608,6 +5624,34 @@ function nextLpId() {
   return landingPages.length > 0 ? Math.max.apply(null, landingPages.map(function(l) { return l.id; })) + 1 : 1;
 }
 
+// Cache: { Dark: { ftds: 5, revenue: 120 }, ... } — loaded async for LP stat cards
+var _lpConvStats = null;
+
+function loadLpConvStats(cb) {
+  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+  var cutoffDate = cutoff.toISOString().split('T')[0];
+  db.collection('conversions').get().then(function(snap) {
+    var stats = {};
+    snap.forEach(function(doc) {
+      var id = doc.id; // e.g. "dark-2026-04-13"
+      var parts = id.split('-');
+      if (parts.length < 4) return;
+      var dateStr = parts.slice(-3).join('-');
+      if (dateStr < cutoffDate) return;
+      var fk = parts.slice(0, parts.length - 3).join('-');
+      var funnelName = fk.charAt(0).toUpperCase() + fk.slice(1);
+      // Match to FUNNEL_NAMES case-insensitively
+      var matched = FUNNEL_NAMES.find(function(fn) { return fn.toLowerCase() === fk.toLowerCase(); }) || funnelName;
+      if (!stats[matched]) stats[matched] = { ftds: 0, revenue: 0 };
+      var d = doc.data();
+      stats[matched].ftds += (d.ftds || 0);
+      stats[matched].revenue += (d.revenue || 0);
+    });
+    _lpConvStats = stats;
+    if (cb) cb();
+  }).catch(function() { _lpConvStats = {}; if (cb) cb(); });
+}
+
 function renderLandingPagesTab() {
   var body = document.getElementById('dealsSubBody');
   if (!body) return;
@@ -5644,7 +5688,7 @@ function renderLandingPagesTab() {
         '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;margin-left:10px;background:' + (isLive ? 'var(--green-glow)' : 'var(--yellow-glow)') + ';color:' + (isLive ? 'var(--green)' : 'var(--yellow)') + ';border:1px solid ' + (isLive ? 'rgba(126,191,154,0.3)' : 'rgba(229,192,123,0.3)') + '">' + (isLive ? '● Live' : '○ Paused') + '</span>' +
       '</div>' +
       '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' +
-        '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08)">' + (lp.funnel ? escHtml(lp.funnel) : '— no funnel') + '</span>' +
+        '<span onclick="setPage(\'funnels\')" title="Go to Funnels" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08);cursor:pointer">' + (lp.funnel ? escHtml(lp.funnel) : '— no funnel') + '</span>' +
         (lp.type === 'redirect' ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(130,100,220,0.15);color:#a990f5;border:1px solid rgba(130,100,220,0.3)">↪ Redirect</span>' : '') +
         (srcName !== '—' ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border)">' + escHtml(srcName) + '</span>' : '') +
         (lp.notes ? '<span style="font-size:10px;color:var(--muted);padding:2px 8px">' + escHtml(lp.notes) + '</span>' : '') +
@@ -5652,6 +5696,16 @@ function renderLandingPagesTab() {
       '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">' +
         trafficHtml + expiryHtml +
       '</div>' +
+      (function() {
+        if (!lp.funnel) return '<div style="font-size:10px;color:var(--muted);padding:4px 0 8px;font-style:italic">Assign a funnel to see stats</div>';
+        var st = _lpConvStats && _lpConvStats[lp.funnel];
+        if (!_lpConvStats) return '<div id="lp-stat-' + lp.id + '" style="font-size:10px;color:var(--muted);padding:4px 0 8px">Loading stats…</div>';
+        if (!st || (st.ftds === 0 && st.revenue === 0)) return '<div style="font-size:10px;color:var(--muted);padding:4px 0 8px">No conversions in last 7 days</div>';
+        return '<div style="display:flex;gap:12px;padding:4px 0 8px">' +
+          '<span style="font-size:10px;font-weight:700;color:var(--green)">FTDs 7d: ' + st.ftds + '</span>' +
+          (st.revenue > 0 ? '<span style="font-size:10px;font-weight:700;color:var(--yellow)">Rev: €' + st.revenue.toFixed(0) + '</span>' : '') +
+        '</div>';
+      })() +
       '<div style="display:flex;gap:6px">' +
         '<a href="' + escHtml(lp.url) + '" target="_blank" style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.04)\'">Open ↗</a>' +
         '<button onclick="openLpModal(' + lp.id + ')" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.04)\'">Edit</button>' +
@@ -5669,6 +5723,11 @@ function renderLandingPagesTab() {
       ? '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:48px;text-align:center;color:var(--muted);font-size:13px">No landing pages yet. Click <strong style="color:var(--text)">+ Add</strong> to add your first one.</div>'
       : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">' + cards + '</div>'
     );
+
+  // Load conversion stats async and re-render cards when ready
+  if (!_lpConvStats) {
+    loadLpConvStats(function() { renderLandingPagesTab(); });
+  }
 }
 
 function openLpModal(id) {
@@ -5939,6 +5998,24 @@ function renderFunnelsPage() {
           '</div>' +
 
         '</div>' +
+
+        // ── Landing Pages assigned to this funnel ──
+        (function() {
+          var fLps = landingPages.filter(function(lp) { return lp.funnel === f; });
+          var chips = fLps.length === 0
+            ? '<span style="font-size:11px;color:var(--muted);font-style:italic">None assigned — </span>' +
+              '<button onclick="dealsSubTab=\'lps\';setPage(\'deals\')" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;padding:0;text-decoration:underline">+ Add LP</button>'
+            : fLps.map(function(lp) {
+                var dom = ''; try { dom = new URL(lp.url).hostname.replace('www.',''); } catch(e) { dom = lp.url; }
+                var isOn = lp.traffic;
+                return '<a href="' + escHtml(lp.url) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:' + (isOn ? 'var(--green)' : 'var(--muted)') + ';border:1px solid ' + (isOn ? 'rgba(126,191,154,0.25)' : 'var(--border)') + ';text-decoration:none">' + escHtml(dom) + (isOn ? ' ▶' : '') + '</a>';
+              }).join(' ');
+          return '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">' +
+            '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:7px">Landing Pages</div>' +
+            '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + chips + '</div>' +
+          '</div>';
+        })() +
+
       '</div>' +
     '</div>';
   }).join('');
@@ -8110,11 +8187,12 @@ function loadPhoneFarmData(callback) {
   }).catch(function() { done.proxies = true; check(); });
 }
 
-function pfSave(docId, field, data, msg) {
+function pfSave(docId, field, data) {
   var obj = {}; obj[field] = data;
+  showSaveIndicator('saving', 'Saving…');
   db.collection('phone_farm').doc(docId).set(obj, {merge:true})
-    .then(function(){ if (msg) showToast(msg,'ok',2000); })
-    .catch(function(e){ showToast('Save error: '+e.message,'alert',3000); });
+    .then(function(){ showSaveIndicator('saved', 'Saved ✓'); })
+    .catch(function(e){ showSaveIndicator('error', 'Save failed ✗'); showToast('Phone farm save error: '+e.message,'alert',3000); });
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -9926,20 +10004,25 @@ var PROJECT_PRIORITY_COLORS = {
 
 // ─── FIREBASE PERSISTENCE ────────────────────────────────────────────────────
 
+var _projectListener = null;
+
 function loadProjectData(cb) {
-  db.collection('projects').doc('tasks').get().then(function(doc) {
+  if (_projectListener) { if (cb) cb(); return; }
+  _projectListener = db.collection('projects').doc('tasks').onSnapshot(function(doc) {
     if (doc.exists && doc.data().tasks) {
       projectTasks = doc.data().tasks;
-    } else {
+    } else if (!projectLoaded) {
       projectTasks = [];
     }
-    projectLoaded = true;
-    if (cb) cb();
-  }).catch(function(e) {
+    if (!projectLoaded) {
+      projectLoaded = true;
+      if (cb) cb();
+    } else if (currentPage === 'project') {
+      _renderProjectPageContent();
+    }
+  }, function(e) {
     console.error('Project load error:', e);
-    projectTasks = [];
-    projectLoaded = true;
-    if (cb) cb();
+    if (!projectLoaded) { projectTasks = []; projectLoaded = true; if (cb) cb(); }
   });
 }
 
@@ -10638,23 +10721,26 @@ function empHoursBg(h) {
 
 // ── FIREBASE LOAD / SAVE ──────────────────────────────────────────────────────
 
+var _hrListener = null;
+
 function loadEmployeeData(cb) {
-  db.collection('hr').doc('data').get().then(function(doc) {
+  if (_hrListener) { if (cb) cb(); return; }
+  _hrListener = db.collection('hr').doc('data').onSnapshot(function(doc) {
     if (doc.exists) {
       var d = doc.data();
-      if (d.employees && Array.isArray(d.employees) && d.employees.length > 0) {
-        employees = d.employees;
-      }
-      if (d.timeLogs && Array.isArray(d.timeLogs)) {
-        timeLogs = d.timeLogs;
-      }
+      if (d.employees && Array.isArray(d.employees) && d.employees.length > 0) employees = d.employees;
+      if (d.timeLogs && Array.isArray(d.timeLogs)) timeLogs = d.timeLogs;
     }
-    employeeLoaded = true;
-    if (cb) cb();
-  }).catch(function(e) {
+    if (!employeeLoaded) {
+      employeeLoaded = true;
+      if (cb) cb();
+    } else if (currentPage === 'employees') {
+      var pg = document.getElementById('employeesPage');
+      if (pg) _buildEmployeesPage(pg);
+    }
+  }, function(e) {
     console.error('HR load error:', e);
-    employeeLoaded = true;
-    if (cb) cb();
+    if (!employeeLoaded) { employeeLoaded = true; if (cb) cb(); }
   });
 }
 
@@ -10677,12 +10763,13 @@ function saveEmployeeData(silent) {
 function renderEmployeesPage() {
   var page = document.getElementById('employeesPage');
   if (!page) return;
-
-  page.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-family:var(--font-mono);font-size:13px;">Loading employee data…</div>';
-
-  loadEmployeeData(function() {
+  if (employeeLoaded) {
+    loadEmployeeData(); // ensure real-time listener is running
     _buildEmployeesPage(page);
-  });
+  } else {
+    page.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-family:var(--font-mono);font-size:13px;">Loading employee data…</div>';
+    loadEmployeeData(function() { _buildEmployeesPage(page); });
+  }
 }
 
 function _buildEmployeesPage(page) {
