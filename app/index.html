@@ -3920,7 +3920,8 @@ DOC_REF.onSnapshot(function(doc) {
         { id: 7,  name: 'iGamingGods',   url: 'https://igaminggods.com',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-10-17', traffic: true  },
         { id: 8,  name: 'iGGDash',       url: 'https://iggdash.com',       funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-06-15', traffic: false },
         { id: 9,  name: 'MinesAI',       url: 'https://minesai.io',        funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-08-20', traffic: false },
-        { id: 10, name: 'SlotInsiders',  url: 'https://slotinsiders.io',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-07-16', traffic: false },
+        { id: 10, name: 'SelectCasino',  url: 'https://selectcasino.link', funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2027-04-15', traffic: true,  type: 'redirect' },
+        { id: 11, name: 'SlotInsiders',  url: 'https://slotinsiders.io',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-07-16', traffic: false },
       ];
       if (!landingPages || landingPages.length === 0) {
         landingPages = JSON.parse(JSON.stringify(LP_FULL_CATALOG));
@@ -3933,6 +3934,7 @@ DOC_REF.onSnapshot(function(doc) {
           if (existing) {
             if (existing.expiry === undefined) { existing.expiry = cat.expiry; changed = true; }
             if (existing.traffic === undefined) { existing.traffic = cat.traffic; changed = true; }
+            if (existing.type === undefined && cat.type) { existing.type = cat.type; changed = true; }
           } else {
             var maxId = landingPages.length > 0 ? Math.max.apply(null, landingPages.map(function(l) { return l.id || 0; })) : 0;
             var newEntry = JSON.parse(JSON.stringify(cat));
@@ -3942,10 +3944,6 @@ DOC_REF.onSnapshot(function(doc) {
           }
         });
       }
-      // Remove redirect-only entries (not real landing pages)
-      var beforePurge = landingPages.length;
-      landingPages = landingPages.filter(function(l) { return l.url.indexOf('selectcasino.link') === -1; });
-      if (landingPages.length !== beforePurge) changed = true;
       // Migrate deal objects with new fields
       deals.forEach(function(d) {
         var seed = seedMap[d.id];
@@ -5631,6 +5629,7 @@ function renderLandingPagesTab() {
       '</div>' +
       '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' +
         '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08)">' + (lp.funnel ? escHtml(lp.funnel) : '— no funnel') + '</span>' +
+        (lp.type === 'redirect' ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(130,100,220,0.15);color:#a990f5;border:1px solid rgba(130,100,220,0.3)">↪ Redirect</span>' : '') +
         (srcName !== '—' ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border)">' + escHtml(srcName) + '</span>' : '') +
         (lp.notes ? '<span style="font-size:10px;color:var(--muted);padding:2px 8px">' + escHtml(lp.notes) + '</span>' : '') +
       '</div>' +
@@ -5659,7 +5658,7 @@ function renderLandingPagesTab() {
 function openLpModal(id) {
   lpEditingId = id;
   var lp = (id !== null && id !== undefined) ? landingPages.find(function(l) { return l.id === id; }) : null;
-  var v = lp || { name: '', url: '', funnel: '', source: '', status: 'live', notes: '', expiry: '', traffic: false };
+  var v = lp || { name: '', url: '', funnel: '', source: '', status: 'live', notes: '', expiry: '', traffic: false, type: '' };
   var funnelOpts = '<option value="">Select funnel</option>' + FUNNEL_NAMES.map(function(f){
     return '<option value="' + f + '"' + (v.funnel === f ? ' selected' : '') + '>' + f + '</option>';
   }).join('');
@@ -5697,13 +5696,18 @@ function openLpModal(id) {
         '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Notes</label>' +
           '<input id="lp-notes" value="' + escHtml(v.notes||'') + '" placeholder="Optional notes" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"></div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
         '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Domain Expiry</label>' +
           '<input id="lp-expiry" type="date" value="' + escHtml(v.expiry||'') + '" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"></div>' +
         '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Traffic</label>' +
           '<select id="lp-traffic" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px">' +
             '<option value="0"' + (!v.traffic ? ' selected' : '') + '>Off</option>' +
             '<option value="1"' + (v.traffic ? ' selected' : '') + '>On</option>' +
+          '</select></div>' +
+        '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Type</label>' +
+          '<select id="lp-type" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px">' +
+            '<option value=""' + (!v.type || v.type === 'lp' ? ' selected' : '') + '>Landing Page</option>' +
+            '<option value="redirect"' + (v.type === 'redirect' ? ' selected' : '') + '>Redirect</option>' +
           '</select></div>' +
       '</div>' +
     '</div>' +
@@ -5735,6 +5739,7 @@ function saveLp() {
     notes: (document.getElementById('lp-notes')||{}).value || '',
     expiry: (document.getElementById('lp-expiry')||{}).value || '',
     traffic: (document.getElementById('lp-traffic')||{}).value === '1',
+    type: (document.getElementById('lp-type')||{}).value || '',
   };
   if (lpEditingId !== null) {
     var idx = landingPages.findIndex(function(l) { return l.id === lpEditingId; });
