@@ -3920,8 +3920,7 @@ DOC_REF.onSnapshot(function(doc) {
         { id: 7,  name: 'iGamingGods',   url: 'https://igaminggods.com',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-10-17', traffic: true  },
         { id: 8,  name: 'iGGDash',       url: 'https://iggdash.com',       funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-06-15', traffic: false },
         { id: 9,  name: 'MinesAI',       url: 'https://minesai.io',        funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-08-20', traffic: false },
-        { id: 10, name: 'SelectCasino',  url: 'https://selectcasino.link', funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2027-04-15', traffic: true  },
-        { id: 11, name: 'SlotInsiders',  url: 'https://slotinsiders.io',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-07-16', traffic: false },
+        { id: 10, name: 'SlotInsiders',  url: 'https://slotinsiders.io',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-07-16', traffic: false },
       ];
       if (!landingPages || landingPages.length === 0) {
         landingPages = JSON.parse(JSON.stringify(LP_FULL_CATALOG));
@@ -3943,6 +3942,10 @@ DOC_REF.onSnapshot(function(doc) {
           }
         });
       }
+      // Remove redirect-only entries (not real landing pages)
+      var beforePurge = landingPages.length;
+      landingPages = landingPages.filter(function(l) { return l.url.indexOf('selectcasino.link') === -1; });
+      if (landingPages.length !== beforePurge) changed = true;
       // Migrate deal objects with new fields
       deals.forEach(function(d) {
         var seed = seedMap[d.id];
@@ -5627,7 +5630,7 @@ function renderLandingPagesTab() {
         '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;margin-left:10px;background:' + (isLive ? 'var(--green-glow)' : 'var(--yellow-glow)') + ';color:' + (isLive ? 'var(--green)' : 'var(--yellow)') + ';border:1px solid ' + (isLive ? 'rgba(126,191,154,0.3)' : 'rgba(229,192,123,0.3)') + '">' + (isLive ? '● Live' : '○ Paused') + '</span>' +
       '</div>' +
       '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' +
-        (lp.funnel ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08)">' + escHtml(lp.funnel) + '</span>' : '') +
+        '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08)">' + (lp.funnel ? escHtml(lp.funnel) : '— no funnel') + '</span>' +
         (srcName !== '—' ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border)">' + escHtml(srcName) + '</span>' : '') +
         (lp.notes ? '<span style="font-size:10px;color:var(--muted);padding:2px 8px">' + escHtml(lp.notes) + '</span>' : '') +
       '</div>' +
