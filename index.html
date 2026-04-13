@@ -10692,11 +10692,9 @@ function empGenId() {
   return 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 }
 
+var _TZ = 'Europe/Ljubljana';
 function empToday() {
-  var d = new Date();
-  var mm = String(d.getMonth() + 1).padStart(2, '0');
-  var dd = String(d.getDate()).padStart(2, '0');
-  return d.getFullYear() + '-' + mm + '-' + dd;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: _TZ }).format(new Date());
 }
 
 function empShowToast(msg, type) {
@@ -10712,11 +10710,14 @@ function empShowToast(msg, type) {
 }
 
 function empGetMonday(weekOffset) {
-  var d = new Date();
-  var day = d.getDay(); // 0=Sun
+  // Get today's date parts in Ljubljana time
+  var todayStr = empToday(); // YYYY-MM-DD
+  var parts = todayStr.split('-');
+  // Build a Date at midnight local time for today
+  var d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+  var day = d.getDay(); // 0=Sun,1=Mon,...
   var diff = (day === 0) ? -6 : 1 - day;
   d.setDate(d.getDate() + diff + (weekOffset * 7));
-  d.setHours(0, 0, 0, 0);
   return d;
 }
 
