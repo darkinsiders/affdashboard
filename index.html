@@ -5129,98 +5129,177 @@ function renderPerformanceData(container, rows) {
 function _loadFallbackDiagnostics() {
   var body = document.getElementById('fallbackDiagBody');
   if (!body) return;
-  db.collection('postbacks').orderBy('ts', 'desc').limit(200).get().then(function(snap) {
+
+  // Fetch both raw postbacks AND the conversion counter docs for Fallback
+  Promise.all([
+    db.collection('postbacks').orderBy('ts', 'desc').limit(500).get(),
+    db.collection('conversions').get()
+  ]).then(function(results) {
+    var pbSnap = results[0], convSnap = results[1];
+
+    // ── Parse raw postbacks ──────────────────────────────────
     var hits = [];
-    snap.forEach(function(doc) {
+    pbSnap.forEach(function(doc) {
       var d = doc.data();
-      if ((d.funnelKey || '').toLowerCase() === 'fallback') {
-        var raw = {};
-        try { raw = JSON.parse(d.raw || '{}'); } catch(e) {}
-        hits.push({
-          ts:       d.ts         || '',
-          network:  d.network    || raw.offer || '—',
-          event:    d.rawEvent   || '—',
-          type:     d.eventType  || '—',
-          revenue:  d.revenue    || 0,
-          funnel:   raw.funnel   || d.funnelKey || '—',
-          clickid:  raw.clickid  || raw.clickId || raw.sub1 || d.sub1 || '—',
-          source:   raw.source   || d.source    || '—',
-          campaign: raw.campaign || d.campaign  || '—',
-          rawFull:  d.raw        || ''
+      if ((d.funnelKey || '').toLowerCase() !== 'fallback') return;
+      var raw = {};
+      try { raw = JSON.parse(d.raw || '{}'); } catch(e) {}
+      hits.push({
+        ts:       d.ts       || '',
+        offer:    raw.offer  || d.network || '—',
+        event:    d.rawEvent || raw.status || raw.type || '—',
+        type:     d.eventType || '—',
+        funnel:   raw.funnel || '—',
+        clickid:  raw.clickid || raw.sub1 || d.sub1 || '',
+        source:   raw.source  || d.source  || '',
+        campaign: raw.campaign || d.campaign || '',
+        revenue:  d.revenue || 0,
+        rawFull:  d.raw || ''
+      });
+    });
+
+    // ── Parse conversion counter docs for Fallback ───────────
+    var convSources = {};  // { sourceName: ftdCount }
+    var convTotal = { ftds: 0, regs: 0 };
+    convSnap.forEach(function(doc) {
+      var d = doc.data();
+      if ((d.funnel || '').toLowerCase() !== 'fallback') return;
+      convTotal.ftds += +(d.ftds || 0);
+      convTotal.regs += +(d.regs || 0);
+      // sources sub-map written by worker: sources.{src}.ftds
+      if (d.sources && typeof d.sources === 'object') {
+        Object.keys(d.sources).forEach(function(src) {
+          var s = d.sources[src];
+          convSources[src] = (convSources[src] || 0) + (+(s.ftds || 0));
         });
       }
     });
 
     var panel = document.getElementById('fallbackDiagPanel');
     var note = panel ? panel.querySelector('span:last-child') : null;
-    if (note) note.textContent = hits.length + ' raw hit(s) found';
+    if (note) note.textContent = hits.length + ' raw postback(s) found';
 
-    if (!hits.length) {
-      body.innerHTML = '<div style="color:var(--muted);font-size:12px">No raw postback records found for Fallback funnel in last 200 entries. The source may be older — check Firebase console directly.</div>';
-      return;
-    }
+    // ── Conclusion logic ─────────────────────────────────────
+    // Distinct click IDs — blank/placeholder = test
+    var distinctClickIds = {};
+    hits.forEach(function(h) { if (h.clickid) distinctClickIds[h.clickid] = true; });
+    var realClickIds = Object.keys(distinctClickIds).filter(function(id) {
+      return id && id !== '—' && id.length > 4 && !/^(test|0|null|undefined)/i.test(id);
+    });
+    var isLikelyTest = realClickIds.length === 0;
 
-    // Summarise by network+offer
-    var byNetwork = {};
-    hits.forEach(function(h) {
-      var key = h.network || 'unknown';
-      if (!byNetwork[key]) byNetwork[key] = { count: 0, events: {}, ftds: 0, sample: h };
-      byNetwork[key].count++;
-      byNetwork[key].events[h.event] = (byNetwork[key].events[h.event] || 0) + 1;
-      if (h.type === 'ftd') byNetwork[key].ftds++;
+    // Distinct offers (should tell us which casino/deal)
+    var distinctOffers = {};
+    hits.forEach(function(h) { if (h.offer && h.offer !== '—') distinctOffers[h.offer] = (distinctOffers[h.offer] || 0) + 1; });
+
+    // Distinct sources (meta, tg, tiktok etc) — identifies funnel
+    var distinctSources = {};
+    hits.forEach(function(h) { if (h.source) distinctSources[h.source] = (distinctSources[h.source] || 0) + 1; });
+    // also from conversion docs
+    Object.keys(convSources).forEach(function(s) {
+      distinctSources[s] = (distinctSources[s] || 0) + convSources[s];
     });
 
-    var summaryHtml = '<div style="margin-bottom:14px">' +
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--red);margin-bottom:8px">Source Summary</div>' +
-      Object.keys(byNetwork).map(function(net) {
-        var nb = byNetwork[net];
-        var evStr = Object.keys(nb.events).map(function(e){ return e + ' ×' + nb.events[e]; }).join(', ');
-        return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:10px 14px;margin-bottom:8px">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
-            '<span style="font-weight:700;color:var(--red);font-size:13px">' + escHtml(net) + '</span>' +
-            '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + nb.count + ' postback(s) — ' + nb.ftds + ' FTD-type</span>' +
-          '</div>' +
-          '<div style="font-size:11px;color:var(--muted)">Events: ' + escHtml(evStr) + '</div>' +
-          '<div style="font-size:11px;color:var(--muted);margin-top:4px">Sample funnel param: <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px;color:var(--red)">' + escHtml(nb.sample.funnel) + '</code> &nbsp; clickid: <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">' + escHtml(nb.sample.clickid) + '</code></div>' +
-          (nb.sample.source !== '—' ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">Source: ' + escHtml(nb.sample.source) + ' &nbsp; Campaign: ' + escHtml(nb.sample.campaign) + '</div>' : '') +
-        '</div>';
-      }).join('') +
-    '</div>';
+    // Distinct campaigns
+    var distinctCampaigns = {};
+    hits.forEach(function(h) { if (h.campaign) distinctCampaigns[h.campaign] = (distinctCampaigns[h.campaign] || 0) + 1; });
 
-    var tableRows = hits.slice(0, 20).map(function(h) {
+    // ── Build conclusion card ────────────────────────────────
+    var conclusionLines = [];
+    var offerList = Object.keys(distinctOffers);
+    var sourceList = Object.keys(distinctSources).sort(function(a,b){ return distinctSources[b]-distinctSources[a]; });
+    var campaignList = Object.keys(distinctCampaigns).sort(function(a,b){ return distinctCampaigns[b]-distinctCampaigns[a]; });
+
+    if (isLikelyTest) {
+      conclusionLines.push('<strong style="color:var(--yellow)">Most likely: CellXpert test/validation postbacks.</strong> All click IDs are blank or missing — real traffic always has a click ID. CellXpert fires test events when you first save a postback URL to verify the endpoint. These are not real conversions.');
+    } else {
+      conclusionLines.push('<strong style="color:var(--red)">Real traffic is misconfigured.</strong> Click IDs are present (' + realClickIds.length + ' unique), meaning real users converted. The postback URL is set in a CellXpert campaign where the <strong>Tracking Code</strong> field is blank or set to "fallback".');
+    }
+
+    if (offerList.length > 0) {
+      conclusionLines.push('Casino/offer sending postbacks: <strong>' + offerList.map(function(o){ return escHtml(o) + ' (' + distinctOffers[o] + ')'; }).join(', ') + '</strong>');
+    }
+
+    if (sourceList.length > 0) {
+      conclusionLines.push('Traffic source(s): <strong>' + sourceList.map(function(s){ return escHtml(s) + ' (' + distinctSources[s] + ')'; }).join(', ') + '</strong> — go to the CellXpert campaign running on <strong>' + escHtml(sourceList[0]) + '</strong> traffic and check its postback/tracking code settings.');
+    } else {
+      conclusionLines.push('No source/campaign data in the postbacks — the postback URL may be set at the <strong>global affiliate level</strong> in CellXpert (not tied to a specific campaign). Check CellXpert → Account Settings → Global Postbacks.');
+    }
+
+    if (campaignList.length > 0) {
+      conclusionLines.push('Campaign names found: <strong>' + campaignList.slice(0,5).map(escHtml).join(', ') + '</strong> — these point to the exact campaign in your ad platform.');
+    }
+
+    var conclusionHtml =
+      '<div style="background:rgba(212,112,128,0.08);border:1px solid rgba(212,112,128,0.25);border-radius:8px;padding:14px 16px;margin-bottom:16px">' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--red);margin-bottom:10px">Diagnosis</div>' +
+        conclusionLines.map(function(l){ return '<div style="font-size:12px;color:var(--text);margin-bottom:7px;line-height:1.6">' + l + '</div>'; }).join('') +
+      '</div>';
+
+    // ── Field breakdown cards ────────────────────────────────
+    function miniCard(label, items) {
+      if (!Object.keys(items).length) return '';
+      var rows = Object.keys(items).sort(function(a,b){ return items[b]-items[a]; }).slice(0,6).map(function(k){
+        return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px">' +
+          '<span style="color:var(--text);font-family:var(--font-mono)">' + escHtml(k || '(blank)') + '</span>' +
+          '<span style="color:var(--muted)">' + items[k] + '</span>' +
+        '</div>';
+      }).join('');
+      return '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;flex:1;min-width:160px">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:8px">' + label + '</div>' +
+        rows +
+      '</div>';
+    }
+
+    var cardsHtml =
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">' +
+        miniCard('Offer / Casino', distinctOffers) +
+        miniCard('Source (traffic)', distinctSources) +
+        miniCard('Campaign', distinctCampaigns) +
+      '</div>';
+
+    // ── Raw hits table ───────────────────────────────────────
+    var tableRows = hits.slice(0, 25).map(function(h) {
       var dt = h.ts ? h.ts.replace('T',' ').slice(0,16) : '—';
+      var cidDisplay = h.clickid || '<span style="color:var(--red);font-style:italic">BLANK</span>';
+      var isBlankCid = !h.clickid;
       return '<tr style="border-bottom:1px solid var(--border)">' +
-        '<td style="padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap">' + escHtml(dt) + '</td>' +
-        '<td style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--red)">' + escHtml(h.network) + '</td>' +
+        '<td style="padding:7px 10px;font-family:var(--font-mono);font-size:10px;color:var(--muted);white-space:nowrap">' + escHtml(dt) + '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;color:var(--accent)">' + escHtml(h.offer) + '</td>' +
         '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(h.event) + '</td>' +
-        '<td style="padding:7px 10px;font-size:11px;color:var(--muted);font-family:var(--font-mono);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(h.clickid) + '</td>' +
-        '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(h.source) + '</td>' +
+        '<td style="padding:7px 10px;font-size:10px;font-family:var(--font-mono);color:' + (isBlankCid?'var(--red)':'var(--muted)') + ';max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (isBlankCid ? 'BLANK' : escHtml(h.clickid)) + '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(h.source || '—') + '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">' + escHtml(h.campaign || '—') + '</td>' +
         '<td style="padding:7px 10px">' +
-          '<button onclick="_showRawPostback(' + JSON.stringify(h.rawFull) + ')" style="background:var(--card2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer">raw</button>' +
+          '<button onclick="_showRawPostback(' + JSON.stringify(h.rawFull).replace(/"/g, '&quot;') + ')" style="background:var(--card2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--muted);cursor:pointer">raw</button>' +
         '</td>' +
       '</tr>';
     }).join('');
 
-    body.innerHTML = summaryHtml +
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:8px">Recent Raw Hits (last 20)</div>' +
+    if (!hits.length) {
+      body.innerHTML = conclusionHtml +
+        '<div style="font-size:12px;color:var(--muted)">No raw postback records in last 500 entries. The postbacks that caused the Fallback counts may be older — open Firebase console → postbacks collection and filter by funnelKey = "Fallback".</div>';
+      return;
+    }
+
+    body.innerHTML = conclusionHtml + cardsHtml +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:8px">All Fallback Raw Hits (last 25) — BLANK click ID = test event</div>' +
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
         '<thead><tr style="background:var(--card2)">' +
-          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Time</th>' +
-          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Network</th>' +
-          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Event</th>' +
-          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Click ID</th>' +
-          '<th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted)">Source</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px">Time</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px">Offer</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px">Event</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px">Click ID</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px">Source</th>' +
+          '<th style="padding:6px 10px;text-align:left;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px">Campaign</th>' +
           '<th style="padding:6px 10px"></th>' +
         '</tr></thead>' +
         '<tbody>' + tableRows + '</tbody>' +
-      '</table></div>' +
-      '<div style="margin-top:12px;padding:10px 14px;background:rgba(255,180,0,0.06);border:1px solid rgba(255,180,0,0.2);border-radius:7px;font-size:11px;color:#f0b429;line-height:1.6">' +
-        '<strong>How to fix:</strong> Go to CellXpert (or the network shown above) &rarr; find the campaign/creative that has the postback URL pasted &rarr; check the <strong>Tracking Code</strong> field. It is set to <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">fallback</code> (or blank, which defaults to fallback). Change it to the correct funnel name: <strong>Dark</strong>, <strong>Slotio</strong>, or <strong>Scanio</strong>. Alternatively re-paste the postback URL with <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">&amp;funnel=Dark</code> hardcoded instead of <code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">[trackingcode]</code>.' +
-      '</div>';
+      '</table></div>';
 
   }).catch(function(err) {
     var b2 = document.getElementById('fallbackDiagBody');
-    if (b2) b2.innerHTML = '<div style="color:var(--red);font-size:12px">Error loading postbacks: ' + escHtml(err.message) + '</div>';
+    if (b2) b2.innerHTML = '<div style="color:var(--red);font-size:12px">Error: ' + escHtml(err.message) + '</div>';
   });
 }
 
