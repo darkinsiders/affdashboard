@@ -10034,7 +10034,7 @@ function saveProjectData() {
   }).catch(function(e) {
     console.error('Project save error:', e);
     showSaveIndicator('error', 'Save failed ✗');
-    showToast('Failed to save tasks — check connection. Changes may not persist.', 'alert', 8000);
+    showToast('Task save failed: ' + (e.code || e.message || String(e)), 'alert', 10000);
   });
 }
 
