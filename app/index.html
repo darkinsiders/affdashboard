@@ -8787,7 +8787,9 @@ function fetchReportData(days) {
   var promises = [
     db.collection('clicks').orderBy('ts','desc').limit(5000).get(),
     db.collection('conversions').get(),
-    db.collection('postbacks').orderBy('ts','desc').limit(100).get()
+    db.collection('postbacks').orderBy('ts','desc').limit(100).get(),
+    db.collection('hr').doc('data').get(),
+    db.collection('tasks').get()
   ];
 
   if (reportIncludeMeta && typeof metaToken !== 'undefined' && metaToken && typeof metaAccountId !== 'undefined' && metaAccountId) {
@@ -8797,7 +8799,8 @@ function fetchReportData(days) {
   }
 
   return Promise.all(promises).then(function(results) {
-    var clickSnap = results[0], convSnap = results[1], pbSnap = results[2], metaData = results[3];
+    var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
+    var hrDoc = results[3], tasksSnap = results[4], metaData = results[5];
 
     // ── Current period clicks ──
     var totalClicks = 0, clicksByFunnel = {}, clicksBySrc = {};
@@ -8884,6 +8887,56 @@ function fetchReportData(days) {
       topDeals = deals.slice().sort(function(a,b){ return (b.revenue||0)-(a.revenue||0); }).slice(0,5);
     }
 
+    // ── Employee stats ──
+    var empData = [];
+    if (hrDoc && hrDoc.exists) {
+      var hrD = hrDoc.data();
+      var hrEmps = (hrD.employees && hrD.employees.length) ? hrD.employees : (typeof employees !== 'undefined' ? employees : []);
+      var hrLogs = hrD.timeLogs || [];
+      var empMap = {};
+      hrEmps.forEach(function(e) {
+        empMap[e.id] = { id: e.id, name: e.name, role: e.role || 'Team Member', totalHours: 0, categories: {}, funnels: {}, tasksDone: 0, tasksOpen: 0 };
+      });
+      hrLogs.forEach(function(log) {
+        if (!log.employeeId || !empMap[log.employeeId]) return;
+        if (cutoffDate && log.date < cutoffDate) return;
+        var em = empMap[log.employeeId];
+        em.totalHours += +(log.hours || 0);
+        if (log.category) em.categories[log.category] = (em.categories[log.category] || 0) + +(log.hours || 0);
+        if (log.funnel)   em.funnels[log.funnel]   = (em.funnels[log.funnel]   || 0) + +(log.hours || 0);
+      });
+      empData = Object.keys(empMap).map(function(k){ return empMap[k]; }).sort(function(a,b){ return b.totalHours - a.totalHours; });
+    }
+
+    // ── Task counts per employee ──
+    if (tasksSnap) {
+      tasksSnap.forEach(function(doc) {
+        var t = doc.data();
+        var assignee = (t.assignee || '').toLowerCase().trim();
+        var emp = empData.find(function(e){ return e.name.toLowerCase() === assignee || e.id === assignee; });
+        if (!emp) return;
+        if (t.status === 'Done') emp.tasksDone++;
+        else if (t.status && t.status !== 'Done') emp.tasksOpen++;
+      });
+    }
+
+    // ── Landing pages ──
+    var lpData = (typeof landingPages !== 'undefined' ? landingPages : []).map(function(lp) {
+      var clicks = clicksByFunnel[lp.funnel] || 0;
+      var conv   = byFunnel[lp.funnel] || { ftds: 0, regs: 0, revenue: 0 };
+      return {
+        name:    lp.name    || '',
+        url:     lp.url     || '',
+        funnel:  lp.funnel  || '',
+        source:  lp.source  || '',
+        status:  lp.status  || 'live',
+        notes:   lp.notes   || '',
+        clicks:  clicks,
+        ftds:    conv.ftds    || 0,
+        revenue: conv.revenue || 0
+      };
+    });
+
     return {
       days: days,
       reportType: reportType,
@@ -8894,6 +8947,8 @@ function fetchReportData(days) {
       topSources: topSources,
       topDeals: topDeals,
       metaCampaigns: metaData,
+      empData: empData,
+      lpData: lpData,
       aiInsights: ''
     };
   });
@@ -8959,6 +9014,30 @@ function _templateInsights(data) {
     lines.push(escHtmlPlain(ts.name) + ' is your highest-volume traffic source with ' + ts.clicks + ' clicks and a ' + ts.cr + '% FTD conversion rate.');
   }
 
+  // Landing page insight
+  if (data.lpData && data.lpData.length > 0) {
+    var topLP = data.lpData.slice().sort(function(a,b){ return b.clicks - a.clicks; })[0];
+    if (topLP && topLP.clicks > 0) {
+      lines.push(escHtmlPlain(topLP.name) + ' is the most-visited landing page with ' + topLP.clicks + ' clicks and ' + topLP.ftds + ' FTDs. ' + (topLP.ftds === 0 && topLP.clicks > 30 ? 'Low FTD yield suggests the offer or CTA may need A/B testing.' : 'Monitor for conversion rate consistency.'));
+    }
+    var deadLP = data.lpData.filter(function(lp){ return lp.status === 'live' && lp.clicks === 0; });
+    if (deadLP.length > 0) {
+      lines.push(deadLP.length + ' live landing page(s) received zero clicks this period (' + deadLP.map(function(lp){ return escHtmlPlain(lp.name); }).join(', ') + '). Verify traffic routing and smartlink configuration.');
+    }
+  }
+
+  // Employee insight
+  if (data.empData && data.empData.length > 0) {
+    var totalHrs = data.empData.reduce(function(s,e){ return s + e.totalHours; }, 0);
+    var activeEmps = data.empData.filter(function(e){ return e.totalHours > 0; });
+    if (totalHrs > 0) {
+      var topEmp = data.empData[0];
+      lines.push('Team logged ' + totalHrs.toFixed(0) + ' hours this period across ' + activeEmps.length + ' active member(s). ' + escHtmlPlain(topEmp.name) + ' led with ' + topEmp.totalHours.toFixed(0) + 'h.');
+    } else {
+      lines.push('No team hours have been logged for this period. Encourage team members to log time to track productivity and project attribution.');
+    }
+  }
+
   return lines.join('\n\n');
 }
 
@@ -8968,6 +9047,17 @@ function escHtmlPlain(s) {
 
 // ── Claude AI insights ────────────────────────────────────────
 function getAIInsights(data, apiKey) {
+  var empSummary = (data.empData && data.empData.length)
+    ? data.empData.map(function(e){
+        var topCat = Object.keys(e.categories).sort(function(a,b){ return e.categories[b]-e.categories[a]; })[0] || 'none';
+        return e.name + '(' + e.totalHours.toFixed(0) + 'h,' + topCat + ',done:' + e.tasksDone + ',open:' + e.tasksOpen + ')';
+      }).join(', ')
+    : 'no data';
+
+  var lpSummary = (data.lpData && data.lpData.length)
+    ? data.lpData.map(function(lp){ return lp.name + '(' + lp.funnel + ',' + lp.status + ',clicks:' + lp.clicks + ',ftds:' + lp.ftds + ')'; }).join(', ')
+    : 'no data';
+
   var summary = [
     'Period: last ' + data.days + ' days',
     'Revenue: \u20ac' + data.current.revenue.toFixed(0) + ' (prev: \u20ac' + data.previous.revenue.toFixed(0) + ')',
@@ -8975,13 +9065,15 @@ function getAIInsights(data, apiKey) {
     'Regs: '   + data.current.regs   + ' (prev: ' + data.previous.regs   + ')',
     'Clicks: ' + data.current.clicks + ' (prev: ' + data.previous.clicks + ')',
     'Funnels: ' + Object.keys(data.byFunnel).map(function(f){ var d=data.byFunnel[f]; return f+'(clicks:'+d.clicks+',ftds:'+d.ftds+',rev:\u20ac'+d.revenue.toFixed(0)+')'; }).join(', '),
-    'Top sources: ' + data.topSources.slice(0,5).map(function(s){ return s.name+'('+s.clicks+'clicks,'+s.cr+'%CR)'; }).join(', ')
+    'Top sources: ' + data.topSources.slice(0,5).map(function(s){ return s.name+'('+s.clicks+'clicks,'+s.cr+'%CR)'; }).join(', '),
+    'Team: ' + empSummary,
+    'Landing pages: ' + lpSummary
   ].join('\n');
 
   var messages = [
     {
       role: 'user',
-      content: 'You are an expert affiliate marketing analyst specialising in online casino traffic. Analyse this performance data and provide 4-5 concise, actionable insights in plain text (no markdown, no bullet symbols). Each insight should be a separate paragraph. Focus on: revenue trends, conversion rates, funnel performance, and traffic source quality.\n\nDATA:\n' + summary
+      content: 'You are an expert affiliate marketing analyst specialising in online casino traffic. Analyse this performance data and provide 5-6 concise, actionable insights in plain text (no markdown, no bullet symbols). Each insight should be a separate paragraph. Cover: revenue trends, conversion rates, funnel performance, traffic source quality, landing page effectiveness, and team productivity observations.\n\nDATA:\n' + summary
     }
   ];
 
@@ -8995,7 +9087,7 @@ function getAIInsights(data, apiKey) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
+      max_tokens: 900,
       messages: messages
     })
   }).then(function(r){ return r.json(); }).then(function(j){
@@ -9253,6 +9345,50 @@ function buildReport(data) {
       '</div>' +
     '</div>' +
 
+    // Landing Pages
+    (function() {
+      if (!data.lpData || !data.lpData.length) return '';
+      var lpRows = data.lpData.map(function(lp) {
+        var isLive = lp.status === 'live';
+        var fc = (typeof FUNNEL_COLORS !== 'undefined' && FUNNEL_COLORS[lp.funnel]) ? FUNNEL_COLORS[lp.funnel] : '#707078';
+        return '<tr>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+            '<strong style="color:#e0e0e8">' + escHtmlPlain(lp.name) + '</strong>' +
+            (lp.notes ? '<span style="font-size:10px;color:rgba(255,255,255,0.25);margin-left:8px">' + escHtmlPlain(lp.notes) + '</span>' : '') +
+          '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+            '<span style="font-size:10px;font-weight:700;color:' + fc + '">' + escHtmlPlain(lp.funnel) + '</span>' +
+          '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:monospace;font-size:11px;color:rgba(255,255,255,0.35)">' + escHtmlPlain(lp.source || '—') + '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+            '<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:' + (isLive?'rgba(126,191,154,0.12)':'rgba(255,255,255,0.05)') + ';color:' + (isLive?'#7EBF9A':'#707078') + '">' + (isLive?'LIVE':'PAUSED') + '</span>' +
+          '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:monospace;color:#a0a0b0;text-align:right">' + lp.clicks + '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:monospace;color:#7EBF9A;text-align:right">' + lp.ftds + '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:monospace;color:#E5C07B;text-align:right">' + (lp.revenue > 0 ? '\u20ac' + lp.revenue.toFixed(0) : '\u2014') + '</td>' +
+        '</tr>';
+      }).join('');
+      return '<div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;margin-bottom:28px">' +
+        '<div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">' +
+          '<h2 style="font-size:14px;font-weight:700;color:#e0e0e8">Landing Pages</h2>' +
+        '</div>' +
+        '<div style="overflow-x:auto">' +
+          '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+            '<thead><tr style="background:rgba(255,255,255,0.03)">' +
+              '<th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Page</th>' +
+              '<th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Funnel</th>' +
+              '<th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Source</th>' +
+              '<th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Status</th>' +
+              '<th style="padding:8px 14px;text-align:right;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Clicks</th>' +
+              '<th style="padding:8px 14px;text-align:right;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">FTDs</th>' +
+              '<th style="padding:8px 14px;text-align:right;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Revenue</th>' +
+            '</tr></thead>' +
+            '<tbody>' + lpRows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+    })() +
+
     // Best Performing Deals
     '<div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;margin-bottom:28px">' +
       '<div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">' +
@@ -9273,6 +9409,47 @@ function buildReport(data) {
 
     // Meta campaigns (conditional)
     metaSection +
+
+    // Employee Overview
+    (function() {
+      if (!data.empData || !data.empData.length) return '';
+      var empRows = data.empData.map(function(e) {
+        var topCat = Object.keys(e.categories).sort(function(a,b){ return e.categories[b]-e.categories[a]; })[0] || '—';
+        var topFunnels = Object.keys(e.funnels).sort(function(a,b){ return e.funnels[b]-e.funnels[a]; }).slice(0,2).join(', ') || '—';
+        var hColor = e.totalHours >= 40 ? '#7EBF9A' : e.totalHours >= 20 ? '#E5C07B' : e.totalHours > 0 ? '#c4845a' : '#707078';
+        return '<tr>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+            '<strong style="color:#e0e0e8">' + escHtmlPlain(e.name) + '</strong>' +
+            '<span style="font-size:10px;color:rgba(255,255,255,0.25);margin-left:8px">' + escHtmlPlain(e.role) + '</span>' +
+          '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:monospace;font-size:13px;font-weight:700;color:' + hColor + ';text-align:right">' + e.totalHours.toFixed(1) + 'h</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:11px;color:#a0a0b0">' + escHtmlPlain(topCat) + '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:11px;color:#a0a0b0">' + escHtmlPlain(topFunnels) + '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:monospace;color:#7EBF9A;text-align:right">' + e.tasksDone + '</td>' +
+          '<td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);font-family:monospace;color:#E5C07B;text-align:right">' + e.tasksOpen + '</td>' +
+        '</tr>';
+      }).join('');
+      var totalHours = data.empData.reduce(function(s,e){ return s + e.totalHours; }, 0);
+      return '<div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;margin-bottom:28px">' +
+        '<div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:space-between">' +
+          '<h2 style="font-size:14px;font-weight:700;color:#e0e0e8">Team Overview</h2>' +
+          '<span style="font-size:11px;color:rgba(255,255,255,0.3);font-family:monospace">' + totalHours.toFixed(1) + 'h total logged this period</span>' +
+        '</div>' +
+        '<div style="overflow-x:auto">' +
+          '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+            '<thead><tr style="background:rgba(255,255,255,0.03)">' +
+              '<th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Member</th>' +
+              '<th style="padding:8px 14px;text-align:right;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Hours</th>' +
+              '<th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Top Category</th>' +
+              '<th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Funnels</th>' +
+              '<th style="padding:8px 14px;text-align:right;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Done</th>' +
+              '<th style="padding:8px 14px;text-align:right;font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.35);text-transform:uppercase">Open</th>' +
+            '</tr></thead>' +
+            '<tbody>' + empRows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+    })() +
 
     // AI Insights
     '<div style="background:rgba(160,160,200,0.05);border:1px solid rgba(160,160,200,0.15);border-radius:12px;padding:22px 24px;margin-bottom:28px">' +
@@ -9348,6 +9525,40 @@ function _buildRecommendedActions(data) {
     }
   }
 
+  // Landing pages: dead LPs
+  if (data.lpData && data.lpData.length > 0 && actions.length < 5) {
+    var deadLPs = data.lpData.filter(function(lp){ return lp.status === 'live' && lp.clicks === 0; });
+    if (deadLPs.length > 0) {
+      actions.push('Landing page(s) ' + deadLPs.map(function(lp){ return lp.name; }).join(', ') + ' are live but received 0 clicks. Check smartlink routing, Meta ad targeting, and that the URL is correctly published.');
+    }
+  }
+
+  // Landing pages: high clicks, 0 FTDs
+  if (data.lpData && data.lpData.length > 0 && actions.length < 5) {
+    data.lpData.forEach(function(lp) {
+      if (lp.clicks > 50 && lp.ftds === 0 && actions.length < 5) {
+        actions.push(lp.name + ' has ' + lp.clicks + ' clicks with 0 FTDs. A/B test the headline, hero image, and primary CTA. Consider swapping to a higher-converting casino offer.');
+      }
+    });
+  }
+
+  // Employee: no hours logged
+  if (data.empData && data.empData.length > 0 && actions.length < 5) {
+    var idleEmps = data.empData.filter(function(e){ return e.totalHours === 0; });
+    if (idleEmps.length > 0) {
+      actions.push(idleEmps.map(function(e){ return e.name; }).join(', ') + ' logged 0 hours this period. Confirm task assignments and ensure time is being tracked in the Team section.');
+    }
+  }
+
+  // Employee: open tasks piling up
+  if (data.empData && data.empData.length > 0 && actions.length < 5) {
+    var openTotal = data.empData.reduce(function(s,e){ return s + e.tasksOpen; }, 0);
+    var doneTotal = data.empData.reduce(function(s,e){ return s + e.tasksDone; }, 0);
+    if (openTotal > 5 && doneTotal < openTotal * 0.3) {
+      actions.push(openTotal + ' open tasks vs ' + doneTotal + ' completed this period. Review project board priorities — consider breaking large tasks into smaller deliverables to improve throughput.');
+    }
+  }
+
   // Fallback
   if (actions.length < 3) {
     var defaults = [
@@ -9358,7 +9569,7 @@ function _buildRecommendedActions(data) {
     defaults.forEach(function(a){ if (actions.length < 5) actions.push(a); });
   }
 
-  return actions.slice(0, 5);
+  return actions.slice(0, 6);
 }
 
 
