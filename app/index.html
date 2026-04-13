@@ -4331,6 +4331,7 @@ function startPostbackListener() {
 // ── Analytics ───────────────────────────────────────────────────────────────
 var analyticsFilterFunnel = '';
 var analyticsFilterDays = 7;
+var analyticsFilterGeo = '';
 var analyticsTab = 'overview';
 var overviewFilterDays = 7;
 var perfFilterDays = 7;
@@ -5051,6 +5052,9 @@ function renderClicksTab() {
             '<option value="">All Funnels</option>' +
             FUNNEL_NAMES.map(function(f){ return '<option value="' + f + '">' + f + '</option>'; }).join('') +
           '</select>' +
+          '<select id="analyticsFilterGeo" onchange="analyticsFilterGeo=this.value;_applyClicksFilters()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
+            '<option value="">All GEOs</option>' +
+          '</select>' +
           '<select id="analyticsFilterDays" onchange="analyticsFilterDays=+this.value;loadAnalyticsClicks()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
             '<option value="1">Today</option>' +
             '<option value="7" selected>Last 7 days</option>' +
@@ -5089,10 +5093,29 @@ function loadAnalyticsClicks() {
       clicks.push({ ts: ts, funnel: d.funnel || '', geo: d.geo || '', casino: d.casino || '', src: d.src || 'NoSource', campaign: d.campaign || '' });
     });
     _lastClicksData = clicks;
-    renderClicksData(body, clicks);
+    // Populate GEO dropdown
+    var geoSel = document.getElementById('analyticsFilterGeo');
+    if (geoSel) {
+      var geoCount = {};
+      clicks.forEach(function(c) { if (c.geo) geoCount[c.geo] = (geoCount[c.geo] || 0) + 1; });
+      var geos = Object.keys(geoCount).sort(function(a,b){ return geoCount[b]-geoCount[a]; });
+      var prevGeo = analyticsFilterGeo;
+      geoSel.innerHTML = '<option value="">All GEOs</option>' +
+        geos.map(function(g){ return '<option value="' + escHtml(g) + '"' + (g === prevGeo ? ' selected' : '') + '>' + escHtml(g) + ' (' + geoCount[g] + ')</option>'; }).join('');
+    }
+    _applyClicksFilters();
   }).catch(function(err) {
     body.innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0">Failed to load: ' + escHtml(err.message) + '</div>';
   });
+}
+
+function _applyClicksFilters() {
+  var body = document.getElementById('analyticsBody');
+  if (!body || !_lastClicksData) return;
+  var filtered = analyticsFilterGeo
+    ? _lastClicksData.filter(function(c) { return c.geo === analyticsFilterGeo; })
+    : _lastClicksData;
+  renderClicksData(body, filtered);
 }
 
 function renderClicksData(container, clicks) {
@@ -5419,17 +5442,27 @@ function renderPerformanceData(container, rows) {
     diagDiv.id = 'fallbackDiagPanel';
     diagDiv.style.cssText = 'margin-top:20px;background:rgba(212,112,128,0.07);border:1px solid rgba(212,112,128,0.3);border-radius:10px;overflow:hidden';
     diagDiv.innerHTML =
-      '<div style="padding:12px 16px;border-bottom:1px solid rgba(212,112,128,0.2);display:flex;align-items:center;justify-content:space-between">' +
+      '<div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="_toggleFallbackDiag(this)">' +
         '<div style="display:flex;align-items:center;gap:8px">' +
           '<span style="font-size:12px;color:var(--red)">&#9888;</span>' +
           '<span style="font-size:12px;font-weight:700;color:var(--red)">Fallback Funnel Diagnostics</span>' +
+          '<span id="fallbackDiagCount" style="font-size:11px;color:var(--muted)">— click to expand</span>' +
         '</div>' +
-        '<span style="font-size:11px;color:var(--muted)">querying raw postbacks…</span>' +
+        '<span style="font-size:11px;color:var(--muted);font-family:var(--font-mono)" id="fallbackDiagArrow">▸ Show</span>' +
       '</div>' +
-      '<div id="fallbackDiagBody" style="padding:14px 16px;font-size:12px;color:var(--muted)">Loading…</div>';
+      '<div id="fallbackDiagBody" style="display:none;padding:14px 16px;border-top:1px solid rgba(212,112,128,0.2);font-size:12px;color:var(--muted)">Loading…</div>';
     container.appendChild(diagDiv);
     _loadFallbackDiagnostics();
   }
+}
+
+function _toggleFallbackDiag(headerEl) {
+  var body = document.getElementById('fallbackDiagBody');
+  var arrow = document.getElementById('fallbackDiagArrow');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (arrow) arrow.textContent = open ? '▸ Show' : '▾ Hide';
 }
 
 function _loadFallbackDiagnostics() {
@@ -5481,9 +5514,8 @@ function _loadFallbackDiagnostics() {
       }
     });
 
-    var panel = document.getElementById('fallbackDiagPanel');
-    var note = panel ? panel.querySelector('span:last-child') : null;
-    if (note) note.textContent = hits.length + ' raw postback(s) found';
+    var countEl = document.getElementById('fallbackDiagCount');
+    if (countEl) countEl.textContent = '— ' + hits.length + ' raw postback(s) found';
 
     // ── Conclusion logic ─────────────────────────────────────
     // Distinct click IDs — blank/placeholder = test
