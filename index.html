@@ -3910,13 +3910,38 @@ DOC_REF.onSnapshot(function(doc) {
         changed = true;
       }
       // Seed landing pages if empty
+      var LP_FULL_CATALOG = [
+        { id: 1,  name: 'Dark — Main',   url: 'https://darkspins.com',     funnel: 'Dark',   source: 'meta', status: 'live', notes: 'wAppDark', expiry: '2027-04-01', traffic: false },
+        { id: 2,  name: 'Slotio — Main', url: 'https://slotioai.com',      funnel: 'Slotio', source: 'meta', status: 'live', notes: '',         expiry: '2026-07-16', traffic: true  },
+        { id: 3,  name: 'Scanio — Main', url: 'https://scanioai.com',      funnel: 'Scanio', source: 'meta', status: 'live', notes: '',         expiry: '2027-04-01', traffic: false },
+        { id: 4,  name: 'Brainrotbet',   url: 'https://brainrotbet.com',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-09-25', traffic: false },
+        { id: 5,  name: 'GameAnalyzer',  url: 'https://gameanalyzer.io',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-08-20', traffic: false },
+        { id: 6,  name: 'GilfCoin',      url: 'https://gilfcoin.fun',      funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-06-11', traffic: false },
+        { id: 7,  name: 'iGamingGods',   url: 'https://igaminggods.com',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-10-17', traffic: true  },
+        { id: 8,  name: 'iGGDash',       url: 'https://iggdash.com',       funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-06-15', traffic: false },
+        { id: 9,  name: 'MinesAI',       url: 'https://minesai.io',        funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-08-20', traffic: false },
+        { id: 10, name: 'SelectCasino',  url: 'https://selectcasino.link', funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2027-04-15', traffic: true  },
+        { id: 11, name: 'SlotInsiders',  url: 'https://slotinsiders.io',   funnel: '',       source: '',     status: 'live', notes: '',         expiry: '2026-07-16', traffic: false },
+      ];
       if (!landingPages || landingPages.length === 0) {
-        landingPages = [
-          { id: 1, name: 'Dark — Main', url: 'https://darkspins.com', funnel: 'Dark', source: 'meta', status: 'live', notes: 'wAppDark' },
-          { id: 2, name: 'Slotio — Main', url: 'https://slotioai.com', funnel: 'Slotio', source: 'meta', status: 'live', notes: '' },
-          { id: 3, name: 'Scanio — Main', url: 'https://scanioai.com', funnel: 'Scanio', source: 'meta', status: 'live', notes: '' },
-        ];
+        landingPages = JSON.parse(JSON.stringify(LP_FULL_CATALOG));
         changed = true;
+      } else {
+        // Migrate: add expiry/traffic to existing entries, add any missing pages
+        LP_FULL_CATALOG.forEach(function(cat) {
+          var norm = cat.url.replace(/\/$/, '').toLowerCase();
+          var existing = landingPages.find(function(l) { return l.url.replace(/\/$/, '').toLowerCase() === norm; });
+          if (existing) {
+            if (existing.expiry === undefined) { existing.expiry = cat.expiry; changed = true; }
+            if (existing.traffic === undefined) { existing.traffic = cat.traffic; changed = true; }
+          } else {
+            var maxId = landingPages.length > 0 ? Math.max.apply(null, landingPages.map(function(l) { return l.id || 0; })) : 0;
+            var newEntry = JSON.parse(JSON.stringify(cat));
+            newEntry.id = maxId + 1;
+            landingPages.push(newEntry);
+            changed = true;
+          }
+        });
       }
       // Migrate deal objects with new fields
       deals.forEach(function(d) {
@@ -5577,6 +5602,21 @@ function renderLandingPagesTab() {
     var isLive = lp.status === 'live';
     var domain = '';
     try { domain = new URL(lp.url).hostname.replace('www.',''); } catch(e) { domain = lp.url; }
+    // Expiry badge
+    var expiryHtml = '';
+    if (lp.expiry) {
+      var now = new Date(); now.setHours(0,0,0,0);
+      var exp = new Date(lp.expiry);
+      var daysLeft = Math.round((exp - now) / 86400000);
+      var expColor = daysLeft <= 14 ? 'var(--red)' : daysLeft <= 30 ? 'var(--yellow)' : 'var(--muted)';
+      var expBg    = daysLeft <= 14 ? 'var(--red-glow)' : daysLeft <= 30 ? 'var(--yellow-glow)' : 'rgba(255,255,255,0.04)';
+      var expBorder = daysLeft <= 14 ? 'rgba(212,112,128,0.3)' : daysLeft <= 30 ? 'rgba(229,192,123,0.3)' : 'var(--border)';
+      var expLabel = daysLeft <= 0 ? 'EXPIRED' : (daysLeft <= 30 ? daysLeft + 'd left' : lp.expiry);
+      expiryHtml = '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:' + expBg + ';color:' + expColor + ';border:1px solid ' + expBorder + '" title="Domain expires ' + lp.expiry + '">⏱ ' + expLabel + '</span>';
+    }
+    var trafficHtml = lp.traffic
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(126,191,154,0.12);color:var(--green);border:1px solid rgba(126,191,154,0.25)">▶ Traffic On</span>'
+      : '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,0.03);color:var(--muted);border:1px solid var(--border)">⏸ Traffic Off</span>';
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;backdrop-filter:blur(36px) saturate(2.2)">' +
       '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:' + fcol + ';opacity:0.6"></div>' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">' +
@@ -5586,10 +5626,13 @@ function renderLandingPagesTab() {
         '</div>' +
         '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap;margin-left:10px;background:' + (isLive ? 'var(--green-glow)' : 'var(--yellow-glow)') + ';color:' + (isLive ? 'var(--green)' : 'var(--yellow)') + ';border:1px solid ' + (isLive ? 'rgba(126,191,154,0.3)' : 'rgba(229,192,123,0.3)') + '">' + (isLive ? '● Live' : '○ Paused') + '</span>' +
       '</div>' +
-      '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">' +
+      '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' +
         (lp.funnel ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.05);color:' + fcol + ';border:1px solid rgba(255,255,255,0.08)">' + escHtml(lp.funnel) + '</span>' : '') +
         (srcName !== '—' ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--muted);border:1px solid var(--border)">' + escHtml(srcName) + '</span>' : '') +
         (lp.notes ? '<span style="font-size:10px;color:var(--muted);padding:2px 8px">' + escHtml(lp.notes) + '</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">' +
+        trafficHtml + expiryHtml +
       '</div>' +
       '<div style="display:flex;gap:6px">' +
         '<a href="' + escHtml(lp.url) + '" target="_blank" style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:6px;color:var(--text);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.04)\'">Open ↗</a>' +
@@ -5613,7 +5656,7 @@ function renderLandingPagesTab() {
 function openLpModal(id) {
   lpEditingId = id;
   var lp = (id !== null && id !== undefined) ? landingPages.find(function(l) { return l.id === id; }) : null;
-  var v = lp || { name: '', url: '', funnel: '', source: '', status: 'live', notes: '' };
+  var v = lp || { name: '', url: '', funnel: '', source: '', status: 'live', notes: '', expiry: '', traffic: false };
   var funnelOpts = '<option value="">Select funnel</option>' + FUNNEL_NAMES.map(function(f){
     return '<option value="' + f + '"' + (v.funnel === f ? ' selected' : '') + '>' + f + '</option>';
   }).join('');
@@ -5651,6 +5694,15 @@ function openLpModal(id) {
         '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Notes</label>' +
           '<input id="lp-notes" value="' + escHtml(v.notes||'') + '" placeholder="Optional notes" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"></div>' +
       '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Domain Expiry</label>' +
+          '<input id="lp-expiry" type="date" value="' + escHtml(v.expiry||'') + '" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none"></div>' +
+        '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Traffic</label>' +
+          '<select id="lp-traffic" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px">' +
+            '<option value="0"' + (!v.traffic ? ' selected' : '') + '>Off</option>' +
+            '<option value="1"' + (v.traffic ? ' selected' : '') + '>On</option>' +
+          '</select></div>' +
+      '</div>' +
     '</div>' +
     '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">' +
       '<button onclick="closeLpModal()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:8px 18px;color:var(--muted);font-size:13px;cursor:pointer">Cancel</button>' +
@@ -5677,7 +5729,9 @@ function saveLp() {
     funnel: (document.getElementById('lp-funnel')||{}).value || '',
     source: (document.getElementById('lp-source')||{}).value || '',
     status: (document.getElementById('lp-status')||{}).value || 'live',
-    notes: (document.getElementById('lp-notes')||{}).value || ''
+    notes: (document.getElementById('lp-notes')||{}).value || '',
+    expiry: (document.getElementById('lp-expiry')||{}).value || '',
+    traffic: (document.getElementById('lp-traffic')||{}).value === '1',
   };
   if (lpEditingId !== null) {
     var idx = landingPages.findIndex(function(l) { return l.id === lpEditingId; });
