@@ -4253,7 +4253,7 @@ DOC_REF.onSnapshot(function(doc) {
         landingPages = JSON.parse(JSON.stringify(LP_FULL_CATALOG));
         changed = true;
       } else {
-        // Migrate: add expiry/traffic to existing entries, add any missing pages
+        // Migrate: add missing fields to existing entries only — never re-add deleted pages
         LP_FULL_CATALOG.forEach(function(cat) {
           var norm = cat.url.replace(/\/$/, '').toLowerCase();
           var existing = landingPages.find(function(l) { return l.url.replace(/\/$/, '').toLowerCase() === norm; });
@@ -4261,12 +4261,6 @@ DOC_REF.onSnapshot(function(doc) {
             if (existing.expiry === undefined) { existing.expiry = cat.expiry || ''; changed = true; }
             if (existing.traffic === undefined) { existing.traffic = cat.traffic || false; changed = true; }
             if (existing.type === undefined) { existing.type = cat.type || ''; changed = true; }
-          } else {
-            var maxId = landingPages.length > 0 ? Math.max.apply(null, landingPages.map(function(l) { return l.id || 0; })) : 0;
-            var newEntry = JSON.parse(JSON.stringify(cat));
-            newEntry.id = maxId + 1;
-            landingPages.push(newEntry);
-            changed = true;
           }
         });
       }
@@ -4330,6 +4324,9 @@ DOC_REF.onSnapshot(function(doc) {
   manualSpendEntries = data.manualSpendEntries || manualSpendEntries;
   if (data.metaToken) metaToken = data.metaToken;
   if (data.metaAccountId) metaAccountId = data.metaAccountId;
+  if (data.customTrafficSources) customTrafficSources = data.customTrafficSources;
+  if (data.funnelPaused) funnelPaused = data.funnelPaused;
+  if (data.linkHistory) linkHistory = data.linkHistory;
   render();
   renderSmartlinks();
   renderConflictBadges();
