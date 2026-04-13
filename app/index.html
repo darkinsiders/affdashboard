@@ -3810,23 +3810,39 @@ function toggleSmartlinks() {
 // ── Firebase save ──────────────────────────────────────────────────────────
 var dataLoaded = false;
 
+// Strip undefined values from any object/array before writing to Firestore
+// (Firestore rejects writes containing undefined — causes silent save failures)
+function cleanForFirestore(val) {
+  return JSON.parse(JSON.stringify(val, function(k, v) {
+    return v === undefined ? null : v;
+  }));
+}
+
 function saveToFirebase() {
   if (!dataLoaded) return;
   showSaveIndicator('saving', 'Saving…');
-  DOC_REF.set({
-    deals: deals,
-    assignments: assignments,
-    dealWeights: dealWeights,
-    smartlinkFallbacks: smartlinkFallbacks,
-    smartlinkHostedUrls: smartlinkHostedUrls,
-    landingPages: landingPages,
-    manualSpendEntries: manualSpendEntries,
-    metaToken: metaToken,
-    metaAccountId: metaAccountId,
-    customTrafficSources: customTrafficSources,
-    linkHistory: linkHistory,
-    funnelPaused: funnelPaused
-  }).then(function() {
+  var payload;
+  try {
+    payload = cleanForFirestore({
+      deals: deals,
+      assignments: assignments,
+      dealWeights: dealWeights,
+      smartlinkFallbacks: smartlinkFallbacks,
+      smartlinkHostedUrls: smartlinkHostedUrls,
+      landingPages: landingPages,
+      manualSpendEntries: manualSpendEntries,
+      metaToken: metaToken,
+      metaAccountId: metaAccountId,
+      customTrafficSources: customTrafficSources,
+      linkHistory: linkHistory,
+      funnelPaused: funnelPaused
+    });
+  } catch(e) {
+    console.error('Save serialization error:', e);
+    showSaveIndicator('error', 'Save failed ✗');
+    return;
+  }
+  DOC_REF.set(payload).then(function() {
     showSaveIndicator('saved', 'Saved ✓');
   }).catch(function(e) {
     console.error('Firebase save error:', e);
@@ -3932,9 +3948,9 @@ DOC_REF.onSnapshot(function(doc) {
           var norm = cat.url.replace(/\/$/, '').toLowerCase();
           var existing = landingPages.find(function(l) { return l.url.replace(/\/$/, '').toLowerCase() === norm; });
           if (existing) {
-            if (existing.expiry === undefined) { existing.expiry = cat.expiry; changed = true; }
-            if (existing.traffic === undefined) { existing.traffic = cat.traffic; changed = true; }
-            if (existing.type === undefined && cat.type) { existing.type = cat.type; changed = true; }
+            if (existing.expiry === undefined) { existing.expiry = cat.expiry || ''; changed = true; }
+            if (existing.traffic === undefined) { existing.traffic = cat.traffic || false; changed = true; }
+            if (existing.type === undefined) { existing.type = cat.type || ''; changed = true; }
           } else {
             var maxId = landingPages.length > 0 ? Math.max.apply(null, landingPages.map(function(l) { return l.id || 0; })) : 0;
             var newEntry = JSON.parse(JSON.stringify(cat));
