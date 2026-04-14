@@ -8733,6 +8733,7 @@ function renderMetaCampaignsPage() {
       '<button class="mc-tab-btn mc-auto-tab' + (metaAutoTab==='auto'?  ' active':'') + '" data-tab="auto"  onclick="mcRenderTab(\'auto\')"     >✨ Auto Generator</button>' +
       '<button class="mc-tab-btn' + (metaAutoTab==='campaigns'?' active':'') + '" data-tab="campaigns" onclick="mcRenderTab(\'campaigns\')" >Active Campaigns</button>' +
       '<button class="mc-tab-btn' + (metaAutoTab==='creatives'?' active':'') + '" data-tab="creatives" onclick="mcRenderTab(\'creatives\')" >Creatives Library</button>' +
+      '<button class="mc-tab-btn' + (metaAutoTab==='audit'?   ' active':'') + '" data-tab="audit"     onclick="mcRenderTab(\'audit\')"     >📊 Campaign Audit</button>' +
     '</div>' +
     '<div id="mcTabBody"></div>' +
     '</div>';
@@ -8755,6 +8756,7 @@ function mcRenderTab(tab, skipTabBarUpdate) {
   else if (tab === 'auto') mcRenderAutoGeneratorTab(body);
   else if (tab === 'campaigns') mcRenderCampaignsTab(body);
   else if (tab === 'creatives') mcRenderCreativesTab(body);
+  else if (tab === 'audit')     mcRenderAuditTab(body);
 }
 
 // ── Tab: Campaign Creator (original form, unchanged logic) ───────────────────
@@ -12937,6 +12939,365 @@ function mcCopyAIConfigToCreator() {
 }
 
 
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAMPAIGN AUDIT — 50-point Meta Ads health check
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function mcRenderAuditTab(body) {
+  if (!body) return;
+  var hasCredentials = !!(metaToken && metaAccountId);
+  var hasKey = !!(claudeApiKey && claudeApiKey.length > 10);
+  var cached = window._lastAuditResult || null;
+  var cachedAt = window._lastAuditAt || null;
+
+  body.innerHTML =
+    '<div style="padding:20px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">' +
+      '<div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--text)">Campaign Audit</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:3px">50-point Meta ads health check powered by Claude AI</div>' +
+      '</div>' +
+      (cached ? '<div style="display:flex;align-items:center;gap:10px">' +
+        '<span style="font-size:10px;color:var(--muted)">Last run: ' + _auditTimeSince(cachedAt) + ' ago</span>' +
+        '<button onclick="runCampaignAudit()" style="padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">\u21bb Re-audit</button>' +
+      '</div>' : '') +
+    '</div>' +
+    (!hasCredentials
+      ? '<div style="padding:20px;background:rgba(212,112,128,0.06);border:1px solid rgba(212,112,128,0.25);border-radius:10px;font-size:12px;color:var(--red)">\u2717 Meta API credentials required. Go to <strong style="color:var(--text)">Settings \u2192 Meta Ads</strong> to configure.</div>'
+      : !hasKey
+        ? '<div style="padding:20px;background:rgba(255,180,0,0.06);border:1px solid rgba(255,180,0,0.25);border-radius:10px;font-size:12px;color:var(--yellow)">\u26a0 Claude API key required. Go to <strong style="color:var(--text)">Settings \u2192 Claude AI</strong> to add your key.</div>'
+        : cached
+          ? '<div id="auditResultsArea">' + renderAuditResults(cached) + '</div>'
+          : '<div style="text-align:center;padding:48px 20px">' +
+              '<div style="font-size:44px;margin-bottom:16px">\U0001f4ca</div>' +
+              '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Ready to audit your Meta account</div>' +
+              '<div style="font-size:12px;color:var(--muted);margin-bottom:24px;max-width:400px;margin-left:auto;margin-right:auto">Claude fetches all your campaigns, ad sets and ads, then runs a 50-point health check and tells you exactly what to fix.</div>' +
+              '<button onclick="runCampaignAudit()" style="padding:13px 28px;border-radius:8px;border:1px solid rgba(160,160,200,0.4);background:rgba(160,160,200,0.12);color:var(--purple);font-size:14px;font-weight:700;cursor:pointer">\U0001f4ca Run Campaign Audit</button>' +
+            '</div>'
+    ) +
+    '</div>';
+}
+
+function _auditTimeSince(ts) {
+  if (!ts) return 'unknown';
+  var s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm';
+  return Math.floor(s/3600) + 'h';
+}
+
+function runCampaignAudit() {
+  if (!metaToken || !metaAccountId) { showToast('<div style="font-size:12px;color:var(--red)">\u2717 Set Meta credentials in Settings first.</div>', 'alert', 4000); return; }
+  if (!claudeApiKey) { showToast('<div style="font-size:12px;color:var(--yellow)">\u26a0 Set Claude API key in Settings \u2192 Claude AI first.</div>', 'alert', 4000); return; }
+
+  var body = document.getElementById('mcTabBody');
+  if (!body) return;
+
+  body.innerHTML =
+    '<div style="padding:20px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+      '<div style="font-size:16px;font-weight:700;color:var(--text)">Campaign Audit</div>' +
+    '</div>' +
+    '<div id="auditProgressWrap" style="text-align:center;padding:48px 20px">' +
+      '<div style="width:56px;height:56px;border-radius:50%;background:rgba(160,160,200,0.1);border:2px solid rgba(160,160,200,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;animation:pulse-dot 1.4s ease infinite">' +
+        '<span style="font-size:22px">\U0001f4ca</span>' +
+      '</div>' +
+      '<div id="auditProgressLabel" style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Fetching campaign data from Meta\u2026</div>' +
+      '<div id="auditProgressSub" style="font-size:11px;color:var(--muted);margin-bottom:20px">Pulling campaigns, ad sets and ads in parallel</div>' +
+      '<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;max-width:280px;margin:0 auto">' +
+        '<div id="auditProgressBar" style="height:100%;width:5%;background:linear-gradient(90deg,var(--purple),var(--accent));border-radius:2px;transition:width 0.6s ease"></div>' +
+      '</div>' +
+    '</div>' +
+    '</div>';
+
+  function prog(pct, label, sub) {
+    var bar = document.getElementById('auditProgressBar');
+    var lbl = document.getElementById('auditProgressLabel');
+    var sub2 = document.getElementById('auditProgressSub');
+    if (bar) bar.style.width = pct + '%';
+    if (lbl) lbl.textContent = label;
+    if (sub2 && sub) sub2.textContent = sub;
+  }
+
+  mcFetchAuditData(prog)
+    .then(function(data) {
+      prog(70, 'Claude is analysing your account\u2026', 'Running 50-point health check');
+      return getAuditInsights(data);
+    })
+    .then(function(result) {
+      window._lastAuditResult = result;
+      window._lastAuditAt = Date.now();
+      prog(100, 'Audit complete!', '');
+      var wrap = document.getElementById('auditProgressWrap');
+      if (wrap) wrap.innerHTML = renderAuditResults(result);
+    })
+    .catch(function(err) {
+      var wrap = document.getElementById('auditProgressWrap');
+      if (wrap) wrap.innerHTML =
+        '<div style="padding:20px;background:rgba(212,112,128,0.06);border:1px solid rgba(212,112,128,0.25);border-radius:10px;color:var(--red);font-size:12px">' +
+          '\u2717 Audit failed: ' + escHtml(err.message || String(err)) +
+        '</div>';
+    });
+}
+
+function mcFetchAuditData(onProgress) {
+  var actId = metaAccountId.startsWith('act_') ? metaAccountId : 'act_' + metaAccountId;
+  var tok   = encodeURIComponent(metaToken);
+  var base  = 'https://graph.facebook.com/v19.0/';
+
+  function apiFetch(url) { return fetch(url).then(function(r){ return r.json(); }); }
+
+  return Promise.all([
+    apiFetch(base + actId + '/campaigns?fields=id,name,status,daily_budget,lifetime_budget,objective,bid_strategy,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,actions,frequency}&limit=50&access_token=' + tok),
+    apiFetch(base + actId + '/adsets?fields=id,name,status,daily_budget,campaign_id,optimization_goal,bid_strategy,targeting,learning_stage_info,insights.date_preset(last_7d){spend,impressions,clicks,ctr,cpm,frequency}&limit=100&access_token=' + tok),
+    apiFetch(base + actId + '/ads?fields=id,name,status,adset_id,campaign_id,insights.date_preset(last_7d){spend,impressions,clicks,ctr,actions}&limit=200&access_token=' + tok)
+  ])
+  .then(function(responses) {
+    if (onProgress) onProgress(55, 'Processing data\u2026', 'Building account snapshot');
+
+    var campaigns = responses[0].data || [];
+    var adsets    = responses[1].data || [];
+    var ads       = responses[2].data || [];
+
+    if (responses[0].error) throw new Error('Meta API: ' + responses[0].error.message);
+
+    var activeCamps    = campaigns.filter(function(c){ return c.status === 'ACTIVE'; }).length;
+    var activeAdsets   = adsets.filter(function(s){ return s.status === 'ACTIVE'; }).length;
+    var activeAds      = ads.filter(function(a){ return a.status === 'ACTIVE'; }).length;
+    var learningAdsets = adsets.filter(function(s){ return s.learning_stage_info && s.learning_stage_info.status === 'LEARNING'; }).length;
+    var learningLimited = adsets.filter(function(s){ return s.learning_stage_info && s.learning_stage_info.status === 'LEARNING_LIMITED'; }).length;
+
+    var adsPerAdset = {};
+    ads.forEach(function(a){ adsPerAdset[a.adset_id] = (adsPerAdset[a.adset_id] || 0) + 1; });
+    var adsPerCamp = {};
+    ads.forEach(function(a){ adsPerCamp[a.campaign_id] = (adsPerCamp[a.campaign_id] || 0) + 1; });
+
+    var objectives = {};
+    campaigns.forEach(function(c){ objectives[c.objective] = (objectives[c.objective] || 0) + 1; });
+
+    var adsWithIns = ads.filter(function(a){ return a.insights && a.insights.data && a.insights.data[0]; });
+    var avgCtr = adsWithIns.length
+      ? (adsWithIns.reduce(function(s,a){ return s + parseFloat(a.insights.data[0].ctr||0); }, 0) / adsWithIns.length).toFixed(2)
+      : null;
+    var lowCtrAds = adsWithIns.filter(function(a){ return parseFloat(a.insights.data[0].ctr||0) < 0.5; }).length;
+    var highFreqAdsets = adsets.filter(function(s){ return s.insights && s.insights.data && s.insights.data[0] && parseFloat(s.insights.data[0].frequency||0) > 3; }).length;
+    var lowBudgetAdsets = adsets.filter(function(s){ return s.daily_budget && parseInt(s.daily_budget)/100 < 20; }).length;
+
+    var totalBudget = campaigns.reduce(function(sum,c){ return sum + (parseInt(c.daily_budget||0)/100); }, 0);
+
+    return {
+      summary: {
+        total_campaigns: campaigns.length,
+        active_campaigns: activeCamps,
+        paused_campaigns: campaigns.length - activeCamps,
+        total_adsets: adsets.length,
+        active_adsets: activeAdsets,
+        total_ads: ads.length,
+        active_ads: activeAds,
+        total_daily_budget_eur: totalBudget.toFixed(0),
+        learning_phase_adsets: learningAdsets,
+        learning_limited_adsets: learningLimited,
+        low_budget_adsets_under_20eur: lowBudgetAdsets,
+        high_frequency_adsets_over_3: highFreqAdsets,
+        objectives: objectives,
+        avg_ctr_last7d: avgCtr ? avgCtr + '%' : 'no data',
+        low_ctr_ads_under_05pct: lowCtrAds,
+        avg_ads_per_adset: adsets.length ? (ads.length / adsets.length).toFixed(1) : 0
+      },
+      campaigns: campaigns.slice(0, 15).map(function(c) {
+        var ins = c.insights && c.insights.data && c.insights.data[0];
+        return {
+          name: c.name, status: c.status, objective: c.objective,
+          daily_budget_eur: c.daily_budget ? (parseInt(c.daily_budget)/100).toFixed(0) : 'lifetime',
+          spend_7d: ins ? ins.spend : null,
+          impressions_7d: ins ? ins.impressions : null,
+          clicks_7d: ins ? ins.clicks : null,
+          ctr_7d: ins ? ins.ctr : null,
+          cpm_7d: ins ? ins.cpm : null,
+          frequency_7d: ins ? ins.frequency : null,
+          ad_count: adsPerCamp[c.id] || 0
+        };
+      }),
+      adsets: adsets.slice(0, 20).map(function(s) {
+        var ins = s.insights && s.insights.data && s.insights.data[0];
+        return {
+          name: s.name, status: s.status,
+          optimization_goal: s.optimization_goal,
+          bid_strategy: s.bid_strategy,
+          daily_budget_eur: s.daily_budget ? (parseInt(s.daily_budget)/100).toFixed(0) : 'inherited',
+          learning_status: s.learning_stage_info ? s.learning_stage_info.status : 'unknown',
+          ad_count: adsPerAdset[s.id] || 0,
+          geos: s.targeting && s.targeting.geo_locations ? (s.targeting.geo_locations.countries || []).join(',') : 'unknown',
+          frequency_7d: ins ? ins.frequency : null,
+          ctr_7d: ins ? ins.ctr : null
+        };
+      }),
+      top_ads: adsWithIns.slice(0, 10).map(function(a) {
+        var ins = a.insights.data[0];
+        return { name: a.name, status: a.status, ctr: ins.ctr, spend: ins.spend, impressions: ins.impressions };
+      })
+    };
+  });
+}
+
+function getAuditInsights(data) {
+  var prompt =
+    'You are a senior Meta Ads strategist specialising in casino affiliate advertising. Audit this Meta account.\n\n' +
+    '## ACCOUNT DATA\n' +
+    JSON.stringify(data, null, 2) + '\n\n' +
+    '## SCORING FRAMEWORK\n\n' +
+    'Account Structure (25%): ideal = 1 objective per campaign, 2-5 ads per ad set. LEARNING_LIMITED > 30% of active adsets = critical issue. >50% paused campaigns = poor hygiene.\n\n' +
+    'Creative Performance (25%): CTR >1.0% = good, 0.5-1.0% = acceptable, <0.5% after 2000+ impressions = replace. Frequency >3.0 in 7 days = fatigue. 3-5 ads per adset is optimal.\n\n' +
+    'Budget & Bidding (25%): minimum EUR20/day per adset. LOWEST_COST_WITHOUT_CAP is best for cold accounts. LINK_CLICKS for cold/learning phase. CONVERSIONS only with 50+ events/week.\n\n' +
+    'Targeting & Delivery (25%): broad targeting (no interests) outperforms interest targeting for cold accounts. Age 21-50 optimal for casino affiliates. GEO clustering (DACH together, Nordics together) improves CPM efficiency. Frequency >3 = audience fatigue.\n\n' +
+    '## OUTPUT — Return ONLY valid JSON:\n' +
+    '{\n' +
+    '  "overall_score": 72,\n' +
+    '  "overall_grade": "C+",\n' +
+    '  "headline": "one sentence verdict",\n' +
+    '  "categories": {\n' +
+    '    "account_structure": { "score": 65, "grade": "C", "summary": "brief", "findings": [\n' +
+    '      { "status": "fail", "title": "short", "detail": "what is wrong and why it matters", "action": "specific fix" }\n' +
+    '    ]},\n' +
+    '    "creative_performance": { "score": 80, "grade": "B", "summary": "brief", "findings": [] },\n' +
+    '    "budget_bidding": { "score": 70, "grade": "C+", "summary": "brief", "findings": [] },\n' +
+    '    "targeting_delivery": { "score": 75, "grade": "B-", "summary": "brief", "findings": [] }\n' +
+    '  },\n' +
+    '  "quick_wins": [\n' +
+    '    { "priority": 1, "action": "specific action", "impact": "high", "effort": "easy" }\n' +
+    '  ]\n' +
+    '}\n\n' +
+    'Be direct. Reference actual campaign/adset names from the data. 3-4 findings per category. 3 quick wins. status must be fail/warning/pass.';
+
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': claudeApiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2500,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(j){
+    if (j.error) throw new Error('Claude: ' + (j.error.message || JSON.stringify(j.error)));
+    if (!j.content || !j.content[0]) throw new Error('Empty Claude response');
+    var text = j.content[0].text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/i,'');
+    try { return JSON.parse(text); }
+    catch(e) { throw new Error('Claude returned invalid JSON: ' + text.substring(0,120)); }
+  });
+}
+
+function renderAuditResults(r) {
+  if (!r) return '';
+  var score = r.overall_score || 0;
+  var scoreColor = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--yellow)' : 'var(--red)';
+  var scoreBg    = score >= 80 ? 'rgba(126,191,154,0.10)' : score >= 60 ? 'rgba(255,180,0,0.08)' : 'rgba(212,112,128,0.10)';
+  var scoreBorder= score >= 80 ? 'rgba(126,191,154,0.3)'  : score >= 60 ? 'rgba(255,180,0,0.3)'   : 'rgba(212,112,128,0.3)';
+
+  var cats = r.categories || {};
+  var catKeys   = ['account_structure','creative_performance','budget_bidding','targeting_delivery'];
+  var catLabels = { account_structure:'Account Structure', creative_performance:'Creative Performance', budget_bidding:'Budget & Bidding', targeting_delivery:'Targeting & Delivery' };
+  var catIcons  = { account_structure:'\U0001f3d7', creative_performance:'\U0001f3a8', budget_bidding:'\U0001f4b0', targeting_delivery:'\U0001f3af' };
+
+  function statusBadge(s) {
+    var m = { fail:['var(--red)','rgba(212,112,128,0.12)','\u2717 FAIL'], warning:['var(--yellow)','rgba(255,180,0,0.10)','\u26a0 WARN'], pass:['var(--green)','rgba(126,191,154,0.10)','\u2713 PASS'] };
+    var v = m[s] || m.warning;
+    return '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:' + v[1] + ';color:' + v[0] + ';white-space:nowrap">' + v[2] + '</span>';
+  }
+
+  function impactBadge(i) {
+    var c = i==='high'?'var(--red)':i==='medium'?'var(--yellow)':'var(--muted)';
+    return '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;border:1px solid ' + c + ';color:' + c + ';text-transform:uppercase">' + escHtml(i||'') + '</span>';
+  }
+
+  var catHtml = catKeys.map(function(key) {
+    var cat = cats[key]; if (!cat) return '';
+    var cs = cat.score || 0;
+    var cc = cs >= 80 ? 'var(--green)' : cs >= 60 ? 'var(--yellow)' : 'var(--red)';
+    var findings = (cat.findings || []).map(function(f) {
+      return '<div style="padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+        '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px">' +
+          statusBadge(f.status) +
+          '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(f.title||'') + '</span>' +
+        '</div>' +
+        (f.detail ? '<div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:4px;padding-left:2px">' + escHtml(f.detail) + '</div>' : '') +
+        (f.action ? '<div style="font-size:11px;color:var(--accent);padding-left:2px">\u2192 ' + escHtml(f.action) + '</div>' : '') +
+      '</div>';
+    }).join('');
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px">' +
+      '<div style="padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:20px">' + (catIcons[key]||'\U0001f4cb') + '</span>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--text)">' + escHtml(catLabels[key]||key) + '</div>' +
+          (cat.summary ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + escHtml(cat.summary) + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div style="font-size:24px;font-weight:900;color:' + cc + ';line-height:1">' + cs + '</div>' +
+          '<div style="font-size:11px;font-weight:700;color:' + cc + '">' + escHtml(cat.grade||'') + '</div>' +
+        '</div>' +
+      '</div>' +
+      findings +
+    '</div>';
+  }).join('');
+
+  var quickWinsHtml = (r.quick_wins || []).map(function(w, i) {
+    return '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<div style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">' + (i+1) + '</div>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px">' + escHtml(w.action||'') + '</div>' +
+        '<div style="display:flex;gap:6px">' +
+          impactBadge(w.impact) +
+          '<span style="font-size:9px;color:var(--muted);padding:1px 5px;border-radius:3px;border:1px solid rgba(255,255,255,0.1)">' + escHtml(w.effort||'') + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var catSummaryBadges = catKeys.map(function(k) {
+    var c = cats[k]; if (!c) return '';
+    var cc = (c.score||0) >= 80 ? 'var(--green)' : (c.score||0) >= 60 ? 'var(--yellow)' : 'var(--red)';
+    return '<div style="font-size:10px;padding:3px 9px;border-radius:4px;background:rgba(255,255,255,0.05);color:var(--muted)">' +
+      escHtml(catLabels[k].split(' ')[0]) + ' <strong style="color:' + cc + '">' + (c.grade||'?') + '</strong>' +
+    '</div>';
+  }).join('');
+
+  return '<div>' +
+    // Score header card
+    '<div style="background:' + scoreBg + ';border:1px solid ' + scoreBorder + ';border-radius:12px;padding:20px 24px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">' +
+      '<div style="text-align:center;min-width:90px">' +
+        '<div style="font-size:52px;font-weight:900;color:' + scoreColor + ';line-height:1;font-family:var(--font-display)">' + score + '</div>' +
+        '<div style="font-size:15px;font-weight:800;color:' + scoreColor + ';margin-top:2px">' + escHtml(r.overall_grade||'') + '</div>' +
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:3px">Health Score</div>' +
+      '</div>' +
+      '<div style="flex:1;min-width:200px">' +
+        '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;line-height:1.4">' + escHtml(r.headline||'') + '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">' + catSummaryBadges + '</div>' +
+      '</div>' +
+      '<button onclick="runCampaignAudit()" style="padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--muted);font-size:11px;cursor:pointer;white-space:nowrap">\u21bb Re-run</button>' +
+    '</div>' +
+
+    // Quick wins
+    (quickWinsHtml ?
+      '<div style="background:var(--card);border:1px solid rgba(160,160,200,0.3);border-radius:10px;overflow:hidden;margin-bottom:16px">' +
+        '<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(160,160,200,0.06)">' +
+          '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--purple)">\u26a1 Quick Wins \u2014 Fix These First</div>' +
+        '</div>' +
+        quickWinsHtml +
+      '</div>'
+    : '') +
+
+    // Category breakdowns
+    catHtml +
+  '</div>';
+}
 
 
 </script>
