@@ -3103,6 +3103,49 @@ var FUNNEL_CTA = {
   SpinGPT: 'direct',
   Shadow:  'direct'
 };
+// Brand context for Auto Generator — tells Claude how to write per-funnel copy
+var FUNNEL_CONTEXT = {
+  Dark: {
+    brand: 'Dark Spins',
+    concept: 'Reveals real-time RTP data on which casino slots are paying right now — hidden data casinos try to suppress',
+    tone: 'Dark, edgy, mysterious. Speaks to the underdog who wants a real edge over the house.',
+    hook: 'Secret RTP slot data the casinos hide from you',
+    audience: 'Male 25-45, analytical casino players who research before betting, want a systematic edge',
+    cta_flow: 'Ad → darkspins.com LP → Telegram bot → casino (copy should mention the free tool/access)'
+  },
+  Slotio: {
+    brand: 'Slotio',
+    concept: 'AI engine that scans thousands of slots in real-time to surface the best-paying games',
+    tone: 'Tech-forward, smart, confident. The intelligent/modern way to play — AI does the work.',
+    hook: 'AI picks the hot slots so you only play the games that actually pay',
+    audience: 'Tech-savvy 22-40, early AI adopters, people who use ChatGPT and tech tools daily',
+    cta_flow: 'Ad → slotioai.com LP → directly to casino (copy should emphasize AI and smart strategy)'
+  },
+  Scanio: {
+    brand: 'Scanio',
+    concept: 'Live casino scanner — analyses slot performance data in real-time like a personal casino analyst',
+    tone: 'Data-driven, analytical, trustworthy. Like having a professional slot analyst in your pocket.',
+    hook: 'Scan live casino performance data before you play — only play what the data shows',
+    audience: 'Data-minded players 28-45, people who research investments/products before buying',
+    cta_flow: 'Ad → scanioai.com LP → Telegram bot → casino (copy should emphasize the scan/data angle)'
+  },
+  SpinGPT: {
+    brand: 'SpinGPT',
+    concept: 'ChatGPT-style AI slot advisor — ask it which games are paying right now and get instant answers',
+    tone: 'Conversational, futuristic, helpful. Like having an AI casino coach available 24/7.',
+    hook: 'Ask AI which slots are hot right now — real answers in seconds',
+    audience: 'ChatGPT/AI enthusiasts 22-38, curious and tech-forward, love discovering new AI tools',
+    cta_flow: 'Ad → directly to casino (no LP — copy should emphasize the AI question/answer mechanic)'
+  },
+  Shadow: {
+    brand: 'Shadow',
+    concept: 'Exclusive insider community with hidden slot intelligence the casino industry fights to suppress',
+    tone: 'Exclusive, mysterious, elite. You are being let in on something most players will never see.',
+    hook: 'The exclusive slot edge the casino industry is trying to block',
+    audience: 'High-value players 30-50 who value exclusivity and insider knowledge, willing to take action',
+    cta_flow: 'Ad → directly to casino (no LP — copy should emphasize exclusivity and insider access)'
+  }
+};
 
 var linkHistory = []; // loaded from Firebase (falls back to localStorage for migration)
 var funnelPaused = {}; // tracks which funnels are paused/offline
@@ -12412,57 +12455,79 @@ function mcFetchGeoPerformance(funnel, days) {
 // ── Claude API call — builds FULL multi-campaign plan ────────────────────────
 function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
   var lpDomain = (typeof FUNNEL_LP_DOMAIN !== 'undefined' ? FUNNEL_LP_DOMAIN[funnel] : '') || '';
+  var slDomain = (typeof FUNNEL_SMARTLINK_DOMAIN !== 'undefined' ? FUNNEL_SMARTLINK_DOMAIN[funnel] : '') || '';
   var ctaType  = (typeof FUNNEL_CTA !== 'undefined' ? FUNNEL_CTA[funnel] : '') || 'direct';
+  var fCtx     = (typeof FUNNEL_CONTEXT !== 'undefined' ? FUNNEL_CONTEXT[funnel] : null) || {};
   var today    = new Date().toISOString().split('T')[0];
   var numCreatives = Math.max(creativeUrls.length, 1);
+
+  var lpInfo = lpDomain
+    ? 'Landing page: https://' + lpDomain + '/ (this is where ads send users)'
+    : 'No LP — ads link directly to smartlink: https://' + slDomain + '/';
+
+  var trackingNote = lpDomain
+    ? 'Tracking URL pattern: https://' + lpDomain + '/?utm_source=meta&utm_medium=paid&utm_campaign={campaign_name}&utm_content={geo}&src=meta'
+    : 'Tracking URL pattern: https://' + slDomain + '/?utm_source=meta&utm_medium=paid&utm_campaign={campaign_name}&utm_content={geo}&src=meta';
 
   var geoDataStr = (perfData && perfData.length > 0)
     ? 'Historical FTDs by country: ' + perfData.slice(0,10).map(function(g){ return g.geo+':'+g.ftds; }).join(', ')
     : 'COLD ACCOUNT — no historical data. Use best-practice tier-1 GEO clusters.';
 
   var creativeSplitRule = numCreatives <= 4
-    ? numCreatives + ' creatives total — put ALL ' + numCreatives + ' creatives in EACH campaign as separate ads (max A/B signal across GEOs)'
+    ? numCreatives + ' creatives — put ALL ' + numCreatives + ' in EACH campaign as separate ads (max A/B signal)'
     : numCreatives <= 8
-      ? numCreatives + ' creatives total — SPLIT across campaigns, 2–4 per campaign, no duplicates between campaigns'
-      : numCreatives + ' creatives total — use 3–4 creatives per campaign, choose best variety, no duplicates';
+      ? numCreatives + ' creatives — SPLIT across campaigns (2-4 per campaign, no duplicates between campaigns)'
+      : numCreatives + ' creatives — use 3-4 per campaign, choose best variety, no duplicates';
 
   var prompt =
-    'You are an expert casino affiliate Meta Ads media buyer. Design the COMPLETE campaign plan for a COLD account.\n\n' +
+    'You are an expert casino affiliate Meta Ads media buyer. Design the COMPLETE campaign plan for this funnel.\n\n' +
 
-    '## INPUTS\n' +
-    'Funnel: ' + funnel + '\n' +
-    'Landing page: ' + (lpDomain ? 'https://' + lpDomain + '/' : 'direct smartlink') + '\n' +
-    'CTA: ' + (ctaType === 'tg' ? 'LP → Telegram bot → casino' : 'Direct click to casino') + '\n' +
+    '## FUNNEL BRAND BRIEF\n' +
+    'Brand name: ' + (fCtx.brand || funnel) + '\n' +
+    'Concept: ' + (fCtx.concept || funnel + ' casino affiliate funnel') + '\n' +
+    'Brand tone & voice: ' + (fCtx.tone || 'Professional and engaging') + '\n' +
+    'Core hook / value prop: ' + (fCtx.hook || 'Get access to exclusive casino content') + '\n' +
+    'Target audience: ' + (fCtx.audience || 'Casino players 25-45') + '\n' +
+    'CTA flow: ' + (fCtx.cta_flow || ctaType + ' flow') + '\n' +
+    lpInfo + '\n' +
+    trackingNote + '\n\n' +
+
+    '## CAMPAIGN INPUTS\n' +
     'Total daily budget: \u20ac' + budget + '\n' +
     'Number of creatives: ' + numCreatives + '\n' +
     'GEO data: ' + geoDataStr + '\n\n' +
 
-    '## CAMPAIGN STRUCTURE RULES\n' +
-    '1. LINK_CLICKS objective always (cold accounts need 50+ conv/week before switching)\n' +
-    '2. 1 Ad Set per campaign with the FULL campaign budget — never split budget across ad sets\n' +
+    '## CAMPAIGN STRUCTURE RULES (follow exactly)\n' +
+    '1. LINK_CLICKS objective always — cold accounts need 50+ conv/week before switching\n' +
+    '2. 1 Ad Set per campaign with FULL campaign budget — never split budget\n' +
     '3. Broad targeting only (no interests), age 21–50\n' +
-    '4. Split into multiple campaigns by GEO CLUSTER for efficient CPM management:\n' +
-    '   - DACH: DE, AT, CH (highest CPM, best conv rate)\n' +
+    '4. Split by GEO cluster for efficient CPM:\n' +
+    '   - DACH: DE, AT, CH (highest CPM, best conv — give most budget)\n' +
     '   - Nordics: NO, SE, FI, DK (medium CPM)\n' +
     '   - Benelux: NL, BE (lower CPM)\n' +
     '5. Campaign count based on budget:\n' +
-    '   - \u20ac50/day or less → 1 campaign: mix of DACH + 1-2 Nordics\n' +
-    '   - \u20ac51–\u20ac100/day → 2 campaigns: DACH ~60% budget, Nordics ~40%\n' +
-    '   - \u20ac101–\u20ac200/day → 3 campaigns: DACH 50%, Nordics 30%, Benelux 20%\n' +
-    '   - >\u20ac200/day → 3–4 campaigns, use judgment\n' +
-    '6. Minimum \u20ac20/day per campaign (Meta cannot optimize below this)\n' +
+    '   - \u20ac50/day or less \u2192 1 campaign: mix of DACH + 1-2 Nordics\n' +
+    '   - \u20ac51\u2013\u20ac100/day \u2192 2 campaigns: DACH ~60%, Nordics ~40%\n' +
+    '   - \u20ac101\u2013\u20ac200/day \u2192 3 campaigns: DACH 50%, Nordics 30%, Benelux 20%\n' +
+    '   - >\u20ac200/day \u2192 3\u20134 campaigns, use judgment\n' +
+    '6. Minimum \u20ac20/day per campaign\n' +
     '7. Campaign budgets MUST sum to exactly \u20ac' + budget + '/day\n' +
     '8. NEVER target: US, UK, FR, IT, ES (Meta gambling ad restrictions)\n\n' +
 
-    '## CREATIVE DISTRIBUTION\n' +
-    creativeSplitRule + '\n' +
-    'Each ad MUST have a different copy angle: Curiosity, FOMO, SocialProof, Exclusivity, Mystery\n' +
-    'Headlines MUST NOT contain: casino, gambling, bet, win, jackpot, real money, slots, poker\n' +
-    'Headlines \u226440 chars | Body \u2264125 chars | Description \u226430 chars\n\n' +
+    '## COPY RULES (critical)\n' +
+    '\u2022 Write copy that sounds AUTHENTICALLY like ' + (fCtx.brand || funnel) + ' — match the brand tone above\n' +
+    '\u2022 Use the core hook as inspiration: "' + (fCtx.hook || '') + '"\n' +
+    '\u2022 Each ad gets a DIFFERENT angle: Curiosity, FOMO, SocialProof, Exclusivity, Mystery\n' +
+    '\u2022 Headlines MUST NOT contain: casino, gambling, bet, win, jackpot, real money, slots, poker, bonus\n' +
+    '\u2022 Headlines \u226440 chars | Body \u2264125 chars | Description \u226430 chars\n' +
+    '\u2022 Body text should feel natural for social media — not like a generic ad\n\n' +
 
-    '## OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no explanation:\n' +
+    '## CREATIVE DISTRIBUTION\n' +
+    creativeSplitRule + '\n\n' +
+
+    '## OUTPUT FORMAT — Return ONLY valid JSON, no markdown:\n' +
     '{\n' +
-    '  "plan_name": "' + funnel + ' Cold Launch ' + today + '",\n' +
+    '  "plan_name": "' + (fCtx.brand || funnel) + ' Cold Launch ' + today + '",\n' +
     '  "campaigns": [\n' +
     '    {\n' +
     '      "name": "' + funnel + '_{GEOs}_LC_' + today + '",\n' +
@@ -12477,21 +12542,21 @@ function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
     '          "name": "' + funnel + '_V1_Curiosity",\n' +
     '          "creative_index": 0,\n' +
     '          "angle": "Curiosity",\n' +
-    '          "headline1": "max 40 chars",\n' +
+    '          "headline1": "max 40 chars — ' + (fCtx.brand || funnel) + ' brand voice",\n' +
     '          "headline2": "max 40 chars",\n' +
     '          "headline3": "max 40 chars",\n' +
-    '          "body": "max 125 chars primary text",\n' +
+    '          "body": "max 125 chars — authentic ' + (fCtx.brand || funnel) + ' tone",\n' +
     '          "description": "max 30 chars"\n' +
     '        }\n' +
     '      ]\n' +
     '    }\n' +
     '  ],\n' +
-    '  "strategy": "1-2 sentences on overall test structure and what you are testing",\n' +
-    '  "reasoning": "2-3 sentences explaining GEO split and budget allocation decisions"\n' +
+    '  "strategy": "1-2 sentences on overall test structure",\n' +
+    '  "reasoning": "2-3 sentences on GEO split, budget allocation, and copy choices for ' + (fCtx.brand || funnel) + '"\n' +
     '}\n\n' +
-    'creative_index must be 0–' + (numCreatives - 1) + '. Campaign budgets must sum to ' + budget + '.';
+    'creative_index: 0\u2013' + (numCreatives-1) + '. Campaign budgets must sum to ' + budget + '.';
 
-  return fetch('https://api.anthropic.com/v1/messages', {
+    return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -12565,10 +12630,14 @@ function renderAICampaignPreview(config, funnel, budget, creativeUrls) {
           geoBadges +
         '</div>' +
       '</div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-bottom:12px;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:5px">' +
+      '<div style="font-size:10px;color:var(--muted);margin-bottom:8px;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:5px">' +
         '<span style="color:var(--text);font-weight:600">Ad Set:</span> ' + escHtml(camp.ad_set_name || '') +
         ' \u00b7 Broad \u00b7 Age ' + (camp.age_min||21) + '\u2013' + (camp.age_max||50) +
       '</div>' +
+      (function(){
+        var tUrl = mcBuildUtm(funnel, camp.name || funnel, (camp.geos||[]).join(','));
+        return tUrl ? '<div style="font-size:9px;color:var(--muted);margin-bottom:12px;padding:5px 10px;background:rgba(255,255,255,0.02);border-radius:5px;font-family:var(--font-mono);word-break:break-all"><span style="color:var(--green);font-weight:700">Track URL: </span>' + escHtml(tUrl) + '</div>' : '';
+      })() +
       '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">' + ads.length + ' Ad' + (ads.length>1?'s':'') + ' \u2014 A/B Creative Test</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' + adCards + '</div>' +
     '</div>';
