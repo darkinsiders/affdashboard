@@ -12409,41 +12409,78 @@ function mcFetchGeoPerformance(funnel, days) {
     .catch(function() { return []; });
 }
 
-// ── Claude API call ───────────────────────────────────────────────────────────
+// ── Claude API call — builds FULL test structure ──────────────────────────────
 function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
   var lpDomain = (typeof FUNNEL_LP_DOMAIN !== 'undefined' ? FUNNEL_LP_DOMAIN[funnel] : '') || '';
   var slDomain = (typeof FUNNEL_SMARTLINK_DOMAIN !== 'undefined' ? FUNNEL_SMARTLINK_DOMAIN[funnel] : '') || '';
   var ctaType  = (typeof FUNNEL_CTA !== 'undefined' ? FUNNEL_CTA[funnel] : '') || 'direct';
   var today    = new Date().toISOString().split('T')[0];
+  var numCreatives = Math.max(creativeUrls.length, 1);
 
+  // GEO data only used if we have it — cold account falls back to best-practice defaults
   var geoDataStr = (perfData && perfData.length > 0)
-    ? perfData.slice(0, 12).map(function(g) { return g.geo + ':' + g.ftds + 'FTDs'; }).join(', ')
-    : 'No historical data available — use tier-1 casino GEO defaults';
+    ? 'Historical FTDs by country: ' + perfData.slice(0,10).map(function(g){ return g.geo+':'+g.ftds; }).join(', ')
+    : 'COLD ACCOUNT — no historical data. Use best-practice tier-1 GEOs only.';
 
   var prompt =
-    'You are an expert casino affiliate Meta Ads manager. Generate the optimal campaign config.\n\n' +
-    '## FUNNEL\n' +
-    'Name: ' + funnel + '\n' +
-    'Landing page: ' + (lpDomain ? 'https://' + lpDomain + '/' : 'None (direct smartlink)') + '\n' +
-    'Smartlink: ' + (slDomain ? 'https://' + slDomain + '/' : 'None') + '\n' +
-    'CTA type: ' + ctaType + ' (' + (ctaType === 'tg' ? 'LP → Telegram bot → casino' : 'direct to casino via smartlink') + ')\n' +
+    'You are an expert casino affiliate Meta Ads media buyer setting up a COLD account test from scratch.\n' +
+    'There is ZERO existing campaign data. Your job is to design the best possible initial test structure.\n\n' +
+
+    '## FUNNEL INFO\n' +
+    'Funnel: ' + funnel + '\n' +
+    'Landing page: ' + (lpDomain ? 'https://' + lpDomain + '/' : 'No LP — direct smartlink') + '\n' +
+    'CTA flow: ' + (ctaType === 'tg' ? 'LP → Telegram bot → casino' : 'Direct click to casino smartlink') + '\n' +
     'Daily budget: €' + budget + '\n' +
-    'Available creatives: ' + creativeUrls.length + (creativeUrls.length > 0 ? ' file(s): ' + creativeUrls.slice(0,3).join(', ') : ' (none yet)') + '\n\n' +
-    '## HISTORICAL GEO PERFORMANCE (last 30 days FTDs per country)\n' +
+    'Number of creatives to test: ' + numCreatives + '\n\n' +
+
+    '## GEO CONTEXT\n' +
     geoDataStr + '\n\n' +
-    '## RULES (follow strictly)\n' +
-    '- Best casino affiliate GEOs for Meta: DE, AT, CH, NO, SE, FI, NL, BE, DK, NZ, AU\n' +
-    '- Budget < €50 → use LINK_CLICKS (cheaper CPM, better for learning phase)\n' +
-    '- Budget ≥ €50 → LINK_CLICKS unless strong conversion pixel history exists\n' +
-    '- NEVER target US, UK, FR, IT — Meta gambling restrictions\n' +
-    '- Headlines must NOT contain: win, jackpot, casino, gambling, bet, real money (Meta policy)\n' +
-    '- Instead use: curiosity, exclusivity, social proof, mystery, FOMO\n' +
-    '- Headlines max 40 chars, body max 125 chars, description max 30 chars\n' +
-    '- Pick 3–6 GEOs max (smaller sets have better CPM)\n' +
-    '- Name format: ' + funnel + '_{GEOS}_{OBJ_SHORT}_' + today + '\n\n' +
-    '## OUTPUT\n' +
-    'Return ONLY valid JSON, no explanation, no markdown fences:\n' +
-    '{"campaign_name":"string","objective":"LINK_CLICKS","geos":["DE","AT"],"headlines":["40chr max","40chr max","40chr max"],"body":"125chr max primary text","description":"30chr max","selected_creative_index":0,"reasoning":"2-3 sentences on GEO and objective choice"}';
+
+    '## COLD ACCOUNT BEST PRACTICES (follow ALL of these)\n' +
+    '1. ALWAYS use LINK_CLICKS objective for cold accounts — CONVERSIONS needs 50+ conversions/week to exit learning phase\n' +
+    '2. Use 1 single Ad Set with the FULL budget — splitting budget across multiple ad sets slows the learning phase\n' +
+    '3. Broad targeting ONLY (no interest targeting) — Meta\'s algorithm finds users better without restrictions on cold accounts\n' +
+    '4. Age 21–50 is the casino affiliate sweet spot on Meta\n' +
+    '5. Best tier-1 GEOs for casino affiliates: DE, AT, CH, NO, SE, FI, NL, BE, DK — pick 3-5 max (tighter GEO = better CPM)\n' +
+    '6. NEVER target: US, UK, FR, IT, ES — Meta gambling ad restrictions\n' +
+    '7. Create ONE ad per creative — Meta\'s delivery system automatically A/B tests them and allocates budget to the winner\n' +
+    '8. Write a DIFFERENT copy angle for each creative — test both the visual AND the messaging simultaneously\n' +
+    '9. Headlines MUST NOT contain: casino, gambling, bet, win, jackpot, real money, slots, poker (Meta policy violation)\n' +
+    '10. Copy angles that work: curiosity gap, social proof, exclusivity, mystery, FOMO, insider knowledge\n' +
+    '11. Keep headlines under 40 chars, body under 125 chars, description under 30 chars\n\n' +
+
+    '## COPY ANGLE IDEAS (use as inspiration, be creative)\n' +
+    '- Curiosity: "What these users discovered changed everything"\n' +
+    '- Exclusivity: "Members-only — not available to the public"\n' +
+    '- Social proof: "Thousands already use this daily"\n' +
+    '- FOMO: "Access closes at midnight tonight"\n' +
+    '- Mystery: "The algorithm nobody talks about"\n\n' +
+
+    '## OUTPUT FORMAT\n' +
+    'Return ONLY valid JSON. No markdown, no explanation, no extra text. Schema:\n' +
+    '{\n' +
+    '  "campaign_name": "' + funnel + '_{GEO1GEO2}_LC_' + today + '",\n' +
+    '  "objective": "LINK_CLICKS",\n' +
+    '  "geos": ["DE", "AT", "CH"],\n' +
+    '  "age_min": 21,\n' +
+    '  "age_max": 50,\n' +
+    '  "ad_set_name": "' + funnel + '_{GEO1GEO2}_Broad_21-50",\n' +
+    '  "ads": [\n' +
+    '    {\n' +
+    '      "name": "' + funnel + '_V1_{AngleName}",\n' +
+    '      "creative_index": 0,\n' +
+    '      "angle": "one word — e.g. Curiosity, FOMO, SocialProof",\n' +
+    '      "headline1": "max 40 chars",\n' +
+    '      "headline2": "max 40 chars",\n' +
+    '      "headline3": "max 40 chars",\n' +
+    '      "body": "max 125 chars primary text",\n' +
+    '      "description": "max 30 chars"\n' +
+    '    }\n' +
+    '  ],\n' +
+    '  "test_strategy": "1-2 sentence explanation of the test structure and what you are testing",\n' +
+    '  "reasoning": "2-3 sentences on GEO choice and why this structure for a cold account"\n' +
+    '}\n\n' +
+    'IMPORTANT: The "ads" array must have exactly ' + numCreatives + ' item(s) — one per creative. creative_index 0 = first creative, 1 = second, etc.';
 
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -12454,8 +12491,8 @@ function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
       'anthropic-dangerous-direct-browser-access': 'true'
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 900,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1200,
       messages: [{ role: 'user', content: prompt }]
     })
   })
@@ -12465,114 +12502,286 @@ function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
     if (!j.content || !j.content[0] || !j.content[0].text) throw new Error('Empty response from Claude');
     var text = j.content[0].text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/i,'');
     try { return JSON.parse(text); }
-    catch(e) { throw new Error('Claude returned invalid JSON. Raw: ' + text.substring(0,120)); }
+    catch(e) { throw new Error('Claude returned invalid JSON. Raw: ' + text.substring(0,200)); }
   });
 }
 
-// ── AI Preview card ───────────────────────────────────────────────────────────
+// ── AI Preview card — shows full test structure ───────────────────────────────
 function renderAICampaignPreview(config, funnel, budget, creativeUrls) {
   var area = document.getElementById('ag_preview_area');
   if (!area) return;
-
-  var creativeUrl = '';
-  var idx = config.selected_creative_index || 0;
-  if (creativeUrls && creativeUrls[idx]) creativeUrl = creativeUrls[idx];
-
-  var thumbHtml = creativeUrl
-    ? '<div style="margin-bottom:14px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">' +
-        '<img src="' + escHtml(creativeUrl) + '" style="width:100%;max-height:180px;object-fit:cover;display:block" onerror="this.parentNode.style.display=\'none\'">' +
-      '</div>'
-    : '';
 
   var geoBadges = (config.geos || []).map(function(g) {
     return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--badge-geo);color:var(--badge-geo-text)">' + escHtml(g) + '</span>';
   }).join(' ');
 
-  var headlines = (config.headlines || []).map(function(h, i) {
-    return '<div class="mc-ai-preview-value" style="margin-bottom:6px;font-size:12px"><span style="color:var(--muted);font-size:10px;margin-right:4px">' + (i+1) + '.</span>' + escHtml(h) + '</div>';
+  // Build per-ad cards
+  var ads = config.ads || [];
+  var adCards = ads.map(function(ad, i) {
+    var curl = creativeUrls && creativeUrls[ad.creative_index != null ? ad.creative_index : i];
+    var isVid = curl && /\.(mp4|webm|mov|avi)(\?.*)?$/i.test(curl);
+    var thumbHtml = curl
+      ? (isVid
+          ? '<div style="width:100%;height:100px;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:28px;border-radius:6px;margin-bottom:10px">▶</div>'
+          : '<img src="' + escHtml(curl) + '" style="width:100%;height:100px;object-fit:cover;border-radius:6px;display:block;margin-bottom:10px;background:rgba(255,255,255,0.04)" onerror="this.style.display=\'none\'">')
+      : '<div style="width:100%;height:60px;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);margin-bottom:10px">No creative uploaded yet</div>';
+
+    var angleColor = { Curiosity:'var(--purple)', FOMO:'var(--red)', SocialProof:'var(--green)', Exclusivity:'var(--yellow)', Mystery:'var(--orange)' }[ad.angle] || 'var(--accent)';
+
+    return '<div style="background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:220px">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">' +
+        '<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Ad ' + (i+1) + '</span>' +
+        (ad.angle ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.06);color:' + angleColor + '">' + escHtml(ad.angle) + '</span>' : '') +
+      '</div>' +
+      thumbHtml +
+      '<div style="margin-bottom:7px">' +
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px">Headlines</div>' +
+        [ad.headline1, ad.headline2, ad.headline3].filter(Boolean).map(function(h, hi) {
+          return '<div style="font-size:11px;color:var(--text);padding:4px 8px;background:rgba(255,255,255,0.04);border-radius:4px;margin-bottom:3px"><span style="color:var(--muted);font-size:9px">' + (hi+1) + '. </span>' + escHtml(h) + '</div>';
+        }).join('') +
+      '</div>' +
+      '<div style="margin-bottom:7px">' +
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px">Body</div>' +
+        '<div style="font-size:11px;color:var(--text);line-height:1.5;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:4px">' + escHtml(ad.body || '') + '</div>' +
+      '</div>' +
+      '<div><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Description: </span><span style="font-size:11px;color:var(--muted)">' + escHtml(ad.description || '') + '</span></div>' +
+    '</div>';
   }).join('');
 
   area.innerHTML =
     '<div class="mc-ai-preview">' +
+      // Header
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">' +
-        '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green)">✨ AI Campaign Preview</span>' +
-        '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(126,191,154,0.12);color:var(--green);text-transform:uppercase;letter-spacing:.05em">Claude Haiku</span>' +
+        '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green)">✨ AI Test Structure</span>' +
+        '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(126,191,154,0.12);color:var(--green);text-transform:uppercase;letter-spacing:.05em">Claude Sonnet</span>' +
       '</div>' +
-      thumbHtml +
-      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Campaign Name</span><div class="mc-ai-preview-value" style="font-family:var(--font-mono);font-size:11px">' + escHtml(config.campaign_name || '') + '</div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
-        '<div><span class="mc-ai-preview-label">Objective</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.objective || '') + '</div></div>' +
-        '<div><span class="mc-ai-preview-label">Daily Budget</span><div class="mc-ai-preview-value" style="color:var(--yellow);font-weight:700">€' + escHtml(String(budget)) + '</div></div>' +
+
+      // Structure overview
+      '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--text);line-height:1.7">' +
+        '<span style="color:var(--muted);font-size:11px">Structure: </span>' +
+        '<strong>1 Campaign</strong> → <strong>1 Ad Set</strong> (€' + budget + '/day, broad) → <strong>' + ads.length + ' Ad' + (ads.length > 1 ? 's' : '') + '</strong> (A/B creative test)' +
       '</div>' +
-      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Target GEOs</span><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">' + geoBadges + '</div></div>' +
-      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Headlines</span>' + headlines + '</div>' +
-      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Primary Text</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.body || '') + '</div></div>' +
-      '<div style="margin-bottom:0"><span class="mc-ai-preview-label">Description</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.description || '') + '</div></div>' +
+
+      // Campaign + AdSet info row
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">' +
+        '<div><span class="mc-ai-preview-label">Campaign</span><div class="mc-ai-preview-value" style="font-family:var(--font-mono);font-size:10px;word-break:break-all">' + escHtml(config.campaign_name || '') + '</div></div>' +
+        '<div><span class="mc-ai-preview-label">Objective</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.objective || 'LINK_CLICKS') + '</div></div>' +
+        '<div><span class="mc-ai-preview-label">Target GEOs</span><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">' + geoBadges + '</div></div>' +
+      '</div>' +
+
+      // Ad set name + targeting
+      '<div style="margin-bottom:14px">' +
+        '<span class="mc-ai-preview-label">Ad Set — ' + escHtml(config.ad_set_name || '') + '</span>' +
+        '<div style="font-size:11px;color:var(--muted)">Broad targeting · Age ' + (config.age_min||21) + '–' + (config.age_max||50) + ' · Lowest cost · Full €' + budget + '/day budget on 1 ad set</div>' +
+      '</div>' +
+
+      // Per-ad cards
+      '<div style="margin-bottom:14px">' +
+        '<span class="mc-ai-preview-label">Ads (' + ads.length + ') — A/B Creative Test</span>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">' + adCards + '</div>' +
+      '</div>' +
+
+      // Test strategy + reasoning
+      (config.test_strategy ? '<div style="font-size:12px;color:var(--text);background:rgba(126,191,154,0.06);border:1px solid rgba(126,191,154,0.2);border-radius:6px;padding:10px 14px;margin-bottom:10px"><strong style="color:var(--green)">Test strategy:</strong> ' + escHtml(config.test_strategy) + '</div>' : '') +
       (config.reasoning ? '<div class="mc-ai-reasoning">' + escHtml(config.reasoning) + '</div>' : '') +
+
+      // Action buttons
       '<div style="display:flex;gap:10px;margin-top:18px">' +
-        '<button onclick="launchAICampaign()" style="flex:1;padding:11px;border-radius:8px;border:1px solid rgba(126,191,154,0.5);background:rgba(126,191,154,0.15);color:var(--green);font-size:13px;font-weight:700;cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(126,191,154,0.25)\'" onmouseleave="this.style.background=\'rgba(126,191,154,0.15)\'">🚀 Looks good, Launch!</button>' +
-        '<button onclick="mcCopyAIConfigToCreator()" style="padding:11px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Edit First ✏</button>' +
+        '<button id="ag_launch_btn" onclick="launchAICampaign()" style="flex:1;padding:13px;border-radius:8px;border:1px solid rgba(126,191,154,0.5);background:rgba(126,191,154,0.15);color:var(--green);font-size:14px;font-weight:700;cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(126,191,154,0.25)\'" onmouseleave="this.style.background=\'rgba(126,191,154,0.15)\'">🚀 Launch All Ads</button>' +
+        '<button onclick="autoGenerateCampaign()" style="padding:13px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">↻ Regenerate</button>' +
       '</div>' +
     '</div>';
 }
 
-// ── Fill Creator form with AI config then launch ──────────────────────────────
-function _mcApplyAIConfig(andLaunch) {
+// ── Launch: create campaign + 1 ad set + N ads (one per creative) ─────────────
+function launchAICampaign() {
   var config  = autoGenState.aiConfig;
   var funnel  = autoGenState.funnel;
   var budget  = autoGenState.budget;
   if (!config) return;
 
+  var token     = (typeof metaToken !== 'undefined' ? metaToken : '') || '';
+  var accountId = (typeof metaAccountId !== 'undefined' ? metaAccountId : '') || '';
+  if (!token || !accountId) {
+    showToast('<div style="font-size:12px;color:var(--red)">✗ Set Meta token + account ID in Settings first.</div>', 'alert', 5000);
+    return;
+  }
+
   var creativeUrls = autoGenState.selectedCreativeUrls.length > 0
     ? autoGenState.selectedCreativeUrls
     : metaCreatives.filter(function(c) { return c.funnel === funnel; }).map(function(c) { return c.url; });
-  var creativeUrl = creativeUrls[config.selected_creative_index || 0] || '';
 
-  mcRenderTab('creator');
-
-  // Use onReady callback via MutationObserver to avoid setTimeout race
-  var tabBody = document.getElementById('mcTabBody');
-  var done = false;
-  function fillForm() {
-    if (done) return;
-    done = true;
-    function sv(id, val) { var el = document.getElementById(id); if (el) { el.value = val; el.dispatchEvent(new Event('input')); } }
-    sv('mc_funnel',  funnel);  metaCampaignFunnel = funnel;
-    sv('mc_name',    config.campaign_name  || '');
-    sv('mc_geos',    (config.geos || []).join(', '));
-    sv('mc_budget',  String(budget));        metaCampaignBudget = budget;
-    sv('mc_h1',      (config.headlines||[])[0] || '');
-    sv('mc_h2',      (config.headlines||[])[1] || '');
-    sv('mc_h3',      (config.headlines||[])[2] || '');
-    sv('mc_body',    config.body        || '');
-    sv('mc_desc',    config.description || '');
-    sv('mc_creative', creativeUrl);
-    var objEl = document.getElementById('mc_objective');
-    if (objEl) objEl.value = config.objective || 'LINK_CLICKS';
-    mcUpdateUtmPreview();
-    if (andLaunch) {
-      createMetaCampaign();
-      showToast(
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);margin-bottom:3px">🚀 AI Campaign Launching</div>' +
-        '<div style="font-size:12px;color:var(--text)">Config applied — creating via Meta API…</div>',
-        'ftd', 5000
-      );
-    }
+  var lpUrl = mcBuildUtm(funnel, config.campaign_name || funnel, (config.geos || []).join(','));
+  if (!lpUrl) {
+    showToast('<div style="font-size:12px;color:var(--yellow)">⚠ No landing page configured for ' + escHtml(funnel) + '. Set it in Settings.</div>', 'alert', 5000);
+    return;
   }
 
-  // Poll until Creator form is rendered (mc_funnel exists)
+  var btn = document.getElementById('ag_launch_btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating campaign…'; }
+
+  var actId = accountId.startsWith('act_') ? accountId : 'act_' + accountId;
+  var geoCountries = (config.geos || ['DE','AT']).map(function(g){ return g.trim().toUpperCase(); });
+  var ads = config.ads || [];
+
+  // Step 1 — Campaign
+  var p1 = new URLSearchParams({
+    name: config.campaign_name || (funnel + '_AutoGen'),
+    objective: config.objective || 'LINK_CLICKS',
+    status: 'PAUSED',
+    special_ad_categories: '[]',
+    access_token: token
+  });
+
+  fetch('https://graph.facebook.com/v19.0/' + actId + '/campaigns', { method:'POST', body: p1 })
+  .then(function(r){ return r.json(); })
+  .then(function(camp) {
+    if (camp.error) throw new Error('Campaign: ' + camp.error.message);
+    var campId = camp.id;
+    if (btn) btn.textContent = '⏳ Creating ad set…';
+
+    // Step 2 — 1 Ad Set with full budget
+    var p2 = new URLSearchParams({
+      name: config.ad_set_name || (funnel + '_Broad_AdSet'),
+      campaign_id: campId,
+      daily_budget: Math.round(budget * 100),
+      billing_event: 'IMPRESSIONS',
+      optimization_goal: 'LINK_CLICKS',
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+      targeting: JSON.stringify({
+        geo_locations: { countries: geoCountries },
+        age_min: config.age_min || 21,
+        age_max: config.age_max || 50
+      }),
+      status: 'PAUSED',
+      access_token: token
+    });
+
+    return fetch('https://graph.facebook.com/v19.0/' + actId + '/adsets', { method:'POST', body: p2 })
+    .then(function(r){ return r.json(); })
+    .then(function(adset) {
+      if (adset.error) throw new Error('Ad Set: ' + adset.error.message);
+      if (btn) btn.textContent = '⏳ Creating ads (0/' + ads.length + ')…';
+
+      // Step 3 — Create ads sequentially, one per creative
+      var adResults = [];
+      function createNextAd(i) {
+        if (i >= ads.length) return Promise.resolve(adResults);
+        var adConf  = ads[i];
+        var curl    = creativeUrls[adConf.creative_index != null ? adConf.creative_index : i] || '';
+        if (btn) btn.textContent = '⏳ Creating ad ' + (i+1) + '/' + ads.length + '…';
+
+        var linkData = {
+          link:    lpUrl,
+          message: adConf.body || '',
+          name:    adConf.headline1 || '',
+          description: adConf.description || '',
+          call_to_action: { type: 'LEARN_MORE', value: { link: lpUrl } }
+        };
+        if (curl) linkData.picture = curl;
+
+        var p3a = new URLSearchParams({
+          name: adConf.name || (funnel + '_Ad' + (i+1)),
+          object_story_spec: JSON.stringify({ page_id: 'ME', link_data: linkData }),
+          access_token: token
+        });
+
+        return fetch('https://graph.facebook.com/v19.0/' + actId + '/adcreatives', { method:'POST', body: p3a })
+        .then(function(r){ return r.json(); })
+        .then(function(creative) {
+          var creativeId = (creative && !creative.error) ? creative.id : null;
+          var p3b_data = {
+            name:     adConf.name || (funnel + '_Ad' + (i+1)),
+            adset_id: adset.id,
+            status:   'PAUSED',
+            access_token: token
+          };
+          if (creativeId) p3b_data.creative = JSON.stringify({ creative_id: creativeId });
+          var p3b = new URLSearchParams(p3b_data);
+          return fetch('https://graph.facebook.com/v19.0/' + actId + '/ads', { method:'POST', body: p3b })
+          .then(function(r){ return r.json(); })
+          .then(function(ad) {
+            adResults.push({ adId: ad.id || null, creativeId: creativeId, name: adConf.name, angle: adConf.angle });
+            return createNextAd(i + 1);
+          });
+        });
+      }
+
+      return createNextAd(0).then(function(results) {
+        return { campId: campId, adsetId: adset.id, ads: results };
+      });
+    });
+  })
+  .then(function(result) {
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 Launch All Ads'; }
+
+    // Log to Firebase
+    db.collection('meta_campaigns').add({
+      campaignId: result.campId,
+      adsetId:    result.adsetId,
+      ads:        result.ads,
+      name:       config.campaign_name,
+      funnel:     funnel,
+      geos:       (config.geos || []).join(', '),
+      budget:     budget,
+      objective:  config.objective || 'LINK_CLICKS',
+      adCount:    result.ads.length,
+      createdAt:  new Date().toISOString(),
+      status:     'PAUSED',
+      source:     'auto_generator'
+    }).catch(function(){});
+
+    showToast(
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);margin-bottom:4px">✓ Campaign Created</div>' +
+      '<div style="font-size:12px;color:var(--text)">1 campaign · 1 ad set · <strong>' + result.ads.length + ' ads</strong> — all PAUSED</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:3px">Go to Meta Ads Manager to review and activate.</div>',
+      'ftd', 10000
+    );
+    mcRenderTab('campaigns');
+    loadMetaCampaigns();
+  })
+  .catch(function(err) {
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 Launch All Ads'; }
+    showToast(
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--red);margin-bottom:3px">✗ API Error</div>' +
+      '<div style="font-size:12px;color:var(--text)">' + escHtml(err.message || String(err)) + '</div>',
+      'alert', 8000
+    );
+  });
+}
+
+function mcCopyAIConfigToCreator() {
+  // Switch to creator tab with the first ad's config pre-filled for manual review
+  var config = autoGenState.aiConfig;
+  if (!config || !config.ads || !config.ads[0]) { mcRenderTab('creator'); return; }
+  var ad0 = config.ads[0];
+  var creativeUrls = autoGenState.selectedCreativeUrls.length > 0
+    ? autoGenState.selectedCreativeUrls
+    : metaCreatives.filter(function(c){ return c.funnel === autoGenState.funnel; }).map(function(c){ return c.url; });
+
+  mcRenderTab('creator');
   var attempts = 0;
   var poll = setInterval(function() {
     attempts++;
     if (document.getElementById('mc_funnel') || attempts > 20) {
       clearInterval(poll);
-      fillForm();
+      function sv(id, val) { var el = document.getElementById(id); if (el) { el.value = val; el.dispatchEvent(new Event('input')); } }
+      sv('mc_funnel',  autoGenState.funnel); metaCampaignFunnel = autoGenState.funnel;
+      sv('mc_name',    config.campaign_name || '');
+      sv('mc_geos',    (config.geos || []).join(', '));
+      sv('mc_budget',  String(autoGenState.budget)); metaCampaignBudget = autoGenState.budget;
+      sv('mc_h1',      ad0.headline1 || '');
+      sv('mc_h2',      ad0.headline2 || '');
+      sv('mc_h3',      ad0.headline3 || '');
+      sv('mc_body',    ad0.body || '');
+      sv('mc_desc',    ad0.description || '');
+      sv('mc_creative', creativeUrls[ad0.creative_index || 0] || '');
+      var objEl = document.getElementById('mc_objective');
+      if (objEl) objEl.value = config.objective || 'LINK_CLICKS';
+      mcUpdateUtmPreview();
     }
   }, 80);
 }
-
-function launchAICampaign()         { _mcApplyAIConfig(true);  }
-function mcCopyAIConfigToCreator()  { _mcApplyAIConfig(false); }
 
 
 </script>
