@@ -1,5 +1,4 @@
-// Postback handler — Cloudflare Worker
-// Writes to Firebase Firestore via REST API (no Firebase SDK needed)
+// Cloudflare Worker — postback handler + weekly autopilot campaign manager
 
 const EVENT_MAP = {
   "registration": "reg",
@@ -13,14 +12,46 @@ const EVENT_MAP = {
   "conversion":   "ftd",
 };
 
-const PROJECT_ID = "affdashboard-3f1a3";
+const PROJECT_ID  = "affdashboard-3f1a3";
+const META_VER    = "v19.0";
+const META_BASE   = `https://graph.facebook.com/${META_VER}`;
+
+// ── Main export ───────────────────────────────────────────────────────────────
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
+
+    // ── Manual autopilot trigger ───────────────────────────────────────────
+    if (url.pathname === "/run-autopilot") {
+      const token = url.searchParams.get("token");
+      if (token !== env.POSTBACK_TOKEN) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      ctx.waitUntil(runAutopilot(env));
+      return new Response(
+        JSON.stringify({ status: "started", message: "Autopilot run initiated" }),
+        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
+    // ── Postback handler (existing) ───────────────────────────────────────
     let p = Object.fromEntries(url.searchParams);
 
-    // Also accept POST body
     if (request.method === "POST") {
       try {
         const ct = request.headers.get("content-type") || "";
@@ -32,17 +63,15 @@ export default {
       } catch (_) {}
     }
 
-    // Auth — always return 200 so affiliate platform validation passes,
-    // but only process if token is correct
     if (p.token !== env.POSTBACK_TOKEN) {
       return new Response("OK", { status: 200 });
     }
 
-    const funnel    = p.funnel  || "";
+    const funnel    = p.funnel || p.sub2 || p.aff_sub2 || p.s2 || "";
     const network   = p.network || p.offer || "";
     const sub1      = p.sub1 || p.clickid || p.aff_sub || p.s1 || "";
-    const source    = p.source || p.src || "";    // traffic source label (meta, tiktok, tg, etc.)
-    const campaign  = p.campaign || p.c || "";    // campaign name
+    const source    = p.source || p.src || "";
+    const campaign  = p.campaign || p.c || "";
     const rawEvent  = (p.event || p.type || p.goal || p.status || "").toLowerCase();
     const revenue   = parseFloat(p.revenue || p.commission || p.amount || p.sum || 0) || 0;
 
@@ -61,13 +90,11 @@ export default {
       return new Response(`Auth error: ${e.message}`, { status: 500 });
     }
 
-    // ── Deduplication — same clickid+eventType should only count once ──────────
-    // Uses a Firestore dedup doc with precondition exists:false.
-    // If the doc already exists the commit throws → isDuplicate = true.
+    // Deduplication
     let isDuplicate = false;
     if (sub1 && eventType) {
-      const safeId   = sub1.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
-      const dedupId  = `${safeId}-${eventType}`;
+      const safeId  = sub1.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+      const dedupId = `${safeId}-${eventType}`;
       const dedupDoc = `projects/${PROJECT_ID}/databases/(default)/documents/dedup/${dedupId}`;
       try {
         await firestoreCommit(PROJECT_ID, [{
@@ -80,37 +107,40 @@ export default {
               createdAt: { stringValue: ts },
             },
           },
-          currentDocument: { exists: false },   // fails if already exists
+          currentDocument: { exists: false },
         }], accessToken);
       } catch (_) {
         isDuplicate = true;
       }
     }
 
-    // Log raw postback (always — includes duplicate flag so we can audit)
-    try { await addDoc(PROJECT_ID, "postbacks", {
-      ts, funnelKey, network, sub1, source, campaign,
-      rawEvent, eventType: eventType || "unknown", revenue,
-      isDuplicate,
-      raw: JSON.stringify(p),
-    }, accessToken); } catch(e) { return new Response(`Firestore log error: ${e.message}`, { status: 500 }); }
+    // Log raw postback
+    try {
+      await addDoc(PROJECT_ID, "postbacks", {
+        ts, funnelKey, network, sub1, source, campaign,
+        rawEvent, eventType: eventType || "unknown", revenue,
+        isDuplicate,
+        raw: JSON.stringify(p),
+      }, accessToken);
+    } catch (e) {
+      return new Response(`Firestore log error: ${e.message}`, { status: 500 });
+    }
 
-    // Skip counters and alerts for duplicates — just acknowledge
     if (isDuplicate) return new Response("OK", { status: 200 });
 
-    // Telegram admin alert (fire-and-forget, never blocks response)
+    // Telegram alert
     if (env.TG_BOT_TOKEN && env.TG_CHAT_ID && eventType) {
-      const emoji = eventType === "ftd" ? "💰" : "📋";
+      const emoji      = eventType === "ftd" ? "💰" : "📋";
       const eventLabel = eventType === "ftd" ? "NEW FTD" : "New Reg";
-      const revStr = (eventType === "ftd" && revenue > 0) ? `\n💵 Revenue: €${revenue.toFixed(2)}` : "";
-      const srcStr = source ? `\n📡 Source: ${source}` : "";
-      const camStr = campaign ? `\n🎯 Campaign: ${campaign}` : "";
+      const revStr     = (eventType === "ftd" && revenue > 0) ? `\n💵 Revenue: €${revenue.toFixed(2)}` : "";
+      const srcStr     = source   ? `\n📡 Source: ${source}`     : "";
+      const camStr     = campaign ? `\n🎯 Campaign: ${campaign}` : "";
       const msg = `${emoji} *${eventLabel}* — ${funnelKey}${revStr}${srcStr}${camStr}\n🕐 ${new Date().toUTCString()}`;
       fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: env.TG_CHAT_ID, text: msg, parse_mode: "Markdown" }),
-      }).catch(() => {}); // fire and forget
+      }).catch(() => {});
     }
 
     // Increment conversion counters
@@ -118,7 +148,6 @@ export default {
       const fieldTransforms = [];
       if (eventType === "reg") {
         fieldTransforms.push({ fieldPath: "regs", increment: { integerValue: "1" } });
-        // Per-source tracking
         if (source) {
           fieldTransforms.push({ fieldPath: `sources.${source}.regs`, increment: { integerValue: "1" } });
           if (campaign) {
@@ -130,7 +159,6 @@ export default {
         if (revenue > 0) {
           fieldTransforms.push({ fieldPath: "revenue", increment: { doubleValue: revenue } });
         }
-        // Per-source tracking
         if (source) {
           fieldTransforms.push({ fieldPath: `sources.${source}.ftds`, increment: { integerValue: "1" } });
           if (revenue > 0) {
@@ -167,10 +195,357 @@ export default {
     }
 
     return new Response("OK", { status: 200 });
-  }
+  },
+
+  // ── Weekly cron trigger ───────────────────────────────────────────────────
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runAutopilot(env));
+  },
 };
 
-// ── Google Service Account JWT → Access Token ────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTOPILOT — weekly Meta campaign health check + auto-fix
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function runAutopilot(env) {
+  const ts        = new Date().toISOString();
+  const runDate   = ts.split("T")[0];
+  let accessToken;
+
+  try {
+    accessToken = await getGoogleAccessToken(env.SA_EMAIL, env.SA_PRIVATE_KEY);
+  } catch (e) {
+    console.error("Autopilot: SA auth failed", e.message);
+    return;
+  }
+
+  // ── 1. Read dashboard settings from Firestore ───────────────────────────
+  let settings;
+  try {
+    settings = await firestoreGet(PROJECT_ID, "dashboard/data", accessToken);
+  } catch (e) {
+    console.error("Autopilot: Could not read dashboard/data", e.message);
+    return;
+  }
+
+  if (!settings.autopilotEnabled) {
+    console.log("Autopilot: disabled in settings, skipping");
+    return;
+  }
+
+  const metaToken         = settings.metaToken;
+  const metaAccountId     = settings.metaAccountId;
+  const claudeApiKey      = settings.claudeApiKey;
+  const aggressiveness    = settings.autopilotAggressiveness || "balanced";
+
+  if (!metaToken || !metaAccountId || !claudeApiKey) {
+    console.error("Autopilot: missing metaToken, metaAccountId, or claudeApiKey");
+    await logAutopilotRun(PROJECT_ID, {
+      ts, runDate, status: "error",
+      error: "Missing credentials (metaToken / metaAccountId / claudeApiKey not set)",
+      aggressiveness, actionsApplied: [], actionsPlanned: [], score: 0, summary: "",
+    }, accessToken);
+    return;
+  }
+
+  // ── 2. Fetch Meta account data ──────────────────────────────────────────
+  let metaData;
+  try {
+    metaData = await fetchMetaAuditData(metaAccountId, metaToken);
+  } catch (e) {
+    console.error("Autopilot: Meta fetch failed", e.message);
+    await logAutopilotRun(PROJECT_ID, {
+      ts, runDate, status: "error",
+      error: `Meta API error: ${e.message}`,
+      aggressiveness, actionsApplied: [], actionsPlanned: [], score: 0, summary: "",
+    }, accessToken);
+    return;
+  }
+
+  // ── 3. Ask Claude for analysis + action list ────────────────────────────
+  let analysis;
+  try {
+    analysis = await callClaudeAutopilot(claudeApiKey, metaData, aggressiveness);
+  } catch (e) {
+    console.error("Autopilot: Claude call failed", e.message);
+    await logAutopilotRun(PROJECT_ID, {
+      ts, runDate, status: "error",
+      error: `Claude error: ${e.message}`,
+      aggressiveness, actionsApplied: [], actionsPlanned: [], score: 0, summary: "",
+    }, accessToken);
+    return;
+  }
+
+  const actions        = analysis.actions || [];
+  const actionsApplied = [];
+  const actionsFailed  = [];
+
+  // ── 4. Apply actions via Meta API ──────────────────────────────────────
+  for (const action of actions) {
+    if (action.type === "flag") {
+      actionsApplied.push({ ...action, applied: false, note: "flagged only" });
+      continue;
+    }
+    try {
+      await applyAutopilotAction(action, metaToken);
+      actionsApplied.push({ ...action, applied: true });
+    } catch (e) {
+      actionsFailed.push({ ...action, applied: false, error: e.message });
+    }
+  }
+
+  // ── 5. Log run to Firestore ────────────────────────────────────────────
+  await logAutopilotRun(PROJECT_ID, {
+    ts, runDate, status: "success",
+    error: "",
+    aggressiveness,
+    score:          analysis.score || 0,
+    summary:        analysis.summary || "",
+    topIssue:       analysis.top_issue || "",
+    actionsPlanned: actions,
+    actionsApplied,
+    actionsFailed,
+    campaignCount:  metaData.campaigns.length,
+    adCount:        metaData.ads.length,
+  }, accessToken);
+
+  // ── 6. Telegram notification ───────────────────────────────────────────
+  if (env.TG_BOT_TOKEN && env.TG_CHAT_ID) {
+    const applied  = actionsApplied.filter(a => a.applied).length;
+    const flagged  = actionsApplied.filter(a => !a.applied).length;
+    const failed   = actionsFailed.length;
+    const grade    = scoreToGrade(analysis.score || 0);
+    const modeStr  = aggressiveness.charAt(0).toUpperCase() + aggressiveness.slice(1);
+
+    let msg = `🤖 *Autopilot Report — ${runDate}*\n`;
+    msg    += `📊 Account Health: *${analysis.score || 0}/100* (${grade})\n`;
+    msg    += `⚙️ Mode: ${modeStr}\n`;
+    if (applied)  msg += `✅ Actions applied: ${applied}\n`;
+    if (flagged)  msg += `🚩 Issues flagged: ${flagged}\n`;
+    if (failed)   msg += `❌ Failed: ${failed}\n`;
+    if (analysis.top_issue) msg += `\n⚠️ *Top issue:* ${analysis.top_issue}`;
+    if (analysis.summary)   msg += `\n\n💬 ${analysis.summary}`;
+
+    fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: env.TG_CHAT_ID, text: msg, parse_mode: "Markdown" }),
+    }).catch(() => {});
+  }
+
+  console.log(`Autopilot: done. Score=${analysis.score}, applied=${actionsApplied.filter(a=>a.applied).length}, failed=${actionsFailed.length}`);
+}
+
+// ── Fetch Meta campaign + ad data for audit ──────────────────────────────────
+
+async function fetchMetaAuditData(accountId, metaToken) {
+  const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
+  const tok   = `access_token=${encodeURIComponent(metaToken)}`;
+
+  // Campaigns
+  const campsUrl = `${META_BASE}/${actId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&limit=50&${tok}`;
+  const campsRes = await fetch(campsUrl);
+  const campsData = await campsRes.json();
+  if (campsData.error) throw new Error(`Campaigns: ${campsData.error.message}`);
+
+  // Ads with 7-day insights
+  const adsUrl = `${META_BASE}/${actId}/ads?fields=id,name,status,campaign_id,adset_id,insights.date_preset(last_7d){spend,clicks,impressions,ctr,cpm,actions,cost_per_action_type,reach,frequency}&limit=100&${tok}`;
+  const adsRes = await fetch(adsUrl);
+  const adsData = await adsRes.json();
+  if (adsData.error) throw new Error(`Ads: ${adsData.error.message}`);
+
+  // Adsets with 7-day insights
+  const setsUrl = `${META_BASE}/${actId}/adsets?fields=id,name,status,campaign_id,daily_budget,targeting,insights.date_preset(last_7d){spend,clicks,impressions,ctr,actions}&limit=100&${tok}`;
+  const setsRes = await fetch(setsUrl);
+  const setsData = await setsRes.json();
+  if (setsData.error) throw new Error(`AdSets: ${setsData.error.message}`);
+
+  return {
+    campaigns: campsData.data  || [],
+    adsets:    setsData.data   || [],
+    ads:       adsData.data    || [],
+  };
+}
+
+// ── Call Claude for autopilot analysis ───────────────────────────────────────
+
+async function callClaudeAutopilot(claudeKey, data, aggressiveness) {
+  const campsSummary = (data.campaigns || []).slice(0, 20).map(c => ({
+    id:           c.id,
+    name:         c.name,
+    status:       c.status,
+    objective:    c.objective,
+    daily_budget: c.daily_budget ? (parseInt(c.daily_budget) / 100).toFixed(2) + " EUR" : "unknown",
+  }));
+
+  const adsSummary = (data.ads || []).slice(0, 50).map(a => {
+    const ins = (a.insights && a.insights.data && a.insights.data[0]) || {};
+    const conv = (ins.actions || []).find(x => x.action_type === "offsite_conversion.fb_pixel_lead" || x.action_type === "link_click");
+    return {
+      id:           a.id,
+      name:         a.name,
+      status:       a.status,
+      campaign_id:  a.campaign_id,
+      adset_id:     a.adset_id,
+      spend_7d:     parseFloat(ins.spend || 0).toFixed(2) + " EUR",
+      clicks_7d:    ins.clicks || 0,
+      impressions:  ins.impressions || 0,
+      ctr:          parseFloat(ins.ctr || 0).toFixed(3) + "%",
+      cpm:          parseFloat(ins.cpm || 0).toFixed(2) + " EUR",
+      conversions:  conv ? parseInt(conv.value || 0) : 0,
+    };
+  });
+
+  const modeGuide = {
+    conservative: "CONSERVATIVE MODE: Do NOT apply any API changes. Only create 'flag' type actions as recommendations for human review. Never pause, scale, or modify anything automatically.",
+    balanced:     "BALANCED MODE: Pause ads with spend > €5 and 0 clicks. Pause adsets with CTR < 0.1% and spend > €10. Flag budget issues and scaling opportunities but don't change budgets. All other issues: flag only.",
+    aggressive:   "AGGRESSIVE MODE: Pause all ads with spend > €3 and 0 conversions + 0 clicks. Reduce daily_budget by 20% on campaigns with CTR < 0.2%. Increase daily_budget by 25% on campaigns with CTR > 1.5% and conversions > 0. Pause entire campaigns that have spent > €20 with absolutely no clicks.",
+  };
+
+  const prompt = `You are an expert Meta Ads campaign manager for casino affiliate offers. Analyze this Meta Ads account and return a list of specific actions.
+
+## ACCOUNT DATA (Last 7 days)
+
+Campaigns (${campsSummary.length}):
+${JSON.stringify(campsSummary, null, 2)}
+
+Ads with performance (${adsSummary.length}):
+${JSON.stringify(adsSummary, null, 2)}
+
+## INSTRUCTIONS
+
+${modeGuide[aggressiveness] || modeGuide.balanced}
+
+Action types available:
+- "pause_ad" — pause a specific ad (use target_id = ad ID)
+- "pause_adset" — pause an ad set (use target_id = adset ID)
+- "pause_campaign" — pause an entire campaign (use target_id = campaign ID)
+- "scale_budget" — increase campaign daily_budget (target_id = campaign ID, value = new budget in cents, e.g. 6000 = €60)
+- "reduce_budget" — decrease campaign daily_budget (target_id = campaign ID, value = new budget in cents)
+- "flag" — flag for human review, no API change (use for anything you're unsure about)
+
+Severity:
+- "critical" — bleeding money with zero results
+- "warning" — underperforming, needs attention
+- "info" — opportunity or minor issue
+
+Score the account 0-100:
+- 90-100: Excellent — campaigns performing well, efficient spend
+- 70-89:  Good — minor issues only
+- 50-69:  Fair — several problems affecting performance
+- 30-49:  Poor — significant waste or structural issues
+- 0-29:   Critical — account needs immediate intervention
+
+Return ONLY valid JSON, no markdown:
+{
+  "actions": [
+    {
+      "type": "pause_ad",
+      "target_id": "123456789",
+      "target_name": "Ad name here",
+      "reason": "Spent €8.50 with 0 clicks in 7 days",
+      "severity": "critical",
+      "value": null
+    }
+  ],
+  "score": 72,
+  "summary": "2-3 sentences on overall account health and what actions were taken",
+  "top_issue": "One sentence on the single biggest problem found"
+}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key":         claudeKey,
+      "anthropic-version": "2023-06-01",
+      "content-type":      "application/json",
+    },
+    body: JSON.stringify({
+      model:      "claude-sonnet-4-6",
+      max_tokens: 2000,
+      messages:   [{ role: "user", content: prompt }],
+    }),
+  });
+
+  const body = await res.json();
+  if (body.error) throw new Error(body.error.message);
+
+  let text = (body.content && body.content[0] && body.content[0].text) || "";
+  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  return JSON.parse(text);
+}
+
+// ── Apply a single Meta API action ──────────────────────────────────────────
+
+async function applyAutopilotAction(action, metaToken) {
+  if (!action.target_id || action.type === "flag") return;
+
+  let url, body;
+
+  if (action.type === "pause_ad" || action.type === "pause_adset" || action.type === "pause_campaign") {
+    url  = `${META_BASE}/${action.target_id}`;
+    body = new URLSearchParams({ status: "PAUSED", access_token: metaToken });
+  } else if (action.type === "scale_budget" || action.type === "reduce_budget") {
+    if (!action.value) return;
+    url  = `${META_BASE}/${action.target_id}`;
+    body = new URLSearchParams({ daily_budget: String(action.value), access_token: metaToken });
+  } else {
+    return; // unknown action type
+  }
+
+  const res  = await fetch(url, { method: "POST", body });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+}
+
+// ── Log autopilot run to Firestore ───────────────────────────────────────────
+
+async function logAutopilotRun(projectId, run, accessToken) {
+  // Store compact versions (Firestore has field limits)
+  const fields = {
+    ts:              { stringValue: run.ts },
+    runDate:         { stringValue: run.runDate },
+    status:          { stringValue: run.status },
+    error:           { stringValue: run.error || "" },
+    aggressiveness:  { stringValue: run.aggressiveness || "balanced" },
+    score:           { integerValue: String(run.score || 0) },
+    summary:         { stringValue: run.summary || "" },
+    topIssue:        { stringValue: run.topIssue || "" },
+    campaignCount:   { integerValue: String(run.campaignCount || 0) },
+    adCount:         { integerValue: String(run.adCount || 0) },
+    actionsCount:    { integerValue: String((run.actionsApplied || []).length) },
+    actionsApplied:  { stringValue: JSON.stringify(run.actionsApplied || []) },
+    actionsFailed:   { stringValue: JSON.stringify(run.actionsFailed || []) },
+  };
+
+  try {
+    await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/autopilot_runs`,
+      {
+        method:  "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body:    JSON.stringify({ fields }),
+      }
+    );
+  } catch (e) {
+    console.error("Failed to log autopilot run:", e.message);
+  }
+}
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+
+function scoreToGrade(score) {
+  if (score >= 90) return "A+";
+  if (score >= 80) return "A";
+  if (score >= 70) return "B";
+  if (score >= 60) return "C";
+  if (score >= 50) return "D";
+  return "F";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Google Service Account JWT → Access Token
+// ══════════════════════════════════════════════════════════════════════════════
 
 async function getGoogleAccessToken(saEmail, privateKeyPem) {
   const now = Math.floor(Date.now() / 1000);
@@ -190,9 +565,8 @@ async function getGoogleAccessToken(saEmail, privateKeyPem) {
   const payloadB64 = b64url(JSON.stringify(payload));
   const sigInput   = `${headerB64}.${payloadB64}`;
 
-  // Handle both literal \n and actual newlines in the stored secret
-  const pem = privateKeyPem.replace(/\\n/g, "\n");
-  const keyB64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, "");
+  const pem      = privateKeyPem.replace(/\\n/g, "\n");
+  const keyB64   = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, "");
   const keyBytes = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
 
   const cryptoKey = await crypto.subtle.importKey(
@@ -210,40 +584,72 @@ async function getGoogleAccessToken(saEmail, privateKeyPem) {
   const jwt = `${sigInput}.${sig}`;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
+    method:  "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+    body:    `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
   });
 
   const { access_token } = await res.json();
   return access_token;
 }
 
-// ── Firestore helpers ────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Firestore helpers
+// ══════════════════════════════════════════════════════════════════════════════
 
 async function addDoc(projectId, collection, data, token) {
   const fields = {};
   for (const [k, v] of Object.entries(data)) {
-    if (typeof v === "string") fields[k] = { stringValue: v };
-    else if (typeof v === "number") fields[k] = { doubleValue: v };
+    if      (typeof v === "string")  fields[k] = { stringValue: v };
+    else if (typeof v === "number")  fields[k] = { doubleValue: v };
+    else if (typeof v === "boolean") fields[k] = { booleanValue: v };
   }
   await fetch(
     `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collection}`,
     {
-      method: "POST",
+      method:  "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ fields }),
+      body:    JSON.stringify({ fields }),
     }
   );
+}
+
+async function firestoreGet(projectId, docPath, token) {
+  const res  = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${docPath}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+  return firestoreParseDoc(json);
+}
+
+function firestoreParseDoc(doc) {
+  const out = {};
+  for (const [k, v] of Object.entries(doc.fields || {})) {
+    out[k] = firestoreParseValue(v);
+  }
+  return out;
+}
+
+function firestoreParseValue(v) {
+  if ("stringValue"  in v) return v.stringValue;
+  if ("integerValue" in v) return parseInt(v.integerValue);
+  if ("doubleValue"  in v) return v.doubleValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("nullValue"    in v) return null;
+  if ("mapValue"     in v) return firestoreParseDoc(v.mapValue);
+  if ("arrayValue"   in v) return (v.arrayValue.values || []).map(firestoreParseValue);
+  return null;
 }
 
 async function firestoreCommit(projectId, writes, token) {
   await fetch(
     `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`,
     {
-      method: "POST",
+      method:  "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ writes }),
+      body:    JSON.stringify({ writes }),
     }
   );
 }

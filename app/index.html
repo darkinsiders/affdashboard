@@ -4620,7 +4620,9 @@ function saveToFirebase() {
       customTrafficSources: customTrafficSources,
       linkHistory: linkHistory,
       funnelPaused: funnelPaused,
-      claudeApiKey: claudeApiKey
+      claudeApiKey: claudeApiKey,
+      autopilotEnabled: autopilotEnabled,
+      autopilotAggressiveness: autopilotAggressiveness
     });
   } catch(e) {
     console.error('Save serialization error:', e);
@@ -4691,6 +4693,8 @@ DOC_REF.onSnapshot(function(doc) {
       if (data.customTrafficSources) customTrafficSources = data.customTrafficSources;
       if (data.funnelPaused) funnelPaused = data.funnelPaused;
       if (data.claudeApiKey) claudeApiKey = data.claudeApiKey;
+      if (data.autopilotEnabled !== undefined) autopilotEnabled = !!data.autopilotEnabled;
+      if (data.autopilotAggressiveness)        autopilotAggressiveness = data.autopilotAggressiveness;
       if (data.linkHistory) {
         linkHistory = data.linkHistory;
       } else {
@@ -8733,7 +8737,8 @@ function renderMetaCampaignsPage() {
       '<button class="mc-tab-btn mc-auto-tab' + (metaAutoTab==='auto'?  ' active':'') + '" data-tab="auto"  onclick="mcRenderTab(\'auto\')"     >✨ Auto Generator</button>' +
       '<button class="mc-tab-btn' + (metaAutoTab==='campaigns'?' active':'') + '" data-tab="campaigns" onclick="mcRenderTab(\'campaigns\')" >Active Campaigns</button>' +
       '<button class="mc-tab-btn' + (metaAutoTab==='creatives'?' active':'') + '" data-tab="creatives" onclick="mcRenderTab(\'creatives\')" >Creatives Library</button>' +
-      '<button class="mc-tab-btn' + (metaAutoTab==='audit'?   ' active':'') + '" data-tab="audit"     onclick="mcRenderTab(\'audit\')"     >📊 Campaign Audit</button>' +
+      '<button class="mc-tab-btn' + (metaAutoTab==='audit'?      ' active':'') + '" data-tab="audit"      onclick="mcRenderTab(\'audit\')"      >📊 Campaign Audit</button>' +
+      '<button class="mc-tab-btn' + (metaAutoTab==='autopilot'? ' active':'') + '" data-tab="autopilot" onclick="mcRenderTab(\'autopilot\')">🤖 Autopilot</button>' +
     '</div>' +
     '<div id="mcTabBody"></div>' +
     '</div>';
@@ -8757,6 +8762,7 @@ function mcRenderTab(tab, skipTabBarUpdate) {
   else if (tab === 'campaigns') mcRenderCampaignsTab(body);
   else if (tab === 'creatives') mcRenderCreativesTab(body);
   else if (tab === 'audit')     mcRenderAuditTab(body);
+  else if (tab === 'autopilot') mcRenderAutopilotTab(body);
 }
 
 // ── Tab: Campaign Creator (original form, unchanged logic) ───────────────────
@@ -9554,6 +9560,8 @@ var lastReportHtml    = '';
 var reportDays        = 7;
 var reportType        = 'weekly';
 var claudeApiKey      = '';   // loaded from Firebase settings — see note above
+var autopilotEnabled        = false;       // persisted via Firebase
+var autopilotAggressiveness = 'balanced';  // 'conservative' | 'balanced' | 'aggressive'
 var reportIncludeMeta = true;
 var reportUseAI       = false;
 
@@ -13299,6 +13307,210 @@ function renderAuditResults(r) {
   '</div>';
 }
 
+
+
+// =========================================================================
+// AUTOPILOT TAB
+// =========================================================================
+
+var _autopilotRuns       = [];
+var _autopilotRunsLoaded = false;
+
+function mcRenderAutopilotTab(body) {
+  var modeOptions = [
+    { val: 'conservative', label: 'Conservative', desc: 'Flag issues only \u2014 no automatic changes' },
+    { val: 'balanced',     label: 'Balanced',     desc: 'Pause obvious waste, flag the rest' },
+    { val: 'aggressive',   label: 'Aggressive',   desc: 'Auto-pause, scale budgets, full control' }
+  ];
+
+  var modeHtml = modeOptions.map(function(m) {
+    var active = autopilotAggressiveness === m.val;
+    return (
+      '<div onclick="_autopilotSetMode(\'' + m.val + '\')" style="cursor:pointer;padding:14px 16px;border-radius:8px;border:2px solid ' +
+      (active ? 'var(--green)' : 'var(--border)') + ';background:' +
+      (active ? 'rgba(126,191,154,0.08)' : 'var(--card)') + ';transition:all 0.15s">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+          '<div style="width:14px;height:14px;border-radius:50%;border:2px solid ' + (active ? 'var(--green)' : 'var(--border)') + ';background:' + (active ? 'var(--green)' : 'transparent') + '"></div>' +
+          '<span style="font-weight:700;font-size:13px;color:' + (active ? 'var(--green)' : 'var(--text)') + '">' + m.label + '</span>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--muted);padding-left:22px">' + m.desc + '</div>' +
+      '</div>'
+    );
+  }).join('');
+
+  var enabled     = autopilotEnabled;
+  var statusColor = enabled ? 'var(--green)' : 'var(--muted)';
+  var statusLabel = enabled ? 'ENABLED' : 'DISABLED';
+
+  body.innerHTML =
+    '<div style="padding:20px;max-width:900px;margin:0 auto">' +
+
+    // Header
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">' +
+      '<div>' +
+        '<div style="font-size:20px;font-weight:800;letter-spacing:-0.5px">\uD83E\uDD16 Autopilot</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:3px">Weekly campaign health check \u2014 Claude analyses your Meta account and applies fixes automatically</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="font-size:11px;font-weight:700;color:' + statusColor + ';letter-spacing:1px">' + statusLabel + '</div>' +
+        '<div onclick="_autopilotToggle()" style="width:46px;height:26px;border-radius:13px;background:' + (enabled ? 'var(--green)' : 'var(--border)') + ';cursor:pointer;position:relative;transition:background 0.2s">' +
+          '<div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left 0.2s;' + (enabled ? 'left:23px' : 'left:3px') + '"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Config panel
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:16px">Configuration</div>' +
+      '<div style="margin-bottom:20px">' +
+        '<div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.5px;margin-bottom:10px;text-transform:uppercase">Aggressiveness Mode</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' + modeHtml + '</div>' +
+      '</div>' +
+      '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px 16px;margin-bottom:16px">' +
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">\uD83D\uDCC5 Schedule</div>' +
+        '<div style="font-size:13px;color:var(--text)">Every <strong>Monday at 09:00 UTC</strong> \u2014 Cloudflare Worker cron</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+        '<button onclick="_autopilotSaveSettings()" style="background:var(--green);color:#0d1117;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">Save Settings</button>' +
+        '<button onclick="runAutopilotNow()" id="ap_run_btn" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">\u26A1 Run Now</button>' +
+        '<div id="ap_run_status" style="font-size:12px;color:var(--muted)"></div>' +
+      '</div>' +
+    '</div>' +
+
+    // History
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+        '<div style="font-size:13px;font-weight:700">Run History</div>' +
+        '<button onclick="loadAutopilotRuns(true)" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer">\u21BB Refresh</button>' +
+      '</div>' +
+      '<div id="ap_history"></div>' +
+    '</div>' +
+    '</div>';
+
+  loadAutopilotRuns(false);
+}
+
+function _autopilotToggle() {
+  autopilotEnabled = !autopilotEnabled;
+  var b = document.getElementById('mcTabBody');
+  if (b) mcRenderAutopilotTab(b);
+}
+
+function _autopilotSetMode(mode) {
+  autopilotAggressiveness = mode;
+  var b = document.getElementById('mcTabBody');
+  if (b) mcRenderAutopilotTab(b);
+}
+
+function _autopilotSaveSettings() {
+  saveToFirebase();
+  showToast('\u2713 Autopilot settings saved', 'ftd', 3000);
+}
+
+function runAutopilotNow() {
+  var btn = document.getElementById('ap_run_btn');
+  var st  = document.getElementById('ap_run_status');
+  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Running\u2026'; }
+  if (st)  { st.textContent = 'Contacting worker\u2026'; }
+
+  fetch('https://affdashboard-postback.darkinsidersbusiness.workers.dev/run-autopilot?token=pbkDark2026xZ')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (btn) { btn.disabled = false; btn.textContent = '\u26A1 Run Now'; }
+      if (d.status === 'started') {
+        if (st) st.textContent = '\u2713 Started \u2014 check history in ~30s';
+        showToast('\u2713 Autopilot started. Results in ~30 seconds.', 'ftd', 5000);
+        setTimeout(function() { loadAutopilotRuns(true); }, 35000);
+      } else {
+        if (st) st.textContent = 'Error: ' + escHtml((d.error || 'unknown'));
+      }
+    })
+    .catch(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = '\u26A1 Run Now'; }
+      if (st)  { st.textContent = 'Error: ' + escHtml(e.message); }
+    });
+}
+
+function loadAutopilotRuns(force) {
+  var hist = document.getElementById('ap_history');
+  if (!hist) return;
+  if (_autopilotRunsLoaded && !force) { _renderAutopilotHistory(_autopilotRuns); return; }
+  hist.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:16px 0">Loading\u2026</div>';
+  db.collection('autopilot_runs').orderBy('ts', 'desc').limit(20).get()
+    .then(function(snap) {
+      _autopilotRuns = snap.docs.map(function(d) { return Object.assign({ _id: d.id }, d.data()); });
+      _autopilotRunsLoaded = true;
+      _renderAutopilotHistory(_autopilotRuns);
+    })
+    .catch(function(e) {
+      if (hist) hist.innerHTML = '<div style="color:var(--red);font-size:13px">Error: ' + escHtml(e.message) + '</div>';
+    });
+}
+
+function _renderAutopilotHistory(runs) {
+  var hist = document.getElementById('ap_history');
+  if (!hist) return;
+  if (!runs || !runs.length) {
+    hist.innerHTML =
+      '<div style="text-align:center;padding:32px 0;color:var(--muted)">' +
+      '<div style="font-size:32px;margin-bottom:8px">\uD83E\uDD16</div>' +
+      '<div style="font-size:13px">No runs yet. Enable autopilot and click Run Now.</div>' +
+      '</div>';
+    return;
+  }
+  hist.innerHTML = runs.map(function(r) {
+    var score    = parseInt(r.score) || 0;
+    var grade    = _apGrade(score);
+    var sc       = score >= 70 ? 'var(--green)' : score >= 50 ? '#f0a500' : 'var(--red)';
+    var ok       = r.status === 'success';
+    var dt       = (r.runDate || r.ts || '').slice(0, 10);
+    var mode     = r.aggressiveness || 'balanced';
+    var actions  = [];
+    try { actions = JSON.parse(r.actionsApplied || '[]'); } catch(e) {}
+    var applied  = actions.filter(function(a) { return a.applied; });
+    var flagged  = actions.filter(function(a) { return !a.applied; });
+    var actSum   = '';
+    if (applied.length) actSum += '<span style="color:var(--green);font-size:10px">' + applied.length + ' applied</span>';
+    if (flagged.length) actSum += (actSum ? ' \u00b7 ' : '') + '<span style="color:#f0a500;font-size:10px">' + flagged.length + ' flagged</span>';
+    if (!actSum)        actSum  = '<span style="color:var(--muted);font-size:10px">no actions</span>';
+    var did = 'apd_' + (r._id || dt).replace(/[^a-zA-Z0-9]/g, '_');
+    var detail = '';
+    if (actions.length || r.summary || r.error) {
+      detail = '<div id="' + did + '" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.02);border-radius:6px;border-left:3px solid ' + sc + '">';
+      if (r.summary)  detail += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-style:italic">' + escHtml(r.summary) + '</div>';
+      if (r.topIssue) detail += '<div style="font-size:11px;color:#f0a500;margin-bottom:8px">\u26A0 ' + escHtml(r.topIssue) + '</div>';
+      actions.forEach(function(a) {
+        var dot = a.applied ? '\u25CF' : '\u25CB';
+        var col = a.applied ? 'var(--green)' : '#f0a500';
+        var sev = a.severity === 'critical' ? '\uD83D\uDD34' : a.severity === 'warning' ? '\uD83D\uDFE1' : '\uD83D\uDD35';
+        detail += '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;font-size:11px">' +
+          '<span style="color:' + col + ';flex-shrink:0">' + dot + '</span>' +
+          '<span style="color:var(--muted);flex-shrink:0">' + sev + ' ' + escHtml(a.type || '') + '</span>' +
+          '<span style="color:var(--text);flex:1">' + escHtml(a.target_name || a.target_id || '') + '</span>' +
+          '<span style="color:var(--muted);font-size:10px">' + escHtml(a.reason || '') + '</span>' +
+          '</div>';
+      });
+      if (r.error) detail += '<div style="font-size:11px;color:var(--red);margin-top:6px">Error: ' + escHtml(r.error) + '</div>';
+      detail += '</div>';
+    }
+    return '<div style="padding:12px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="(function(){var d=document.getElementById(\'' + did + '\');if(d)d.style.display=d.style.display===\'none\'?\'block\':\'none\';})()">' +
+        '<span style="color:' + (ok ? 'var(--green)' : 'var(--red)') + ';font-size:14px;flex-shrink:0">' + (ok ? '\u2713' : '\u2717') + '</span>' +
+        '<span style="font-size:12px;color:var(--muted);width:90px;flex-shrink:0">' + escHtml(dt) + '</span>' +
+        '<span style="font-size:20px;font-weight:900;color:' + sc + ';width:35px;flex-shrink:0">' + grade + '</span>' +
+        '<span style="font-size:11px;color:var(--muted);width:55px;flex-shrink:0">' + score + '/100</span>' +
+        '<span style="font-size:11px;color:var(--muted);text-transform:capitalize;width:85px;flex-shrink:0">' + escHtml(mode) + '</span>' +
+        actSum +
+        (detail ? '<span style="margin-left:auto;font-size:10px;color:var(--muted)">\u25BC</span>' : '') +
+      '</div>' +
+      detail +
+    '</div>';
+  }).join('');
+}
+
+function _apGrade(n) {
+  return n >= 90 ? 'A+' : n >= 80 ? 'A' : n >= 70 ? 'B' : n >= 60 ? 'C' : n >= 50 ? 'D' : 'F';
+}
 
 </script>
 </body>
