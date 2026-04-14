@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap');
 
@@ -1385,6 +1386,306 @@
   .matrix-cell-ok { background: rgba(29,179,104,0.07); color: var(--green); font-family: var(--font-mono); font-weight: 600; font-size: 11px; }
   .matrix-cell-conflict { background: var(--yellow-glow); color: var(--yellow); font-family: var(--font-mono); font-weight: 600; font-size: 11px; }
   .matrix-cell-empty { color: var(--border-bright); font-family: var(--font-mono); }
+
+  /* ══════════════════════════════════════════════════════════════════
+     AUTO META CAMPAIGN GENERATOR — UI Components
+  ══════════════════════════════════════════════════════════════════ */
+
+  /* Tab bar */
+  .mc-tab-bar {
+    display: flex; border-bottom: 1px solid var(--border);
+    padding: 0 20px; gap: 0; overflow-x: auto;
+  }
+  .mc-tab-btn {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+    padding: 11px 14px; cursor: pointer; font-family: var(--font-body);
+    transition: all .15s; margin-bottom: -1px; white-space: nowrap; outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mc-tab-btn:hover { color: var(--text); }
+  .mc-tab-btn.active { border-bottom-color: rgba(24,119,242,0.8); color: var(--text); font-weight: 700; }
+  .mc-tab-btn.mc-auto-tab.active { border-bottom-color: var(--green); color: var(--green); }
+
+  /* Upload zone */
+  .mc-upload-zone {
+    border: 2px dashed rgba(160,160,200,0.3); border-radius: 10px;
+    padding: 28px 20px; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: rgba(160,160,200,0.03); position: relative;
+  }
+  .mc-upload-zone:hover, .mc-upload-zone.drag-over {
+    border-color: rgba(160,160,200,0.6); background: rgba(160,160,200,0.07);
+  }
+  .mc-upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .mc-upload-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .mc-upload-progress-row { display: flex; flex-direction: column; gap: 3px; }
+  .mc-upload-progress-bar-wrap {
+    height: 3px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;
+  }
+  .mc-upload-progress-bar {
+    height: 100%; background: var(--green); border-radius: 3px;
+    transition: width .15s; width: 0%;
+  }
+
+  /* Selectable creative card */
+  .mc-creative-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; cursor: pointer; transition: border-color .15s; position: relative;
+  }
+  .mc-creative-card:hover { border-color: var(--border-bright); }
+  .mc-creative-card.mc-selected { border-color: var(--green); background: rgba(126,191,154,0.06); }
+  .mc-select-check {
+    position: absolute; top: 6px; right: 6px;
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #000;
+    transition: background .15s, border-color .15s; z-index: 1;
+  }
+  .mc-creative-card.mc-selected .mc-select-check {
+    background: var(--green); border-color: var(--green);
+  }
+
+  /* AI Preview card */
+  .mc-ai-preview {
+    background: rgba(126,191,154,0.04);
+    border: 1px solid rgba(126,191,154,0.22);
+    border-radius: 12px; padding: 20px; margin-top: 16px;
+  }
+  .mc-ai-preview-label {
+    display: block; font-size: 9px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .1em;
+    color: var(--muted); margin-bottom: 5px;
+  }
+  .mc-ai-preview-value {
+    font-size: 13px; color: var(--text);
+    background: rgba(0,0,0,0.28); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px; line-height: 1.4;
+  }
+  .mc-ai-reasoning {
+    font-size: 11px; color: var(--muted); font-style: italic;
+    line-height: 1.6; margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     MOBILE NAV — hamburger + drawer
+  ══════════════════════════════════════════════════════════════════ */
+  #mobileMenuBtn {
+    display: none;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text);
+    margin-left: auto;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
+    outline: none;
+  }
+  #mobileMenuBtn:hover { background: rgba(255,255,255,0.06); border-color: var(--border-bright); }
+  #mobileMenuBtn.active { background: rgba(255,255,255,0.08); border-color: var(--border-bright); }
+
+  #mobileNavDrawer {
+    display: none;
+    position: fixed;
+    inset: 0;
+    top: 48px;
+    background: rgba(2,2,6,0.97);
+    z-index: 98;
+    overflow-y: auto;
+    padding: 8px 12px 32px;
+    flex-direction: column;
+    gap: 2px;
+    backdrop-filter: blur(48px) saturate(1.8);
+    -webkit-backdrop-filter: blur(48px) saturate(1.8);
+    border-top: 1px solid var(--border);
+  }
+  #mobileNavDrawer.open { display: flex; animation: mobileDrawerIn 0.18s ease; }
+  @keyframes mobileDrawerIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .mob-nav-section {
+    font-family: var(--font-display);
+    font-size: 9px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.13em;
+    color: var(--muted);
+    padding: 16px 10px 5px;
+    opacity: 0.55;
+  }
+  .mob-nav-section:first-child { padding-top: 8px; }
+  .mob-nav-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 11px 12px;
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 14px; font-weight: 500;
+    color: rgba(255,255,255,0.75);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mob-nav-item:active { background: rgba(255,255,255,0.08); }
+  .mob-nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .mob-nav-divider { height: 1px; background: var(--border); margin: 6px 0; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     RESPONSIVE BREAKPOINTS
+  ══════════════════════════════════════════════════════════════════ */
+
+  /* ── Medium screens: tighten nav ── */
+  @media (max-width: 960px) {
+    .top-nav { padding: 0 16px; gap: 2px; }
+    .nav-group-btn { padding: 6px 8px; font-size: 10px; letter-spacing: 0.05em; }
+    .nav-logo { margin-right: 8px; }
+    .main { padding: 20px 20px; }
+    .header { padding: 14px 20px; }
+  }
+
+  /* ── Mobile: hamburger nav ── */
+  @media (max-width: 768px) {
+    /* Hide desktop nav, show hamburger */
+    .nav-group,
+    .nav-sep,
+    .nav-breadcrumb,
+    #navUserChip { display: none !important; }
+    #mobileMenuBtn { display: flex !important; }
+
+    .top-nav { padding: 0 14px; gap: 0; }
+    .nav-logo { margin-right: 0; font-size: 10px; }
+
+    /* Main layout */
+    .main { padding: 14px 14px 80px; }
+    .header { padding: 12px 14px; gap: 10px; flex-wrap: wrap; }
+    .header h1 { font-size: 14px; letter-spacing: 0.04em; }
+    .header p { font-size: 9px; }
+    .header-icon { width: 32px; height: 32px; font-size: 14px; }
+
+    /* Stats grid */
+    .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+    .stat-value { font-size: 22px; }
+    .stat-card { padding: 14px 14px; }
+
+    /* Toolbar */
+    .toolbar { flex-wrap: wrap; gap: 8px; }
+    .search-wrap { min-width: 100%; order: -1; }
+    .btn-add { width: 100%; justify-content: center; }
+
+    /* Table */
+    .table-wrap { -webkit-overflow-scrolling: touch; }
+
+    /* Form rows */
+    .form-row { grid-template-columns: 1fr !important; }
+
+    /* Modal — bottom sheet on mobile */
+    .modal-overlay {
+      align-items: flex-end !important;
+      padding: 0 !important;
+    }
+    .modal {
+      max-width: 100% !important;
+      width: 100% !important;
+      max-height: 88vh !important;
+      overflow-y: auto !important;
+      border-radius: 18px 18px 0 0 !important;
+      padding: 24px 18px !important;
+    }
+    .modal-footer { flex-direction: column-reverse; }
+    .modal-footer .btn-add,
+    .modal-footer button { width: 100%; justify-content: center; }
+
+    /* Toast — full width at bottom */
+    #toastContainer { bottom: 14px; right: 12px; left: 12px; }
+    .toast { min-width: unset; max-width: 100%; width: 100%; }
+
+    /* Login */
+    .login-inner { gap: 20px; padding: 0 14px; }
+    .login-members { gap: 8px; }
+    .login-card { min-width: 96px; padding: 18px 14px; }
+    .login-logo h1 { font-size: 24px; }
+    .login-logo-icon { width: 52px; height: 52px; font-size: 24px; }
+
+    /* Funnel nav pills */
+    .funnel-nav { padding: 0 14px; overflow-x: auto; }
+
+    /* ── Inline grid overrides (JS-rendered content) ──
+       Multi-column & fixed-px grids → single column.
+       auto-fill / auto-fit grids are already fluid — leave them alone. */
+    #dashboardContent [style*="grid-template-columns"]:not([style*="auto-fill"]):not([style*="auto-fit"]) {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Phone farm card grid & creatives grid — keep 2 cols minimum */
+    #phoneFarmPage [style*="auto-fill"],
+    #metaCampaignsPage [style*="auto-fill"],
+    #dealsPage [style*="auto-fill"],
+    #projectPage [style*="auto-fill"] {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+    }
+
+    /* Funnel health cards row (5-wide) → 2-col */
+    #homePage [style*="repeat(5"],
+    #homePage [style*="repeat(4"] {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Home 2-col chart row keep stacked */
+    #homePage [style*="3fr"],
+    #homePage [style*="2fr 1fr"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Phone farm split panel */
+    #phoneFarmPage [style*="290px"],
+    #phoneFarmPage [style*="300px"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Meta campaigns side panel */
+    #metaCampaignsPage [style*="420px"],
+    #metaCampaignsPage [style*="400px"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Employees weekly table — keep scrollable */
+    #employeesPage .table-wrap { min-width: 100%; }
+
+    /* Analytics sub-tabs horizontal scroll */
+    .funnel-nav-tabs { overflow-x: auto; flex-wrap: nowrap; }
+
+    /* Section headers flex wrap on small screens */
+    .assignments-header { flex-wrap: wrap; gap: 8px; }
+
+    /* Save indicator smaller */
+    .save-indicator { font-size: 10px; padding: 4px 8px; }
+  }
+
+  /* ── Very small screens ── */
+  @media (max-width: 480px) {
+    .stats { grid-template-columns: 1fr; gap: 8px; }
+    .stat-value { font-size: 20px; }
+    .main { padding: 10px 10px 80px; }
+    .login-card { min-width: 82px; padding: 14px 10px; }
+    .login-avatar { width: 46px; height: 46px; font-size: 15px; }
+    .login-name { font-size: 13px; }
+    .login-logo h1 { font-size: 20px; }
+    .modal { padding: 18px 14px !important; }
+
+    /* On very small screens, even auto-fill should use tighter minimum */
+    #phoneFarmPage [style*="auto-fill"],
+    #metaCampaignsPage [style*="auto-fill"],
+    #dealsPage [style*="auto-fill"],
+    #projectPage [style*="auto-fill"] {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -1707,8 +2008,100 @@
   <!-- Breadcrumb (right side) -->
   <div class="nav-breadcrumb" id="navBreadcrumb"></div>
   <div id="navUserChip"></div>
+
+  <!-- Mobile hamburger button -->
+  <button id="mobileMenuBtn" onclick="toggleMobileNav()" aria-label="Menu">
+    <svg id="mobileMenuIcon" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <line x1="2" y1="5" x2="16" y2="5"/>
+      <line x1="2" y1="9" x2="16" y2="9"/>
+      <line x1="2" y1="13" x2="16" y2="13"/>
+    </svg>
+  </button>
 </div>
 
+<!-- Mobile nav drawer -->
+<div id="mobileNavDrawer">
+  <div class="mob-nav-section">Main</div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('home')})">
+    <span class="mob-nav-dot" style="background:var(--text)"></span> Home
+  </div>
+
+  <div class="mob-nav-section">Analytics</div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){analyticsTab='clicks';setPage('analytics')})">
+    <span class="mob-nav-dot" style="background:var(--accent)"></span> Clicks
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){analyticsTab='sources';setPage('analytics')})">
+    <span class="mob-nav-dot" style="background:var(--purple)"></span> Sources
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){analyticsTab='performance';setPage('analytics')})">
+    <span class="mob-nav-dot" style="background:var(--green)"></span> Performance
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){analyticsTab='roi';setPage('analytics')})">
+    <span class="mob-nav-dot" style="background:var(--yellow)"></span> ROI &amp; Spend
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('report')})">
+    <span class="mob-nav-dot" style="background:var(--muted)"></span> Reports
+  </div>
+
+  <div class="mob-nav-divider"></div>
+  <div class="mob-nav-section">Funnels</div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('funnels')})">
+    <span class="mob-nav-dot" style="background:var(--accent)"></span> Overview
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setFunnel('Dark')})">
+    <span class="mob-nav-dot" style="background:#4a9eff"></span> Dark
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setFunnel('Slotio')})">
+    <span class="mob-nav-dot" style="background:var(--green)"></span> Slotio
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setFunnel('Scanio')})">
+    <span class="mob-nav-dot" style="background:var(--orange)"></span> Scanio
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setFunnel('SpinGPT')})">
+    <span class="mob-nav-dot" style="background:var(--red)"></span> SpinGPT
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setFunnel('Shadow')})">
+    <span class="mob-nav-dot" style="background:var(--purple)"></span> Shadow
+  </div>
+
+  <div class="mob-nav-divider"></div>
+  <div class="mob-nav-section">Campaigns</div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('builder')})">
+    <span class="mob-nav-dot" style="background:var(--yellow)"></span> Link Builder
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('metaCampaigns')})">
+    <span class="mob-nav-dot" style="background:#4a9eff"></span> Meta Campaigns
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('phoneFarm')})">
+    <span class="mob-nav-dot" style="background:var(--green)"></span> Phone Farm
+  </div>
+
+  <div class="mob-nav-divider"></div>
+  <div class="mob-nav-section">Resources</div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('deals')})">
+    <span class="mob-nav-dot" style="background:var(--green)"></span> Casino Deals
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){dealsSubTab='lps';setPage('deals')})">
+    <span class="mob-nav-dot" style="background:var(--accent)"></span> Landing Pages
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('tools')})">
+    <span class="mob-nav-dot" style="background:#f0883e"></span> Bot Content
+  </div>
+
+  <div class="mob-nav-divider"></div>
+  <div class="mob-nav-section">Team</div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('project')})">
+    <span class="mob-nav-dot" style="background:var(--purple)"></span> Projects
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('employees')})">
+    <span class="mob-nav-dot" style="background:var(--accent)"></span> Employees
+  </div>
+
+  <div class="mob-nav-divider"></div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('settings')})">
+    <span class="mob-nav-dot" style="background:var(--muted)"></span> Settings
+  </div>
+</div>
 
 <div id="dashboardContent">
 <div id="funnelGeoBar" style="display:none"></div>
@@ -1999,8 +2392,9 @@ var firebaseConfig = {
   appId: "1:1066401093922:web:baf13dcde3aaf99e60ed7b"
 };
 firebase.initializeApp(firebaseConfig);
-var db   = firebase.firestore();
-var auth = firebase.auth();
+var db      = firebase.firestore();
+var auth    = firebase.auth();
+var storage = firebase.storage();
 
 // Enable offline persistence — queues writes if network drops, syncs on reconnect
 db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
@@ -2228,6 +2622,41 @@ function closeNavDropdowns() {
 
 // Click nav item: close dropdown then run action
 function navGo(fn) {
+  closeNavDropdowns();
+  fn();
+}
+
+// ── Mobile nav ─────────────────────────────────────────────────────────────
+var mobileNavOpen = false;
+function toggleMobileNav() {
+  mobileNavOpen = !mobileNavOpen;
+  var drawer = document.getElementById('mobileNavDrawer');
+  var btn = document.getElementById('mobileMenuBtn');
+  var icon = document.getElementById('mobileMenuIcon');
+  if (mobileNavOpen) {
+    drawer.classList.add('open');
+    btn.classList.add('active');
+    // Switch to X icon
+    icon.innerHTML = '<line x1="3" y1="3" x2="15" y2="15"/><line x1="15" y1="3" x2="3" y2="15"/>';
+    document.body.style.overflow = 'hidden';
+  } else {
+    closeMobileNav();
+  }
+}
+function closeMobileNav() {
+  mobileNavOpen = false;
+  var drawer = document.getElementById('mobileNavDrawer');
+  var btn = document.getElementById('mobileMenuBtn');
+  var icon = document.getElementById('mobileMenuIcon');
+  if (drawer) drawer.classList.remove('open');
+  if (btn) btn.classList.remove('active');
+  if (icon) {
+    icon.innerHTML = '<line x1="2" y1="5" x2="16" y2="5"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="13" x2="16" y2="13"/>';
+  }
+  document.body.style.overflow = '';
+}
+function mobileNavGo(fn) {
+  closeMobileNav();
   closeNavDropdowns();
   fn();
 }
@@ -7610,6 +8039,8 @@ var metaCampaignFunnel = 'Dark';
 var metaCampaignGeos = '';
 var metaCampaignBudget = 50;
 var metaCampaignObjective = 'LINK_CLICKS';
+var metaAutoTab = 'creator';   // 'creator' | 'auto' | 'campaigns' | 'creatives'
+var autoGenState = { funnel: 'Dark', budget: 50, selectedCreativeUrls: [], aiConfig: null };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -8206,261 +8637,171 @@ function renderMetaCampaignsPage() {
   var container = document.getElementById('metaCampaignsPage');
   if (!container) return;
 
+  container.innerHTML =
+    '<div style="padding:28px 28px 80px;max-width:1400px;animation:fade-in .25s ease">' +
+    // ── Page header ──
+    '<div style="margin-bottom:24px">' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">' +
+        '<div style="width:36px;height:36px;border-radius:10px;background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.3);display:flex;align-items:center;justify-content:center;font-size:18px">f</div>' +
+        '<div>' +
+          '<div style="font-size:22px;font-weight:800;font-family:var(--font-display);color:var(--text)">Meta Campaign Generator</div>' +
+          '<div style="font-size:12px;color:var(--muted);margin-top:1px">Create, manage and track Meta (Facebook/Instagram) ad campaigns for your affiliate funnels.</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    // ── Tab bar ──
+    '<div class="mc-tab-bar" style="margin-bottom:20px">' +
+      '<button class="mc-tab-btn' + (metaAutoTab==='creator'?   ' active':'') + '" data-tab="creator"    onclick="mcRenderTab(\'creator\')"  >Campaign Creator</button>' +
+      '<button class="mc-tab-btn mc-auto-tab' + (metaAutoTab==='auto'?  ' active':'') + '" data-tab="auto"  onclick="mcRenderTab(\'auto\')"     >✨ Auto Generator</button>' +
+      '<button class="mc-tab-btn' + (metaAutoTab==='campaigns'?' active':'') + '" data-tab="campaigns" onclick="mcRenderTab(\'campaigns\')" >Active Campaigns</button>' +
+      '<button class="mc-tab-btn' + (metaAutoTab==='creatives'?' active':'') + '" data-tab="creatives" onclick="mcRenderTab(\'creatives\')" >Creatives Library</button>' +
+    '</div>' +
+    '<div id="mcTabBody"></div>' +
+    '</div>';
+
+  mcRenderTab(metaAutoTab, true);
+  loadMetaCreatives();
+  loadMetaCampaigns();
+}
+
+function mcRenderTab(tab, skipTabBarUpdate) {
+  metaAutoTab = tab;
+  var body = document.getElementById('mcTabBody');
+  if (!body) return;
+  if (!skipTabBarUpdate) {
+    document.querySelectorAll('.mc-tab-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+  }
+  if (tab === 'creator')   mcRenderCreatorTab(body);
+  else if (tab === 'auto') mcRenderAutoGeneratorTab(body);
+  else if (tab === 'campaigns') mcRenderCampaignsTab(body);
+  else if (tab === 'creatives') mcRenderCreativesTab(body);
+}
+
+// ── Tab: Campaign Creator (original form, unchanged logic) ───────────────────
+function mcRenderCreatorTab(body) {
   var funnelOpts = (typeof FUNNEL_NAMES !== 'undefined' ? FUNNEL_NAMES : ['Dark','Slotio','Scanio','SpinGPT','Shadow'])
-    .map(function(f) {
-      return '<option value="' + f + '"' + (f === metaCampaignFunnel ? ' selected' : '') + '>' + f + '</option>';
-    }).join('');
-
-  var funnelFilterOpts = '<option value="">All Funnels</option>' +
-    (typeof FUNNEL_NAMES !== 'undefined' ? FUNNEL_NAMES : ['Dark','Slotio','Scanio','SpinGPT','Shadow'])
-    .map(function(f) { return '<option value="' + f + '">' + f + '</option>'; }).join('');
-
+    .map(function(f) { return '<option value="' + f + '"' + (f === metaCampaignFunnel ? ' selected' : '') + '>' + f + '</option>'; }).join('');
   var initLp  = mcLpUrl(metaCampaignFunnel);
   var initUtm = mcBuildUtm(metaCampaignFunnel, '', metaCampaignGeos);
-
-  // ── shared input style ──
   var IS = 'width:100%;background:rgba(0,0,0,0.35);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none;transition:border-color .2s';
   var IS_MONO = IS + ';font-family:var(--font-mono);font-size:11px';
   var LABEL = 'font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:6px';
-
-  container.innerHTML = [
-    '<div style="padding:28px 28px 60px;max-width:1200px;animation:fade-in .25s ease">',
-
-    // ── Page header ──
-    '<div style="margin-bottom:28px">',
-      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">',
-        '<div style="width:36px;height:36px;border-radius:10px;background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.3);display:flex;align-items:center;justify-content:center;font-size:18px">f</div>',
-        '<div>',
-          '<div style="font-size:22px;font-weight:800;font-family:var(--font-display);color:var(--text)">Meta Campaign Generator</div>',
-          '<div style="font-size:12px;color:var(--muted);margin-top:1px">Create, manage and track Meta (Facebook/Instagram) ad campaigns for your affiliate funnels.</div>',
-        '</div>',
-      '</div>',
-    '</div>',
-
-    // ── Two-column layout: Creator | Campaigns ──
-    '<div style="display:grid;grid-template-columns:420px 1fr;gap:20px;align-items:start;margin-bottom:24px">',
-
-    // ════════════════════════════════════════════════════
-    // LEFT — CAMPAIGN CREATOR
-    // ════════════════════════════════════════════════════
-    '<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid rgba(24,119,242,0.5);border-radius:12px;overflow:hidden">',
-
+  body.innerHTML = [
+    '<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid rgba(24,119,242,0.5);border-radius:12px;overflow:hidden;max-width:520px">',
       '<div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">',
         '<span style="font-size:13px;font-weight:800;color:var(--text)">Campaign Creator</span>',
         '<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;background:rgba(24,119,242,0.12);color:#4a9eff;text-transform:uppercase;letter-spacing:.06em">Meta Ads API</span>',
       '</div>',
-
       '<div style="padding:20px;display:flex;flex-direction:column;gap:16px">',
-
-        // Funnel + Source row
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">',
-          '<div>',
-            '<label style="' + LABEL + '">Funnel</label>',
-            '<select id="mc_funnel" onchange="metaCampaignFunnel=this.value;mcUpdateUtmPreview()" style="' + IS + ';cursor:pointer">' + funnelOpts + '</select>',
-          '</div>',
-          '<div>',
-            '<label style="' + LABEL + '">Traffic Source</label>',
-            '<div style="' + IS + ';color:rgba(24,119,242,0.9);font-weight:700;background:rgba(24,119,242,0.06);border-color:rgba(24,119,242,0.2);display:flex;align-items:center;gap:6px">',
-              '<span style="width:8px;height:8px;border-radius:50%;background:#1877F2;display:inline-block"></span> meta',
-            '</div>',
-          '</div>',
+          '<div><label style="' + LABEL + '">Funnel</label>',
+          '<select id="mc_funnel" onchange="metaCampaignFunnel=this.value;mcUpdateUtmPreview()" style="' + IS + ';cursor:pointer">' + funnelOpts + '</select></div>',
+          '<div><label style="' + LABEL + '">Traffic Source</label>',
+          '<div style="' + IS + ';color:rgba(24,119,242,0.9);font-weight:700;background:rgba(24,119,242,0.06);border-color:rgba(24,119,242,0.2);display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#1877F2;display:inline-block"></span> meta</div></div>',
         '</div>',
-
-        // Campaign Name
-        '<div>',
-          '<label style="' + LABEL + '">Campaign Name</label>',
-          '<input id="mc_name" type="text" placeholder="e.g. Dark_DE_Traffic_Apr26" oninput="mcUpdateUtmPreview()" style="' + IS + '">',
-        '</div>',
-
-        // GEOs
-        '<div>',
-          '<label style="' + LABEL + '">Target GEOs <span style="color:var(--muted);font-weight:400;text-transform:none">(comma-separated ISO codes)</span></label>',
-          '<input id="mc_geos" type="text" placeholder="DE, AT, CH, NL" oninput="mcUpdateUtmPreview()" style="' + IS + '">',
-        '</div>',
-
-        // Budget + Objective
+        '<div><label style="' + LABEL + '">Campaign Name</label><input id="mc_name" type="text" placeholder="e.g. Dark_DE_Traffic_Apr26" oninput="mcUpdateUtmPreview()" style="' + IS + '"></div>',
+        '<div><label style="' + LABEL + '">Target GEOs <span style="color:var(--muted);font-weight:400;text-transform:none">(comma-separated ISO codes)</span></label><input id="mc_geos" type="text" placeholder="DE, AT, CH, NL" oninput="mcUpdateUtmPreview()" style="' + IS + '"></div>',
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">',
-          '<div>',
-            '<label style="' + LABEL + '">Daily Budget (€)</label>',
-            '<input id="mc_budget" type="number" min="1" step="1" value="' + metaCampaignBudget + '" style="' + IS + '">',
-          '</div>',
-          '<div>',
-            '<label style="' + LABEL + '">Objective</label>',
-            '<select id="mc_objective" style="' + IS + ';cursor:pointer">',
-              '<option value="LINK_CLICKS"' + (metaCampaignObjective === 'LINK_CLICKS' ? ' selected' : '') + '>Traffic (Link Clicks)</option>',
-              '<option value="CONVERSIONS"' + (metaCampaignObjective === 'CONVERSIONS' ? ' selected' : '') + '>Conversions</option>',
-              '<option value="APP_INSTALLS"' + (metaCampaignObjective === 'APP_INSTALLS' ? ' selected' : '') + '>App Installs</option>',
-            '</select>',
-          '</div>',
+          '<div><label style="' + LABEL + '">Daily Budget (€)</label><input id="mc_budget" type="number" min="1" step="1" value="' + metaCampaignBudget + '" style="' + IS + '"></div>',
+          '<div><label style="' + LABEL + '">Objective</label><select id="mc_objective" style="' + IS + ';cursor:pointer">',
+            '<option value="LINK_CLICKS"' + (metaCampaignObjective === 'LINK_CLICKS' ? ' selected' : '') + '>Traffic (Link Clicks)</option>',
+            '<option value="CONVERSIONS"' + (metaCampaignObjective === 'CONVERSIONS' ? ' selected' : '') + '>Conversions</option>',
+            '<option value="APP_INSTALLS"' + (metaCampaignObjective === 'APP_INSTALLS' ? ' selected' : '') + '>App Installs</option>',
+          '</select></div>',
         '</div>',
-
-        // ── AD COPY ──
         '<div style="border-top:1px solid var(--border);padding-top:16px">',
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">',
             '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Ad Copy</span>',
             '<button onclick="generateMetaAdCopy(document.getElementById(\'mc_funnel\').value, document.getElementById(\'mc_geos\').value)" style="font-size:10px;font-weight:700;padding:5px 12px;border-radius:6px;border:1px solid rgba(24,119,242,0.35);background:rgba(24,119,242,0.1);color:#4a9eff;cursor:pointer;letter-spacing:.04em;transition:background .15s" onmouseenter="this.style.background=\'rgba(24,119,242,0.18)\'" onmouseleave="this.style.background=\'rgba(24,119,242,0.1)\'">✨ AI Generate Copy</button>',
           '</div>',
-
-          // Headline 1
-          '<div style="margin-bottom:12px">',
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">',
-              '<label style="' + LABEL + ';margin-bottom:0">Headline 1 <span style="color:var(--red)">*</span></label>',
-              '<span id="mc_h1_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 40</span>',
-            '</div>',
-            '<input id="mc_h1" type="text" maxlength="50" placeholder="Primary headline…" oninput="mcUpdateCharCount(\'mc_h1\',\'mc_h1_cnt\',40)" style="' + IS + '">',
-          '</div>',
-
-          // Headline 2
-          '<div style="margin-bottom:12px">',
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">',
-              '<label style="' + LABEL + ';margin-bottom:0">Headline 2</label>',
-              '<span id="mc_h2_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 40</span>',
-            '</div>',
-            '<input id="mc_h2" type="text" maxlength="50" placeholder="Secondary headline…" oninput="mcUpdateCharCount(\'mc_h2\',\'mc_h2_cnt\',40)" style="' + IS + '">',
-          '</div>',
-
-          // Headline 3
-          '<div style="margin-bottom:12px">',
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">',
-              '<label style="' + LABEL + ';margin-bottom:0">Headline 3</label>',
-              '<span id="mc_h3_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 40</span>',
-            '</div>',
-            '<input id="mc_h3" type="text" maxlength="50" placeholder="Tertiary headline…" oninput="mcUpdateCharCount(\'mc_h3\',\'mc_h3_cnt\',40)" style="' + IS + '">',
-          '</div>',
-
-          // Primary Text
-          '<div style="margin-bottom:12px">',
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">',
-              '<label style="' + LABEL + ';margin-bottom:0">Primary Text <span style="color:var(--red)">*</span></label>',
-              '<span id="mc_body_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 125</span>',
-            '</div>',
-            '<textarea id="mc_body" maxlength="150" placeholder="Main ad body copy…" rows="3" oninput="mcUpdateCharCount(\'mc_body\',\'mc_body_cnt\',125)" style="' + IS + ';resize:vertical"></textarea>',
-          '</div>',
-
-          // Description
-          '<div>',
-            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">',
-              '<label style="' + LABEL + ';margin-bottom:0">Description</label>',
-              '<span id="mc_desc_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 30</span>',
-            '</div>',
-            '<input id="mc_desc" type="text" maxlength="40" placeholder="Short description…" oninput="mcUpdateCharCount(\'mc_desc\',\'mc_desc_cnt\',30)" style="' + IS + '">',
-          '</div>',
+          '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><label style="' + LABEL + ';margin-bottom:0">Headline 1 <span style="color:var(--red)">*</span></label><span id="mc_h1_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 40</span></div><input id="mc_h1" type="text" maxlength="50" placeholder="Primary headline…" oninput="mcUpdateCharCount(\'mc_h1\',\'mc_h1_cnt\',40)" style="' + IS + '"></div>',
+          '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><label style="' + LABEL + ';margin-bottom:0">Headline 2</label><span id="mc_h2_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 40</span></div><input id="mc_h2" type="text" maxlength="50" placeholder="Secondary headline…" oninput="mcUpdateCharCount(\'mc_h2\',\'mc_h2_cnt\',40)" style="' + IS + '"></div>',
+          '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><label style="' + LABEL + ';margin-bottom:0">Headline 3</label><span id="mc_h3_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 40</span></div><input id="mc_h3" type="text" maxlength="50" placeholder="Tertiary headline…" oninput="mcUpdateCharCount(\'mc_h3\',\'mc_h3_cnt\',40)" style="' + IS + '"></div>',
+          '<div style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><label style="' + LABEL + ';margin-bottom:0">Primary Text <span style="color:var(--red)">*</span></label><span id="mc_body_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 125</span></div><textarea id="mc_body" maxlength="150" placeholder="Main ad body copy…" rows="3" oninput="mcUpdateCharCount(\'mc_body\',\'mc_body_cnt\',125)" style="' + IS + ';resize:vertical"></textarea></div>',
+          '<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><label style="' + LABEL + ';margin-bottom:0">Description</label><span id="mc_desc_cnt" style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">0 / 30</span></div><input id="mc_desc" type="text" maxlength="40" placeholder="Short description…" oninput="mcUpdateCharCount(\'mc_desc\',\'mc_desc_cnt\',30)" style="' + IS + '"></div>',
         '</div>',
-
-        // ── CREATIVE URL ──
-        '<div style="border-top:1px solid var(--border);padding-top:16px">',
-          '<label style="' + LABEL + '">Creative URL <span style="color:var(--muted);font-weight:400;text-transform:none">(image or video)</span></label>',
-          '<input id="mc_creative" type="url" placeholder="https://cdn.example.com/ad-image.jpg" style="' + IS + '">',
-        '</div>',
-
-        // ── LANDING PAGE + UTM ──
+        '<div style="border-top:1px solid var(--border);padding-top:16px"><label style="' + LABEL + '">Creative URL <span style="color:var(--muted);font-weight:400;text-transform:none">(image or video)</span></label><input id="mc_creative" type="url" placeholder="https://cdn.example.com/ad-image.jpg" style="' + IS + '"></div>',
         '<div style="border-top:1px solid var(--border);padding-top:16px;display:flex;flex-direction:column;gap:12px">',
-          '<div>',
-            '<label style="' + LABEL + '">Landing Page URL <span style="color:var(--muted);font-weight:400;text-transform:none">(auto-filled)</span></label>',
-            '<div style="display:flex;gap:8px">',
-              '<input id="mc_lp_url" type="text" readonly value="' + escHtml(initLp) + '" style="' + IS + ';flex:1;color:var(--muted);background:rgba(0,0,0,0.5)">',
-            '</div>',
-          '</div>',
-          '<div>',
-            '<label style="' + LABEL + '">UTM Preview <span style="color:var(--muted);font-weight:400;text-transform:none">(auto-built)</span></label>',
-            '<div style="display:flex;gap:8px;align-items:center">',
-              '<input id="mc_utm_preview" type="text" readonly value="' + escHtml(initUtm) + '" style="' + IS_MONO + ';flex:1;color:var(--muted);background:rgba(0,0,0,0.5);font-size:10px">',
-              '<button onclick="copyToClipboard(document.getElementById(\'mc_utm_preview\').value, this, ICON_COPY)" style="flex-shrink:0;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card2);color:var(--muted);cursor:pointer;display:flex;align-items:center">' + ICON_COPY + '</button>',
-            '</div>',
-          '</div>',
+          '<div><label style="' + LABEL + '">Landing Page URL <span style="color:var(--muted);font-weight:400;text-transform:none">(auto-filled)</span></label><div style="display:flex;gap:8px"><input id="mc_lp_url" type="text" readonly value="' + escHtml(initLp) + '" style="' + IS + ';flex:1;color:var(--muted);background:rgba(0,0,0,0.5)"></div></div>',
+          '<div><label style="' + LABEL + '">UTM Preview <span style="color:var(--muted);font-weight:400;text-transform:none">(auto-built)</span></label><div style="display:flex;gap:8px;align-items:center"><input id="mc_utm_preview" type="text" readonly value="' + escHtml(initUtm) + '" style="' + IS_MONO + ';flex:1;color:var(--muted);background:rgba(0,0,0,0.5);font-size:10px"><button onclick="copyToClipboard(document.getElementById(\'mc_utm_preview\').value,this,ICON_COPY)" style="flex-shrink:0;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card2);color:var(--muted);cursor:pointer;display:flex;align-items:center">' + ICON_COPY + '</button></div></div>',
         '</div>',
-
-        // ── ACTION BUTTONS ──
         '<div style="border-top:1px solid var(--border);padding-top:16px;display:flex;gap:10px">',
           '<button id="mc_create_btn" onclick="createMetaCampaign()" style="flex:1;padding:11px 16px;border-radius:8px;border:1px solid rgba(24,119,242,0.4);background:rgba(24,119,242,0.14);color:#4a9eff;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;letter-spacing:.02em" onmouseenter="this.style.background=\'rgba(24,119,242,0.22)\'" onmouseleave="this.style.background=\'rgba(24,119,242,0.14)\'">Create Campaign via API</button>',
           '<button onclick="mcCopyConfig()" style="padding:11px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s;white-space:nowrap" onmouseenter="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseleave="this.style.background=\'var(--card2)\'">Copy Config</button>',
         '</div>',
-
-      '</div>', // end form body
-    '</div>', // end left panel
-
-    // ════════════════════════════════════════════════════
-    // RIGHT — ACTIVE CAMPAIGNS
-    // ════════════════════════════════════════════════════
-    '<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid rgba(126,191,154,0.45);border-radius:12px;overflow:hidden">',
-
-      '<div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">',
-        '<span style="font-size:13px;font-weight:800;color:var(--text);flex:1;min-width:120px">Active Campaigns</span>',
-        '<select id="mc_filter_funnel" onchange="renderMetaCampaignsTable(metaCampaignsData)" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' + funnelFilterOpts + '</select>',
-        '<button onclick="loadMetaCampaigns()" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseleave="this.style.background=\'var(--card2)\'">↻ Refresh</button>',
       '</div>',
-
-      '<div style="overflow-x:auto">',
-        '<table style="width:100%;border-collapse:collapse">',
-          '<thead>',
-            '<tr style="border-bottom:1px solid var(--border)">',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);white-space:nowrap">Name</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Status</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Budget</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Spend</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Impr.</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Clicks</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">FTDs</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">ROAS</th>',
-              '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Action</th>',
-            '</tr>',
-          '</thead>',
-          '<tbody id="mc_campaigns_table_body">',
-            '<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--muted);font-size:12px">',
-              'Click <strong style="color:var(--text)">↻ Refresh</strong> to load campaigns from Meta.',
-            '</td></tr>',
-          '</tbody>',
-        '</table>',
-      '</div>',
-
-      // Info bar
-      '<div style="padding:12px 20px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:8px">',
-        '<span style="width:6px;height:6px;border-radius:50%;background:rgba(24,119,242,0.5);display:inline-block"></span>',
-        'Campaigns fetched live from Meta Graph API v19.0. FTDs matched from postback data. All new campaigns created as PAUSED.',
-      '</div>',
-
-    '</div>', // end right panel
-
-    '</div>', // end 2-col grid
-
-    // ════════════════════════════════════════════════════
-    // CREATIVES LIBRARY
-    // ════════════════════════════════════════════════════
-    '<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid rgba(160,160,200,0.45);border-radius:12px;overflow:hidden">',
-
-      '<div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">',
-        '<span style="font-size:13px;font-weight:800;color:var(--text);flex:1;min-width:140px">Creatives Library</span>',
-        '<select id="mc_creatives_filter" onchange="renderCreativesGrid()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' + funnelFilterOpts + '</select>',
-      '</div>',
-
-      // Grid area
-      '<div id="mc_creatives_grid" style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;min-height:80px">',
-        '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--muted);font-size:12px">Loading creatives…</div>',
-      '</div>',
-
-      // Add creative row
-      '<div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">',
-        '<div style="flex:1;min-width:220px">',
-          '<label style="' + LABEL + '">Add Creative URL</label>',
-          '<input id="mc_new_creative_url" type="url" placeholder="https://cdn.example.com/banner.jpg" style="' + IS + '">',
-        '</div>',
-        '<div style="min-width:130px">',
-          '<label style="' + LABEL + '">Tag Funnel</label>',
-          '<select id="mc_new_creative_funnel" style="' + IS + ';cursor:pointer">' +
-            (typeof FUNNEL_NAMES !== 'undefined' ? FUNNEL_NAMES : ['Dark','Slotio','Scanio','SpinGPT','Shadow'])
-              .map(function(f) { return '<option value="' + f + '"' + (f === metaCampaignFunnel ? ' selected' : '') + '>' + f + '</option>'; }).join('') +
-          '</select>',
-        '</div>',
-        '<button onclick="saveMetaCreative(document.getElementById(\'mc_new_creative_url\').value, document.getElementById(\'mc_new_creative_funnel\').value)" style="padding:9px 18px;border-radius:7px;border:1px solid rgba(160,160,200,0.35);background:rgba(160,160,200,0.1);color:var(--purple);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:background .15s" onmouseenter="this.style.background=\'rgba(160,160,200,0.18)\'" onmouseleave="this.style.background=\'rgba(160,160,200,0.1)\'">+ Save Creative</button>',
-      '</div>',
-
-    '</div>', // end creatives
-
-    '</div>' // end page wrapper
+    '</div>'
   ].join('');
+}
 
-  // Load data after DOM is rendered
-  loadMetaCreatives();
+// ── Tab: Active Campaigns ─────────────────────────────────────────────────────
+function mcRenderCampaignsTab(body) {
+  var funnelFilterOpts = '<option value="">All Funnels</option>' +
+    (typeof FUNNEL_NAMES !== 'undefined' ? FUNNEL_NAMES : ['Dark','Slotio','Scanio','SpinGPT','Shadow'])
+    .map(function(f) { return '<option value="' + f + '">' + f + '</option>'; }).join('');
+  body.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid rgba(126,191,154,0.45);border-radius:12px;overflow:hidden">' +
+      '<div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+        '<span style="font-size:13px;font-weight:800;color:var(--text);flex:1;min-width:120px">Active Campaigns</span>' +
+        '<select id="mc_filter_funnel" onchange="renderMetaCampaignsTable(metaCampaignsData)" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' + funnelFilterOpts + '</select>' +
+        '<button onclick="loadMetaCampaigns()" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer">↻ Refresh</button>' +
+      '</div>' +
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+        '<thead><tr style="border-bottom:1px solid var(--border)">' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);white-space:nowrap">Name</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Status</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Budget</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Spend</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Impr.</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Clicks</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">FTDs</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">ROAS</th>' +
+          '<th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Action</th>' +
+        '</tr></thead>' +
+        '<tbody id="mc_campaigns_table_body"><tr><td colspan="9" style="padding:24px;text-align:center;color:var(--muted);font-size:12px">' +
+          'Click <strong style="color:var(--text)">↻ Refresh</strong> to load campaigns from Meta.' +
+        '</td></tr></tbody>' +
+      '</table></div>' +
+      '<div style="padding:12px 20px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:8px">' +
+        '<span style="width:6px;height:6px;border-radius:50%;background:rgba(24,119,242,0.5);display:inline-block"></span>' +
+        'Campaigns fetched live from Meta Graph API v19.0. FTDs matched from postback data. All new campaigns created as PAUSED.' +
+      '</div>' +
+    '</div>';
+}
+
+// ── Tab: Creatives Library (with upload zone) ────────────────────────────────
+function mcRenderCreativesTab(body) {
+  var funnelOpts = (typeof FUNNEL_NAMES !== 'undefined' ? FUNNEL_NAMES : ['Dark','Slotio','Scanio','SpinGPT','Shadow'])
+    .map(function(f) { return '<option value="' + f + '"' + (f === metaCampaignFunnel ? ' selected' : '') + '>' + f + '</option>'; }).join('');
+  var funnelFilterOpts = '<option value="">All Funnels</option>' +
+    (typeof FUNNEL_NAMES !== 'undefined' ? FUNNEL_NAMES : ['Dark','Slotio','Scanio','SpinGPT','Shadow'])
+    .map(function(f) { return '<option value="' + f + '">' + f + '</option>'; }).join('');
+  var IS = 'width:100%;background:rgba(0,0,0,0.35);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none;transition:border-color .2s';
+  var LABEL = 'font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:6px';
+  body.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid rgba(160,160,200,0.45);border-radius:12px;overflow:hidden">' +
+      '<div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+        '<span style="font-size:13px;font-weight:800;color:var(--text);flex:1;min-width:140px">Creatives Library</span>' +
+        '<select id="mc_creatives_filter" onchange="renderCreativesGrid()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer">' + funnelFilterOpts + '</select>' +
+      '</div>' +
+      // Upload zone
+      '<div style="padding:16px 16px 0">' +
+        mcBuildUploadZoneHtml(metaCampaignFunnel) +
+      '</div>' +
+      // Grid
+      '<div id="mc_creatives_grid" style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;min-height:80px">' +
+        '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--muted);font-size:12px">Loading creatives…</div>' +
+      '</div>' +
+      // Add URL row (kept for URL-based entry)
+      '<div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:220px"><label style="' + LABEL + '">Or paste a creative URL</label><input id="mc_new_creative_url" type="url" placeholder="https://cdn.example.com/banner.jpg" style="' + IS + '"></div>' +
+        '<div style="min-width:130px"><label style="' + LABEL + '">Tag Funnel</label><select id="mc_new_creative_funnel" style="' + IS + ';cursor:pointer">' + funnelOpts + '</select></div>' +
+        '<button onclick="saveMetaCreative(document.getElementById(\'mc_new_creative_url\').value,document.getElementById(\'mc_new_creative_funnel\').value)" style="padding:9px 18px;border-radius:7px;border:1px solid rgba(160,160,200,0.35);background:rgba(160,160,200,0.1);color:var(--purple);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Save URL</button>' +
+      '</div>' +
+    '</div>';
+  renderCreativesGrid();
 }
 
 
@@ -11814,6 +12155,424 @@ function empSaveEmployee(e, existingId) {
   _renderLogTimeForm();
   _renderEmployeeManagementSection();
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTO META CAMPAIGN GENERATOR
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Upload Zone HTML builder ──────────────────────────────────────────────────
+function mcBuildUploadZoneHtml(funnel) {
+  var f = escHtml(funnel || 'Dark');
+  return '<div class="mc-upload-zone" id="mcUploadZone"' +
+    ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+    ' ondragleave="this.classList.remove(\'drag-over\')"' +
+    ' ondrop="mcHandleDrop(event,\'' + f + '\')">' +
+    '<input type="file" id="mcFileInput" accept="image/*,video/*" multiple onchange="mcHandleFileInput(event,\'' + f + '\')">' +
+    '<div style="pointer-events:none">' +
+      '<div style="font-size:26px;margin-bottom:8px">☁</div>' +
+      '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Drop creatives here or click to upload</div>' +
+      '<div style="font-size:11px;color:var(--muted)">JPG · PNG · GIF · WebP · MP4 · MOV</div>' +
+    '</div>' +
+  '</div>' +
+  '<div id="mcUploadProgress" class="mc-upload-progress"></div>';
+}
+
+function mcHandleDrop(event, funnel) {
+  event.preventDefault();
+  var zone = document.getElementById('mcUploadZone');
+  if (zone) zone.classList.remove('drag-over');
+  var files = event.dataTransfer && event.dataTransfer.files;
+  if (!files || !files.length) return;
+  for (var i = 0; i < files.length; i++) uploadCreativeFile(files[i], funnel);
+}
+
+function mcHandleFileInput(event, funnel) {
+  var files = event.target && event.target.files;
+  if (!files || !files.length) return;
+  for (var i = 0; i < files.length; i++) uploadCreativeFile(files[i], funnel);
+  event.target.value = '';
+}
+
+// ── Firebase Storage upload ───────────────────────────────────────────────────
+function uploadCreativeFile(file, funnel) {
+  if (!storage) {
+    showToast('<div style="font-size:12px;color:var(--red)">✗ Firebase Storage not available.</div>', 'alert', 4000);
+    return;
+  }
+  var safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g, '_');
+  var path = 'creatives/' + funnel + '/' + Date.now() + '_' + safeName;
+  var ref = storage.ref(path);
+  var task = ref.put(file);
+
+  var rowId = 'uprow_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  var progressWrap = document.getElementById('mcUploadProgress');
+  if (progressWrap) {
+    var row = document.createElement('div');
+    row.id = rowId;
+    row.className = 'mc-upload-progress-row';
+    row.innerHTML =
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">' +
+        '<span style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(file.name) + '</span>' +
+        '<span id="' + rowId + '_pct">0%</span>' +
+      '</div>' +
+      '<div class="mc-upload-progress-bar-wrap"><div class="mc-upload-progress-bar" id="' + rowId + '_bar"></div></div>';
+    progressWrap.appendChild(row);
+  }
+
+  task.on('state_changed',
+    function(snap) {
+      var pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
+      var bar = document.getElementById(rowId + '_bar');
+      var pctEl = document.getElementById(rowId + '_pct');
+      if (bar) bar.style.width = pct + '%';
+      if (pctEl) pctEl.textContent = pct + '%';
+    },
+    function(err) {
+      showToast('<div style="font-size:12px;color:var(--red)">✗ Upload failed: ' + escHtml(err.message) + '</div>', 'alert', 5000);
+      var rowEl = document.getElementById(rowId);
+      if (rowEl) rowEl.style.opacity = '0.4';
+    },
+    function() {
+      task.snapshot.ref.getDownloadURL().then(function(url) {
+        var record = { url: url, funnel: funnel, addedAt: new Date().toISOString() };
+        db.collection('meta_creatives').add(record).then(function() {
+          metaCreatives.unshift(record);
+          renderCreativesGrid();
+          mcRenderAutoCreativePicker();
+          var rowEl = document.getElementById(rowId);
+          if (rowEl) {
+            var bar = document.getElementById(rowId + '_bar');
+            if (bar) bar.style.background = 'var(--green)';
+            setTimeout(function() { if (rowEl.parentNode) rowEl.parentNode.removeChild(rowEl); }, 2500);
+          }
+          showToast(
+            '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);margin-bottom:3px">Creative Uploaded</div>' +
+            '<div style="font-size:12px;color:var(--text)">' + escHtml(file.name) + ' → <strong style="color:' + mcFunnelColor(funnel) + '">' + escHtml(funnel) + '</strong></div>',
+            'ftd', 4000
+          );
+        });
+      });
+    }
+  );
+}
+
+// ── Auto Generator Tab UI ─────────────────────────────────────────────────────
+function mcRenderAutoGeneratorTab(body) {
+  var IS = 'width:100%;background:rgba(0,0,0,0.35);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-body);outline:none;transition:border-color .2s';
+  var LABEL = 'font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:6px';
+  var funnelOpts = (typeof FUNNEL_NAMES !== 'undefined' ? FUNNEL_NAMES : ['Dark','Slotio','Scanio','SpinGPT','Shadow'])
+    .map(function(f) { return '<option value="' + f + '"' + (f === autoGenState.funnel ? ' selected' : '') + '>' + f + '</option>'; }).join('');
+  var hasKey = !!(typeof claudeApiKey !== 'undefined' && claudeApiKey && claudeApiKey.length > 10);
+  var keyWarning = hasKey ? '' :
+    '<div style="background:rgba(229,192,123,0.08);border:1px solid rgba(229,192,123,0.3);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--yellow);line-height:1.5">' +
+      '<strong>⚠ Claude API key not set.</strong> Go to Analytics → Reports → Settings to add your key before using Auto Generator.' +
+    '</div>';
+
+  body.innerHTML =
+    '<div style="max-width:600px">' +
+      '<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid rgba(126,191,154,0.5);border-radius:12px;overflow:hidden">' +
+        '<div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">' +
+          '<span style="font-size:13px;font-weight:800;color:var(--text)">Auto Generator</span>' +
+          '<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;background:rgba(126,191,154,0.12);color:var(--green);text-transform:uppercase;letter-spacing:.06em">Claude AI</span>' +
+        '</div>' +
+        '<div style="padding:20px;display:flex;flex-direction:column;gap:18px">' +
+          keyWarning +
+          // 2 inputs: funnel + budget
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' +
+            '<div><label style="' + LABEL + '">Funnel</label>' +
+            '<select id="ag_funnel" onchange="autoGenState.funnel=this.value;mcRenderAutoCreativePicker()" style="' + IS + ';cursor:pointer">' + funnelOpts + '</select></div>' +
+            '<div><label style="' + LABEL + '">Daily Budget (€)</label>' +
+            '<input id="ag_budget" type="number" min="1" step="1" value="' + autoGenState.budget + '" oninput="autoGenState.budget=+this.value" style="' + IS + '"></div>' +
+          '</div>' +
+          // Creative picker
+          '<div>' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+              '<span style="' + LABEL + ';margin-bottom:0">Creatives <span style="font-weight:400;text-transform:none;color:var(--muted)">(optional — AI auto-picks if none selected)</span></span>' +
+              '<button onclick="autoGenState.selectedCreativeUrls=[];mcRenderAutoCreativePicker()" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;font-family:var(--font-body)">Clear</button>' +
+            '</div>' +
+            '<div id="ag_creative_picker" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;max-height:220px;overflow-y:auto"></div>' +
+          '</div>' +
+          // Generate button
+          '<button id="ag_gen_btn" onclick="autoGenerateCampaign()"' +
+            ' style="width:100%;padding:13px;border-radius:9px;border:1px solid rgba(126,191,154,0.4);background:rgba(126,191,154,0.12);color:var(--green);font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.02em"' +
+            ' onmouseenter="this.style.background=\'rgba(126,191,154,0.22)\'"' +
+            ' onmouseleave="this.style.background=\'rgba(126,191,154,0.12)\'">' +
+            '✨ Generate &amp; Launch' +
+          '</button>' +
+          '<div id="ag_preview_area"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  mcRenderAutoCreativePicker();
+}
+
+function mcRenderAutoCreativePicker() {
+  var grid = document.getElementById('ag_creative_picker');
+  if (!grid) return;
+  var funnel = autoGenState.funnel;
+  var list = metaCreatives.filter(function(c) { return c.funnel === funnel; });
+  if (!list.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;font-size:11px;color:var(--muted);padding:10px;text-align:center">No creatives for <strong>' + escHtml(funnel) + '</strong> — upload some in the Creatives Library tab.</div>';
+    return;
+  }
+  grid.innerHTML = list.map(function(c, i) {
+    var sel = autoGenState.selectedCreativeUrls.indexOf(c.url) !== -1;
+    var isVid = /\.(mp4|webm|mov|avi)(\?.*)?$/i.test(c.url || '');
+    var thumb = isVid
+      ? '<div style="width:100%;height:72px;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:22px">▶</div>'
+      : '<img src="' + escHtml(c.url) + '" loading="lazy" style="width:100%;height:72px;object-fit:cover;display:block;background:rgba(255,255,255,0.04)" onerror="this.style.opacity=\'.2\'">';
+    var urlSafe = escHtml(c.url).replace(/'/g, "\\'");
+    return '<div class="mc-creative-card' + (sel ? ' mc-selected' : '') + '" onclick="mcToggleCreativeSelect(' + i + ',\'' + urlSafe + '\')">' +
+      '<div class="mc-select-check">' + (sel ? '✓' : '') + '</div>' +
+      thumb +
+    '</div>';
+  }).join('');
+}
+
+function mcToggleCreativeSelect(index, url) {
+  var idx = autoGenState.selectedCreativeUrls.indexOf(url);
+  if (idx === -1) autoGenState.selectedCreativeUrls.push(url);
+  else autoGenState.selectedCreativeUrls.splice(idx, 1);
+  mcRenderAutoCreativePicker();
+}
+
+// ── Orchestrator ─────────────────────────────────────────────────────────────
+function autoGenerateCampaign() {
+  var funnel = (document.getElementById('ag_funnel') || {}).value || autoGenState.funnel;
+  var budget = parseFloat((document.getElementById('ag_budget') || {}).value) || autoGenState.budget;
+  autoGenState.funnel = funnel;
+  autoGenState.budget = budget;
+
+  if (typeof claudeApiKey === 'undefined' || !claudeApiKey || claudeApiKey.length < 10) {
+    showToast('<div style="font-size:12px;color:var(--yellow)">⚠ Set your Claude API key in Reports → Settings first.</div>', 'alert', 5000);
+    return;
+  }
+
+  var btn = document.getElementById('ag_gen_btn');
+  var previewArea = document.getElementById('ag_preview_area');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Researching best practices…'; }
+  if (previewArea) previewArea.innerHTML =
+    '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">' +
+      '<span style="animation:pulse-dot 1.2s infinite;display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:8px;vertical-align:middle"></span>' +
+      'Claude is analysing your funnel performance and generating the optimal campaign…' +
+    '</div>';
+
+  var creativeUrls = autoGenState.selectedCreativeUrls.length > 0
+    ? autoGenState.selectedCreativeUrls
+    : metaCreatives.filter(function(c) { return c.funnel === funnel; }).map(function(c) { return c.url; });
+
+  mcFetchGeoPerformance(funnel, 30)
+    .then(function(perfData) {
+      return getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData);
+    })
+    .then(function(config) {
+      autoGenState.aiConfig = config;
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Generate & Launch'; }
+      renderAICampaignPreview(config, funnel, budget, creativeUrls);
+    })
+    .catch(function(err) {
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Generate & Launch'; }
+      if (previewArea) previewArea.innerHTML =
+        '<div style="padding:16px;color:var(--red);font-size:12px;background:var(--red-glow);border:1px solid rgba(212,112,128,0.3);border-radius:8px;margin-top:12px">' +
+          '✗ ' + escHtml(err.message || String(err)) +
+        '</div>';
+    });
+}
+
+// ── GEO performance from postbacks ───────────────────────────────────────────
+function mcFetchGeoPerformance(funnel, days) {
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  var cutoffStr = cutoff.toISOString().split('T')[0];
+  return db.collection('postbacks')
+    .where('ts', '>=', cutoffStr)
+    .orderBy('ts', 'desc')
+    .limit(500)
+    .get()
+    .then(function(snap) {
+      var geoMap = {};
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        var docFunnel = (d.funnelKey || d.funnel || '').toLowerCase();
+        if (docFunnel !== funnel.toLowerCase()) return;
+        if (d.eventType !== 'ftd') return;
+        var geo = '';
+        try { var raw = JSON.parse(d.raw || '{}'); geo = raw.country || raw.geo || d.country || d.geo || ''; } catch(e) { geo = d.country || d.geo || ''; }
+        if (!geo || geo.length !== 2) return;
+        geo = geo.toUpperCase();
+        geoMap[geo] = (geoMap[geo] || 0) + 1;
+      });
+      return Object.keys(geoMap).map(function(g) { return { geo: g, ftds: geoMap[g] }; }).sort(function(a,b) { return b.ftds - a.ftds; });
+    })
+    .catch(function() { return []; });
+}
+
+// ── Claude API call ───────────────────────────────────────────────────────────
+function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
+  var lpDomain = (typeof FUNNEL_LP_DOMAIN !== 'undefined' ? FUNNEL_LP_DOMAIN[funnel] : '') || '';
+  var slDomain = (typeof FUNNEL_SMARTLINK_DOMAIN !== 'undefined' ? FUNNEL_SMARTLINK_DOMAIN[funnel] : '') || '';
+  var ctaType  = (typeof FUNNEL_CTA !== 'undefined' ? FUNNEL_CTA[funnel] : '') || 'direct';
+  var today    = new Date().toISOString().split('T')[0];
+
+  var geoDataStr = (perfData && perfData.length > 0)
+    ? perfData.slice(0, 12).map(function(g) { return g.geo + ':' + g.ftds + 'FTDs'; }).join(', ')
+    : 'No historical data available — use tier-1 casino GEO defaults';
+
+  var prompt =
+    'You are an expert casino affiliate Meta Ads manager. Generate the optimal campaign config.\n\n' +
+    '## FUNNEL\n' +
+    'Name: ' + funnel + '\n' +
+    'Landing page: ' + (lpDomain ? 'https://' + lpDomain + '/' : 'None (direct smartlink)') + '\n' +
+    'Smartlink: ' + (slDomain ? 'https://' + slDomain + '/' : 'None') + '\n' +
+    'CTA type: ' + ctaType + ' (' + (ctaType === 'tg' ? 'LP → Telegram bot → casino' : 'direct to casino via smartlink') + ')\n' +
+    'Daily budget: €' + budget + '\n' +
+    'Available creatives: ' + creativeUrls.length + (creativeUrls.length > 0 ? ' file(s): ' + creativeUrls.slice(0,3).join(', ') : ' (none yet)') + '\n\n' +
+    '## HISTORICAL GEO PERFORMANCE (last 30 days FTDs per country)\n' +
+    geoDataStr + '\n\n' +
+    '## RULES (follow strictly)\n' +
+    '- Best casino affiliate GEOs for Meta: DE, AT, CH, NO, SE, FI, NL, BE, DK, NZ, AU\n' +
+    '- Budget < €50 → use LINK_CLICKS (cheaper CPM, better for learning phase)\n' +
+    '- Budget ≥ €50 → LINK_CLICKS unless strong conversion pixel history exists\n' +
+    '- NEVER target US, UK, FR, IT — Meta gambling restrictions\n' +
+    '- Headlines must NOT contain: win, jackpot, casino, gambling, bet, real money (Meta policy)\n' +
+    '- Instead use: curiosity, exclusivity, social proof, mystery, FOMO\n' +
+    '- Headlines max 40 chars, body max 125 chars, description max 30 chars\n' +
+    '- Pick 3–6 GEOs max (smaller sets have better CPM)\n' +
+    '- Name format: ' + funnel + '_{GEOS}_{OBJ_SHORT}_' + today + '\n\n' +
+    '## OUTPUT\n' +
+    'Return ONLY valid JSON, no explanation, no markdown fences:\n' +
+    '{"campaign_name":"string","objective":"LINK_CLICKS","geos":["DE","AT"],"headlines":["40chr max","40chr max","40chr max"],"body":"125chr max primary text","description":"30chr max","selected_creative_index":0,"reasoning":"2-3 sentences on GEO and objective choice"}';
+
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': claudeApiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 900,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(j) {
+    if (j.error) throw new Error('Claude: ' + (j.error.message || JSON.stringify(j.error)));
+    if (!j.content || !j.content[0] || !j.content[0].text) throw new Error('Empty response from Claude');
+    var text = j.content[0].text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/i,'');
+    try { return JSON.parse(text); }
+    catch(e) { throw new Error('Claude returned invalid JSON. Raw: ' + text.substring(0,120)); }
+  });
+}
+
+// ── AI Preview card ───────────────────────────────────────────────────────────
+function renderAICampaignPreview(config, funnel, budget, creativeUrls) {
+  var area = document.getElementById('ag_preview_area');
+  if (!area) return;
+
+  var creativeUrl = '';
+  var idx = config.selected_creative_index || 0;
+  if (creativeUrls && creativeUrls[idx]) creativeUrl = creativeUrls[idx];
+
+  var thumbHtml = creativeUrl
+    ? '<div style="margin-bottom:14px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">' +
+        '<img src="' + escHtml(creativeUrl) + '" style="width:100%;max-height:180px;object-fit:cover;display:block" onerror="this.parentNode.style.display=\'none\'">' +
+      '</div>'
+    : '';
+
+  var geoBadges = (config.geos || []).map(function(g) {
+    return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--badge-geo);color:var(--badge-geo-text)">' + escHtml(g) + '</span>';
+  }).join(' ');
+
+  var headlines = (config.headlines || []).map(function(h, i) {
+    return '<div class="mc-ai-preview-value" style="margin-bottom:6px;font-size:12px"><span style="color:var(--muted);font-size:10px;margin-right:4px">' + (i+1) + '.</span>' + escHtml(h) + '</div>';
+  }).join('');
+
+  area.innerHTML =
+    '<div class="mc-ai-preview">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">' +
+        '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green)">✨ AI Campaign Preview</span>' +
+        '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(126,191,154,0.12);color:var(--green);text-transform:uppercase;letter-spacing:.05em">Claude Haiku</span>' +
+      '</div>' +
+      thumbHtml +
+      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Campaign Name</span><div class="mc-ai-preview-value" style="font-family:var(--font-mono);font-size:11px">' + escHtml(config.campaign_name || '') + '</div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+        '<div><span class="mc-ai-preview-label">Objective</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.objective || '') + '</div></div>' +
+        '<div><span class="mc-ai-preview-label">Daily Budget</span><div class="mc-ai-preview-value" style="color:var(--yellow);font-weight:700">€' + escHtml(String(budget)) + '</div></div>' +
+      '</div>' +
+      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Target GEOs</span><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">' + geoBadges + '</div></div>' +
+      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Headlines</span>' + headlines + '</div>' +
+      '<div style="margin-bottom:10px"><span class="mc-ai-preview-label">Primary Text</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.body || '') + '</div></div>' +
+      '<div style="margin-bottom:0"><span class="mc-ai-preview-label">Description</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.description || '') + '</div></div>' +
+      (config.reasoning ? '<div class="mc-ai-reasoning">' + escHtml(config.reasoning) + '</div>' : '') +
+      '<div style="display:flex;gap:10px;margin-top:18px">' +
+        '<button onclick="launchAICampaign()" style="flex:1;padding:11px;border-radius:8px;border:1px solid rgba(126,191,154,0.5);background:rgba(126,191,154,0.15);color:var(--green);font-size:13px;font-weight:700;cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(126,191,154,0.25)\'" onmouseleave="this.style.background=\'rgba(126,191,154,0.15)\'">🚀 Looks good, Launch!</button>' +
+        '<button onclick="mcCopyAIConfigToCreator()" style="padding:11px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Edit First ✏</button>' +
+      '</div>' +
+    '</div>';
+}
+
+// ── Fill Creator form with AI config then launch ──────────────────────────────
+function _mcApplyAIConfig(andLaunch) {
+  var config  = autoGenState.aiConfig;
+  var funnel  = autoGenState.funnel;
+  var budget  = autoGenState.budget;
+  if (!config) return;
+
+  var creativeUrls = autoGenState.selectedCreativeUrls.length > 0
+    ? autoGenState.selectedCreativeUrls
+    : metaCreatives.filter(function(c) { return c.funnel === funnel; }).map(function(c) { return c.url; });
+  var creativeUrl = creativeUrls[config.selected_creative_index || 0] || '';
+
+  mcRenderTab('creator');
+
+  // Use onReady callback via MutationObserver to avoid setTimeout race
+  var tabBody = document.getElementById('mcTabBody');
+  var done = false;
+  function fillForm() {
+    if (done) return;
+    done = true;
+    function sv(id, val) { var el = document.getElementById(id); if (el) { el.value = val; el.dispatchEvent(new Event('input')); } }
+    sv('mc_funnel',  funnel);  metaCampaignFunnel = funnel;
+    sv('mc_name',    config.campaign_name  || '');
+    sv('mc_geos',    (config.geos || []).join(', '));
+    sv('mc_budget',  String(budget));        metaCampaignBudget = budget;
+    sv('mc_h1',      (config.headlines||[])[0] || '');
+    sv('mc_h2',      (config.headlines||[])[1] || '');
+    sv('mc_h3',      (config.headlines||[])[2] || '');
+    sv('mc_body',    config.body        || '');
+    sv('mc_desc',    config.description || '');
+    sv('mc_creative', creativeUrl);
+    var objEl = document.getElementById('mc_objective');
+    if (objEl) objEl.value = config.objective || 'LINK_CLICKS';
+    mcUpdateUtmPreview();
+    if (andLaunch) {
+      createMetaCampaign();
+      showToast(
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);margin-bottom:3px">🚀 AI Campaign Launching</div>' +
+        '<div style="font-size:12px;color:var(--text)">Config applied — creating via Meta API…</div>',
+        'ftd', 5000
+      );
+    }
+  }
+
+  // Poll until Creator form is rendered (mc_funnel exists)
+  var attempts = 0;
+  var poll = setInterval(function() {
+    attempts++;
+    if (document.getElementById('mc_funnel') || attempts > 20) {
+      clearInterval(poll);
+      fillForm();
+    }
+  }, 80);
+}
+
+function launchAICampaign()         { _mcApplyAIConfig(true);  }
+function mcCopyAIConfigToCreator()  { _mcApplyAIConfig(false); }
 
 
 </script>
