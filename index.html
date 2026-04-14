@@ -6941,6 +6941,29 @@ function renderSettingsPage() {
         '<span id="metaSaveMsg" style="margin-left:12px;font-size:12px;color:var(--green);display:none">Saved \u2713</span>' +
       '</div>' +
 
+      // ── Claude AI Key ─────────────────────────────────────────
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">' +
+          '<div style="font-size:15px;font-weight:700">Claude AI</div>' +
+          '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:rgba(160,160,200,0.12);color:var(--purple);text-transform:uppercase;letter-spacing:.06em">AI Features</span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:18px">Required for AI Report generation and the Auto Campaign Generator. Get a key at <span style="color:var(--accent)">console.anthropic.com</span>.</div>' +
+        (claudeApiKey
+          ? '<div style="display:flex;align-items:center;gap:10px">' +
+              '<div style="background:var(--card2);border:1px solid rgba(126,191,154,0.3);border-radius:8px;padding:9px 14px;font-family:var(--font-mono);font-size:12px;color:var(--green);flex:1">' +
+                '&#10003;&nbsp; Key configured &mdash; ' + escHtml(claudeApiKey.slice(0,12)) + '&hellip;' +
+              '</div>' +
+              '<button onclick="_settingsClearClaudeKey()" style="background:rgba(212,112,128,0.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;white-space:nowrap">Clear Key</button>' +
+            '</div>'
+          : '<div style="display:flex;gap:10px">' +
+              '<input type="password" id="settings-claude-key" placeholder="sk-ant-api03-..." ' +
+                'style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none">' +
+              '<button onclick="_settingsSaveClaudeKey()" style="background:var(--accent);border:none;border-radius:8px;padding:9px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Save Key</button>' +
+            '</div>' +
+            '<div id="settings-claude-key-err" style="display:none;margin-top:7px;font-size:11px;color:var(--red)">Please paste a valid key (starts with sk-ant-).</div>'
+        ) +
+      '</div>' +
+
       // ── Postback Setup ────────────────────────────────────────
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px">' +
         '<div style="font-size:15px;font-weight:700;margin-bottom:4px">Postback Setup</div>' +
@@ -9641,24 +9664,22 @@ function _renderReportPageInner() {
 
         '</div>' +
 
-        // Claude API key input
+        // Claude API key status (managed in Settings)
         '<div id="reportApiKeyRow" style="margin-bottom:22px;' + (!reportUseAI ? 'display:none' : '') + '">' +
-          '<label style="display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;letter-spacing:0.05em;text-transform:uppercase">Claude API Key</label>' +
           (apiKeySet
-            ? '<div style="display:flex;align-items:center;gap:10px">' +
-                '<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 14px;font-family:var(--font-mono);font-size:12px;color:var(--green);flex:1">' +
-                  '&#10003;&nbsp; API key configured (' + claudeApiKey.slice(0,8) + '&hellip;)' +
-                '</div>' +
-                '<button onclick="_reportClearApiKey()" style="background:rgba(212,112,128,0.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer">Clear</button>' +
+            ? '<div style="display:flex;align-items:center;gap:10px;background:rgba(126,191,154,0.06);border:1px solid rgba(126,191,154,0.2);border-radius:8px;padding:10px 14px">' +
+                '<span style="font-size:16px">&#10003;</span>' +
+                '<span style="font-size:12px;color:var(--green);font-weight:600">Claude API key configured</span>' +
+                '<span style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-left:4px">(' + escHtml(claudeApiKey.slice(0,12)) + '&hellip;)</span>' +
+                '<button onclick="setPage(\'settings\')" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:5px;padding:4px 10px;color:var(--muted);font-size:11px;cursor:pointer">Manage in Settings</button>' +
               '</div>'
-            : '<div style="display:flex;gap:10px">' +
-                '<input type="password" id="reportApiKeyInput" placeholder="sk-ant-api03-..." ' +
-                  'style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none">' +
-                '<button onclick="_reportSaveApiKey()" style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 16px;color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap">Save Key</button>' +
-              '</div>' +
-              '<div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.6">' +
-                'No API key set. Get one at <span style="color:var(--accent)">console.anthropic.com</span>, ' +
-                'or add it in Settings &rarr; Integrations. Without a key, reports will include template-based insights.' +
+            : '<div style="display:flex;align-items:center;gap:12px;background:rgba(212,112,128,0.06);border:1px solid rgba(212,112,128,0.25);border-radius:8px;padding:12px 16px">' +
+                '<span style="font-size:20px">&#9888;</span>' +
+                '<div>' +
+                  '<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:2px">Claude API key not set</div>' +
+                  '<div style="font-size:11px;color:var(--muted)">Go to Settings to add your key. Without it, reports use template-based insights only.</div>' +
+                '</div>' +
+                '<button onclick="setPage(\'settings\')" style="margin-left:auto;background:var(--accent);border:none;border-radius:6px;padding:7px 14px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Go to Settings</button>' +
               '</div>'
           ) +
         '</div>' +
@@ -9772,7 +9793,34 @@ function _syncReportToggles() {
   if (akr) akr.style.display = reportUseAI ? '' : 'none';
 }
 
-// ── API key save / clear ─────────────────────────────────────
+// ── Claude API key save / clear (Settings page) ──────────────
+function _settingsSaveClaudeKey() {
+  var inp = document.getElementById('settings-claude-key');
+  var err = document.getElementById('settings-claude-key-err');
+  var val = inp ? inp.value.trim() : '';
+  if (!val || !val.startsWith('sk-ant-')) {
+    if (err) { err.style.display = 'block'; setTimeout(function(){ err.style.display = 'none'; }, 3000); }
+    return;
+  }
+  claudeApiKey = val;
+  db.collection('settings').doc('main').set({ claudeApiKey: claudeApiKey }, { merge: true })
+    .then(function() {
+      showToast('<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px">\u2713 Claude API Key Saved</div><div style="font-size:12px;color:var(--text)">AI features are now enabled.</div>', 'ftd', 4000);
+      renderSettingsPage();
+    })
+    .catch(function(e) { console.error('Save API key error:', e); });
+}
+function _settingsClearClaudeKey() {
+  claudeApiKey = '';
+  db.collection('settings').doc('main').set({ claudeApiKey: '' }, { merge: true })
+    .then(function() {
+      showToast('<div style="font-size:12px;color:var(--muted)">Claude API key cleared.</div>', 'alert', 3000);
+      renderSettingsPage();
+    })
+    .catch(function(e) { console.error('Clear API key error:', e); });
+}
+
+// ── API key save / clear (Report page — kept for compatibility) ─
 function _reportSaveApiKey() {
   var inp = document.getElementById('reportApiKeyInput');
   if (!inp || !inp.value.trim()) return;
@@ -12309,7 +12357,7 @@ function mcRenderAutoGeneratorTab(body) {
   var hasKey = !!(typeof claudeApiKey !== 'undefined' && claudeApiKey && claudeApiKey.length > 10);
   var keyWarning = hasKey ? '' :
     '<div style="background:rgba(229,192,123,0.08);border:1px solid rgba(229,192,123,0.3);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--yellow);line-height:1.5">' +
-      '<strong>⚠ Claude API key not set.</strong> Go to Analytics → Reports → Settings to add your key before using Auto Generator.' +
+      '<strong>⚠ Claude API key not set.</strong> Go to Settings → Claude AI to add your key before using Auto Generator.' +
     '</div>';
 
   body.innerHTML =
@@ -12389,7 +12437,7 @@ function autoGenerateCampaign() {
   autoGenState.budget = budget;
 
   if (typeof claudeApiKey === 'undefined' || !claudeApiKey || claudeApiKey.length < 10) {
-    showToast('<div style="font-size:12px;color:var(--yellow)">⚠ Set your Claude API key in Reports → Settings first.</div>', 'alert', 5000);
+    showToast('<div style="font-size:12px;color:var(--yellow)">⚠ Set your Claude API key in Settings → Claude AI first.</div>', 'alert', 5000);
     return;
   }
 
