@@ -4619,7 +4619,8 @@ function saveToFirebase() {
       metaAccountId: metaAccountId,
       customTrafficSources: customTrafficSources,
       linkHistory: linkHistory,
-      funnelPaused: funnelPaused
+      funnelPaused: funnelPaused,
+      claudeApiKey: claudeApiKey
     });
   } catch(e) {
     console.error('Save serialization error:', e);
@@ -4689,12 +4690,22 @@ DOC_REF.onSnapshot(function(doc) {
       if (data.metaAccountId) metaAccountId = data.metaAccountId;
       if (data.customTrafficSources) customTrafficSources = data.customTrafficSources;
       if (data.funnelPaused) funnelPaused = data.funnelPaused;
+      if (data.claudeApiKey) claudeApiKey = data.claudeApiKey;
       if (data.linkHistory) {
         linkHistory = data.linkHistory;
       } else {
         // Migrate from localStorage on first Firebase load
         var lsHistory = localStorage.getItem('linkHistory');
         if (lsHistory) { try { linkHistory = JSON.parse(lsHistory); localStorage.removeItem('linkHistory'); } catch(e){} }
+      }
+      // Migrate claudeApiKey from settings/main if not yet in main doc
+      if (!claudeApiKey) {
+        db.collection('settings').doc('main').get().then(function(s) {
+          if (s.exists && s.data().claudeApiKey) {
+            claudeApiKey = s.data().claudeApiKey;
+            saveToFirebase(); // persist into main doc
+          }
+        }).catch(function(){});
       }
       dataLoaded = true;
       // Run migrations
@@ -4813,6 +4824,7 @@ DOC_REF.onSnapshot(function(doc) {
   if (data.metaAccountId) metaAccountId = data.metaAccountId;
   if (data.customTrafficSources) customTrafficSources = data.customTrafficSources;
   if (data.funnelPaused) funnelPaused = data.funnelPaused;
+  if (data.claudeApiKey !== undefined) claudeApiKey = data.claudeApiKey;
   if (data.linkHistory) linkHistory = data.linkHistory;
   render();
   renderSmartlinks();
@@ -9548,11 +9560,12 @@ function renderReportPage() {
   var page = document.getElementById('reportPage');
   if (!page) return;
 
-  // Load saved claude key from Firestore settings on first render
+  // claudeApiKey is now loaded at startup from dashboard/data — just render directly
   db.collection('settings').doc('main').get().then(function(snap) {
     if (snap.exists) {
       var d = snap.data();
-      if (d.claudeApiKey) { claudeApiKey = d.claudeApiKey; }
+      // Only read report preferences, not the key (key comes from main doc now)
+      if (!claudeApiKey && d.claudeApiKey) { claudeApiKey = d.claudeApiKey; } // fallback for old users
       if (typeof d.reportIncludeMeta !== 'undefined') { reportIncludeMeta = !!d.reportIncludeMeta; }
       if (typeof d.reportUseAI !== 'undefined') { reportUseAI = !!d.reportUseAI; }
       _renderReportPageInner();
@@ -9803,21 +9816,15 @@ function _settingsSaveClaudeKey() {
     return;
   }
   claudeApiKey = val;
-  db.collection('settings').doc('main').set({ claudeApiKey: claudeApiKey }, { merge: true })
-    .then(function() {
-      showToast('<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px">\u2713 Claude API Key Saved</div><div style="font-size:12px;color:var(--text)">AI features are now enabled.</div>', 'ftd', 4000);
-      renderSettingsPage();
-    })
-    .catch(function(e) { console.error('Save API key error:', e); });
+  saveToFirebase();
+  showToast('<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px">\u2713 Claude API Key Saved</div><div style="font-size:12px;color:var(--text)">AI features are now enabled.</div>', 'ftd', 4000);
+  renderSettingsPage();
 }
 function _settingsClearClaudeKey() {
   claudeApiKey = '';
-  db.collection('settings').doc('main').set({ claudeApiKey: '' }, { merge: true })
-    .then(function() {
-      showToast('<div style="font-size:12px;color:var(--muted)">Claude API key cleared.</div>', 'alert', 3000);
-      renderSettingsPage();
-    })
-    .catch(function(e) { console.error('Clear API key error:', e); });
+  saveToFirebase();
+  showToast('<div style="font-size:12px;color:var(--muted)">Claude API key cleared.</div>', 'alert', 3000);
+  renderSettingsPage();
 }
 
 // ── API key save / clear (Report page — kept for compatibility) ─
@@ -9825,15 +9832,13 @@ function _reportSaveApiKey() {
   var inp = document.getElementById('reportApiKeyInput');
   if (!inp || !inp.value.trim()) return;
   claudeApiKey = inp.value.trim();
-  db.collection('settings').doc('main').set({ claudeApiKey: claudeApiKey }, { merge: true })
-    .then(function() { _renderReportPageInner(); })
-    .catch(function(e) { console.error('Save API key error:', e); });
+  saveToFirebase();
+  _renderReportPageInner();
 }
 function _reportClearApiKey() {
   claudeApiKey = '';
-  db.collection('settings').doc('main').set({ claudeApiKey: '' }, { merge: true })
-    .then(function() { _renderReportPageInner(); })
-    .catch(function(e) { console.error('Clear API key error:', e); });
+  saveToFirebase();
+  _renderReportPageInner();
 }
 
 // ── Copy HTML ────────────────────────────────────────────────
