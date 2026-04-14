@@ -8746,6 +8746,7 @@ function renderMetaCampaignsPage() {
   mcRenderTab(metaAutoTab, true);
   loadMetaCreatives();
   loadMetaCampaigns();
+  subscribeAutopilotPending();
 }
 
 function mcRenderTab(tab, skipTabBarUpdate) {
@@ -13310,84 +13311,245 @@ function renderAuditResults(r) {
 
 
 // =========================================================================
-// AUTOPILOT TAB
+// AUTOPILOT TAB — plan-and-approve flow
 // =========================================================================
 
-var _autopilotRuns       = [];
-var _autopilotRunsLoaded = false;
+var _autopilotRuns            = [];
+var _autopilotRunsLoaded      = false;
+var _autopilotPending         = null;   // pending plan from Firestore
+var _autopilotPendingListener = null;   // Firestore unsubscribe fn
+var _autopilotApproved        = {};     // {idx: true/false} per action
+
+// Subscribe to autopilot_pending/latest on app load (called from initApp or first tab open)
+function subscribeAutopilotPending() {
+  if (_autopilotPendingListener) return;
+  _autopilotPendingListener = db.collection('autopilot_pending').doc('latest')
+    .onSnapshot(function(snap) {
+      if (snap.exists && snap.data().status === 'pending') {
+        var prev = _autopilotPending;
+        _autopilotPending = snap.data();
+        // Default: all actions approved
+        if (!prev || prev.ts !== _autopilotPending.ts) {
+          var actions = [];
+          try { actions = JSON.parse(_autopilotPending.actions || '[]'); } catch(e) {}
+          _autopilotApproved = {};
+          actions.forEach(function(_, idx) { _autopilotApproved[idx] = true; });
+        }
+        _updateAutopilotBadge(true);
+        if (metaAutoTab === 'autopilot') {
+          var b = document.getElementById('mcTabBody');
+          if (b) mcRenderAutopilotTab(b);
+        }
+      } else if (_autopilotPending) {
+        _autopilotPending = null;
+        _updateAutopilotBadge(false);
+        if (metaAutoTab === 'autopilot') {
+          var b = document.getElementById('mcTabBody');
+          if (b) mcRenderAutopilotTab(b);
+        }
+      }
+    }, function(e) {
+      console.warn('autopilot_pending listener error:', e.message);
+    });
+}
+
+function _updateAutopilotBadge(show) {
+  document.querySelectorAll('[data-tab="autopilot"]').forEach(function(btn) {
+    var existing = btn.querySelector('.ap-badge');
+    if (show && !existing) {
+      var dot = document.createElement('span');
+      dot.className = 'ap-badge';
+      dot.style.cssText = 'display:inline-block;width:7px;height:7px;border-radius:50%;background:#e74c3c;margin-left:5px;vertical-align:middle';
+      btn.appendChild(dot);
+    } else if (!show && existing) {
+      existing.remove();
+    }
+  });
+}
 
 function mcRenderAutopilotTab(body) {
-  var modeOptions = [
+  subscribeAutopilotPending();
+
+  var sections = '';
+
+  // ── Pending plan section ─────────────────────────────────────────────────
+  if (_autopilotPending) {
+    var plan    = _autopilotPending;
+    var actions = [];
+    try { actions = JSON.parse(plan.actions || '[]'); } catch(e) {}
+    var score   = parseInt(plan.score) || 0;
+    var grade   = _apGrade(score);
+    var sc      = score >= 70 ? 'var(--green)' : score >= 50 ? '#f0a500' : '#e74c3c';
+    var dt      = (plan.runDate || plan.ts || '').slice(0, 10);
+    var mode    = plan.aggressiveness || 'balanced';
+
+    var actionRows = actions.map(function(a, idx) {
+      var checked   = _autopilotApproved[idx] !== false;
+      var sevColor  = a.severity === 'critical' ? '#e74c3c' : a.severity === 'warning' ? '#f0a500' : 'var(--muted)';
+      var sevLabel  = (a.severity || 'info').toUpperCase();
+      var typeLabel = a.type || 'flag';
+      var isFlag    = a.type === 'flag';
+
+      return '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:8px;border:1px solid ' +
+        (checked ? (a.severity === 'critical' ? 'rgba(231,76,60,0.3)' : 'rgba(160,160,200,0.2)') : 'var(--border)') +
+        ';background:' + (checked ? (a.severity === 'critical' ? 'rgba(231,76,60,0.06)' : 'rgba(255,255,255,0.02)') : 'transparent') +
+        ';margin-bottom:8px;opacity:' + (checked ? '1' : '0.45') + '">' +
+
+        // Checkbox
+        '<div onclick="_apToggle(' + idx + ')" style="flex-shrink:0;margin-top:2px;width:18px;height:18px;border-radius:4px;border:2px solid ' +
+          (checked ? 'var(--green)' : 'var(--border)') +
+          ';background:' + (checked ? 'var(--green)' : 'transparent') +
+          ';cursor:pointer;display:flex;align-items:center;justify-content:center">' +
+          (checked ? '<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#0d1117" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '') +
+        '</div>' +
+
+        // Content
+        '<div style="flex:1;min-width:0">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap">' +
+            '<span style="font-size:10px;font-weight:700;color:' + sevColor + ';background:' + sevColor + '1a;padding:2px 7px;border-radius:10px">' + escHtml(sevLabel) + '</span>' +
+            '<span style="font-size:11px;font-weight:700;color:var(--text);font-family:var(--font-mono)">' + escHtml(typeLabel) + '</span>' +
+            (isFlag ? '<span style="font-size:10px;color:var(--muted);font-style:italic">(recommendation only)</span>' : '') +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text);margin-bottom:2px;word-break:break-word">' + escHtml(a.target_name || a.target_id || '') + '</div>' +
+          '<div style="font-size:11px;color:var(--muted)">' + escHtml(a.reason || '') + '</div>' +
+          (a.value ? '<div style="font-size:11px;color:#f0a500;margin-top:2px">New budget: \u20ac' + (parseInt(a.value) / 100).toFixed(2) + '/day</div>' : '') +
+        '</div>' +
+
+        // Toggle label
+        '<div onclick="_apToggle(' + idx + ')" style="flex-shrink:0;font-size:11px;color:' + (checked ? 'var(--green)' : 'var(--muted)') + ';cursor:pointer;font-weight:600">' +
+          (checked ? 'Approve' : 'Skip') +
+        '</div>' +
+
+      '</div>';
+    }).join('');
+
+    var approvedCount = actions.filter(function(_, idx) { return _autopilotApproved[idx] !== false && actions[idx].type !== 'flag'; }).length;
+    var flagCount     = actions.filter(function(a) { return a.type === 'flag'; }).length;
+    var actionCount   = actions.length - flagCount;
+
+    sections +=
+      '<div style="background:var(--card);border:2px solid rgba(231,76,60,0.4);border-radius:12px;padding:24px;margin-bottom:20px">' +
+
+      // Plan header
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">' +
+        '<div>' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+            '<div style="font-size:13px;font-weight:700;color:#e74c3c">\u23F3 Plan Awaiting Approval</div>' +
+            '<div style="font-size:10px;color:var(--muted);background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:10px">' + escHtml(dt) + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:12px">' +
+            '<div style="font-size:32px;font-weight:900;color:' + sc + ';line-height:1">' + grade + '</div>' +
+            '<div>' +
+              '<div style="font-size:22px;font-weight:800;color:' + sc + ';line-height:1">' + score + '<span style="font-size:13px;color:var(--muted)">/100</span></div>' +
+              '<div style="font-size:11px;color:var(--muted);text-transform:capitalize">' + escHtml(mode) + ' mode</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          '<div style="text-align:center;padding:8px 14px;background:rgba(255,255,255,0.04);border-radius:8px">' +
+            '<div style="font-size:18px;font-weight:800">' + actions.length + '</div>' +
+            '<div style="font-size:10px;color:var(--muted)">Total</div>' +
+          '</div>' +
+          '<div style="text-align:center;padding:8px 14px;background:rgba(255,255,255,0.04);border-radius:8px">' +
+            '<div style="font-size:18px;font-weight:800;color:var(--green)">' + approvedCount + '</div>' +
+            '<div style="font-size:10px;color:var(--muted)">API Changes</div>' +
+          '</div>' +
+          (flagCount > 0 ? '<div style="text-align:center;padding:8px 14px;background:rgba(255,255,255,0.04);border-radius:8px">' +
+            '<div style="font-size:18px;font-weight:800;color:#f0a500">' + flagCount + '</div>' +
+            '<div style="font-size:10px;color:var(--muted)">Flags</div>' +
+          '</div>' : '') +
+        '</div>' +
+      '</div>' +
+
+      // Summary + top issue
+      (plan.summary ? '<div style="font-size:12px;color:var(--muted);font-style:italic;margin-bottom:10px;padding:10px 14px;background:rgba(255,255,255,0.02);border-radius:6px">' + escHtml(plan.summary) + '</div>' : '') +
+      (plan.topIssue ? '<div style="font-size:12px;color:#f0a500;margin-bottom:14px;display:flex;align-items:center;gap:6px"><span>\u26A0</span>' + escHtml(plan.topIssue) + '</div>' : '') +
+
+      // Action rows
+      '<div style="margin-bottom:16px">' +
+        '<div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Proposed Actions <span style="font-weight:400">(uncheck to skip)</span></div>' +
+        (actions.length > 0 ? actionRows : '<div style="font-size:13px;color:var(--muted);padding:16px 0;text-align:center">No actions proposed \u2014 account looks healthy</div>') +
+      '</div>' +
+
+      // Approve / reject buttons
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+        '<button onclick="applyAutopilotApproved()" id="ap_apply_btn" style="background:var(--green);color:#0d1117;border:none;border-radius:8px;padding:11px 24px;font-size:13px;font-weight:800;cursor:pointer">' +
+          '\u2705 Apply Approved Actions (' + approvedCount + ')' +
+        '</button>' +
+        '<button onclick="_apDismissPlan()" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:11px 18px;font-size:13px;cursor:pointer">' +
+          '\u274C Dismiss Plan' +
+        '</button>' +
+        '<div id="ap_apply_status" style="font-size:12px;color:var(--muted)"></div>' +
+      '</div>' +
+
+    '</div>';
+  }
+
+  // ── Settings panel ───────────────────────────────────────────────────────
+  var modeOpts = [
     { val: 'conservative', label: 'Conservative', desc: 'Flag issues only \u2014 no automatic changes' },
     { val: 'balanced',     label: 'Balanced',     desc: 'Pause obvious waste, flag the rest' },
     { val: 'aggressive',   label: 'Aggressive',   desc: 'Auto-pause, scale budgets, full control' }
   ];
-
-  var modeHtml = modeOptions.map(function(m) {
+  var modeHtml = modeOpts.map(function(m) {
     var active = autopilotAggressiveness === m.val;
-    return (
-      '<div onclick="_autopilotSetMode(\'' + m.val + '\')" style="cursor:pointer;padding:14px 16px;border-radius:8px;border:2px solid ' +
-      (active ? 'var(--green)' : 'var(--border)') + ';background:' +
-      (active ? 'rgba(126,191,154,0.08)' : 'var(--card)') + ';transition:all 0.15s">' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
-          '<div style="width:14px;height:14px;border-radius:50%;border:2px solid ' + (active ? 'var(--green)' : 'var(--border)') + ';background:' + (active ? 'var(--green)' : 'transparent') + '"></div>' +
-          '<span style="font-weight:700;font-size:13px;color:' + (active ? 'var(--green)' : 'var(--text)') + '">' + m.label + '</span>' +
-        '</div>' +
-        '<div style="font-size:11px;color:var(--muted);padding-left:22px">' + m.desc + '</div>' +
-      '</div>'
-    );
+    return '<div onclick="_autopilotSetMode(\'' + m.val + '\')" style="cursor:pointer;padding:12px 14px;border-radius:8px;border:2px solid ' +
+      (active ? 'var(--green)' : 'var(--border)') + ';background:' + (active ? 'rgba(126,191,154,0.08)' : 'var(--card)') + ';transition:all 0.15s">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">' +
+        '<div style="width:12px;height:12px;border-radius:50%;border:2px solid ' + (active ? 'var(--green)' : 'var(--border)') + ';background:' + (active ? 'var(--green)' : 'transparent') + '"></div>' +
+        '<span style="font-weight:700;font-size:12px;color:' + (active ? 'var(--green)' : 'var(--text)') + '">' + m.label + '</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--muted);padding-left:20px">' + m.desc + '</div>' +
+    '</div>';
   }).join('');
 
-  var enabled     = autopilotEnabled;
-  var statusColor = enabled ? 'var(--green)' : 'var(--muted)';
-  var statusLabel = enabled ? 'ENABLED' : 'DISABLED';
-
-  body.innerHTML =
-    '<div style="padding:20px;max-width:900px;margin:0 auto">' +
-
-    // Header
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">' +
-      '<div>' +
-        '<div style="font-size:20px;font-weight:800;letter-spacing:-0.5px">\uD83E\uDD16 Autopilot</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-top:3px">Weekly campaign health check \u2014 Claude analyses your Meta account and applies fixes automatically</div>' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:10px">' +
-        '<div style="font-size:11px;font-weight:700;color:' + statusColor + ';letter-spacing:1px">' + statusLabel + '</div>' +
-        '<div onclick="_autopilotToggle()" style="width:46px;height:26px;border-radius:13px;background:' + (enabled ? 'var(--green)' : 'var(--border)') + ';cursor:pointer;position:relative;transition:background 0.2s">' +
-          '<div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left 0.2s;' + (enabled ? 'left:23px' : 'left:3px') + '"></div>' +
+  var enabled = autopilotEnabled;
+  sections +=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+      '<div style="font-size:13px;font-weight:700">\uD83E\uDD16 Autopilot Settings</div>' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<div style="font-size:11px;font-weight:700;color:' + (enabled ? 'var(--green)' : 'var(--muted)') + ';letter-spacing:1px">' + (enabled ? 'ENABLED' : 'DISABLED') + '</div>' +
+        '<div onclick="_autopilotToggle()" style="width:44px;height:24px;border-radius:12px;background:' + (enabled ? 'var(--green)' : 'var(--border)') + ';cursor:pointer;position:relative;transition:background 0.2s">' +
+          '<div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left 0.2s;' + (enabled ? 'left:23px' : 'left:3px') + '"></div>' +
         '</div>' +
       '</div>' +
     '</div>' +
 
-    // Config panel
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px">' +
-      '<div style="font-size:13px;font-weight:700;margin-bottom:16px">Configuration</div>' +
-      '<div style="margin-bottom:20px">' +
-        '<div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.5px;margin-bottom:10px;text-transform:uppercase">Aggressiveness Mode</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' + modeHtml + '</div>' +
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">' +
+      '<div style="margin-bottom:16px">' +
+        '<div style="font-size:10px;color:var(--muted);font-weight:600;letter-spacing:0.5px;margin-bottom:8px;text-transform:uppercase">Aggressiveness Mode</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' + modeHtml + '</div>' +
       '</div>' +
-      '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px 16px;margin-bottom:16px">' +
-        '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">\uD83D\uDCC5 Schedule</div>' +
-        '<div style="font-size:13px;color:var(--text)">Every <strong>Monday at 09:00 UTC</strong> \u2014 Cloudflare Worker cron</div>' +
+      '<div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--muted)">' +
+        '\uD83D\uDCC5 Schedule: <strong style="color:var(--text)">Every Monday at 09:00 UTC</strong> \u2014 Cloudflare Worker cron' +
       '</div>' +
-      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
-        '<button onclick="_autopilotSaveSettings()" style="background:var(--green);color:#0d1117;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">Save Settings</button>' +
-        '<button onclick="runAutopilotNow()" id="ap_run_btn" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">\u26A1 Run Now</button>' +
-        '<div id="ap_run_status" style="font-size:12px;color:var(--muted)"></div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:10px 14px;background:rgba(126,191,154,0.06);border-radius:6px;border-left:3px solid var(--green)">' +
+        '\u2139 Plans are <strong>never applied automatically</strong>. Each run saves a plan here for your review. You approve or skip each action before anything changes in Meta.' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<button onclick="_autopilotSaveSettings()" style="background:var(--green);color:#0d1117;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer">Save Settings</button>' +
+        '<button onclick="runAutopilotNow()" id="ap_run_btn" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer">\u26A1 Generate Plan Now</button>' +
+        '<div id="ap_run_status" style="font-size:11px;color:var(--muted)"></div>' +
       '</div>' +
     '</div>' +
 
     // History
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
         '<div style="font-size:13px;font-weight:700">Run History</div>' +
-        '<button onclick="loadAutopilotRuns(true)" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer">\u21BB Refresh</button>' +
+        '<button onclick="loadAutopilotRuns(true)" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">\u21BB Refresh</button>' +
       '</div>' +
       '<div id="ap_history"></div>' +
-    '</div>' +
     '</div>';
 
+  body.innerHTML = '<div style="padding:20px;max-width:900px;margin:0 auto">' + sections + '</div>';
   loadAutopilotRuns(false);
+}
+
+function _apToggle(idx) {
+  _autopilotApproved[idx] = !(_autopilotApproved[idx] !== false);
+  var b = document.getElementById('mcTabBody');
+  if (b) mcRenderAutopilotTab(b);
 }
 
 function _autopilotToggle() {
@@ -13407,28 +13569,229 @@ function _autopilotSaveSettings() {
   showToast('\u2713 Autopilot settings saved', 'ftd', 3000);
 }
 
+function _apDismissPlan() {
+  if (!confirm('Dismiss this plan? It will be cleared without applying any changes.')) return;
+  db.collection('autopilot_pending').doc('latest').update({ status: 'dismissed' })
+    .then(function() {
+      _autopilotPending = null;
+      _updateAutopilotBadge(false);
+      showToast('Plan dismissed', 'alert', 2500);
+      var b = document.getElementById('mcTabBody');
+      if (b) mcRenderAutopilotTab(b);
+    })
+    .catch(function(e) { showToast('Error: ' + escHtml(e.message), 'alert', 4000); });
+}
+
+function applyAutopilotApproved() {
+  var actions = [];
+  try { actions = JSON.parse((_autopilotPending || {}).actions || '[]'); } catch(e) {}
+
+  var approved = actions.filter(function(a, idx) {
+    return _autopilotApproved[idx] !== false && a.type !== 'flag';
+  });
+
+  var btn = document.getElementById('ap_apply_btn');
+  var st  = document.getElementById('ap_apply_status');
+
+  if (approved.length === 0) {
+    showToast('No actions selected to apply.', 'alert', 3000);
+    return;
+  }
+
+  if (!metaToken || !metaAccountId) {
+    showToast('\u26A0 Meta token not set \u2014 go to Settings to configure.', 'alert', 5000);
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Applying\u2026'; }
+  if (st)  { st.textContent = '0 / ' + approved.length + ' done'; }
+
+  var done = 0, failed = 0, results = [];
+
+  function applyNext(idx) {
+    if (idx >= approved.length) {
+      // All done — log to Firestore + clear pending
+      var plan = _autopilotPending || {};
+      var allActions = actions.map(function(a, i) {
+        return Object.assign({}, a, {
+          approved: _autopilotApproved[i] !== false,
+          applied:  approved.indexOf(a) !== -1 && results[approved.indexOf(a)] && results[approved.indexOf(a)].ok
+        });
+      });
+
+      db.collection('autopilot_runs').add({
+        ts:             new Date().toISOString(),
+        runDate:        (plan.runDate || new Date().toISOString().slice(0,10)),
+        status:         failed === 0 ? 'success' : 'partial',
+        aggressiveness: plan.aggressiveness || autopilotAggressiveness,
+        score:          parseInt(plan.score) || 0,
+        summary:        plan.summary || '',
+        topIssue:       plan.topIssue || '',
+        actionsApplied: JSON.stringify(allActions),
+        actionsCount:   approved.length,
+        appliedCount:   done,
+        failedCount:    failed,
+      }).then(function() {
+        return db.collection('autopilot_pending').doc('latest').update({ status: 'applied' });
+      }).then(function() {
+        if (btn) { btn.disabled = false; btn.textContent = '\u2705 Apply Approved Actions'; }
+        if (st)  { st.textContent = ''; }
+        var msg = done + ' action' + (done !== 1 ? 's' : '') + ' applied';
+        if (failed > 0) msg += ', ' + failed + ' failed';
+        showToast('\u2713 ' + msg, 'ftd', 5000);
+        _autopilotRunsLoaded = false;
+      }).catch(function(e) {
+        if (btn) { btn.disabled = false; btn.textContent = '\u2705 Apply Approved Actions'; }
+        showToast('Applied but log failed: ' + escHtml(e.message), 'alert', 5000);
+      });
+      return;
+    }
+
+    var action = approved[idx];
+    _applyMetaAction(action)
+      .then(function() {
+        done++;
+        results[idx] = { ok: true };
+        if (st) st.textContent = done + ' / ' + approved.length + ' done';
+        applyNext(idx + 1);
+      })
+      .catch(function(e) {
+        failed++;
+        results[idx] = { ok: false, error: e.message };
+        if (st) st.textContent = done + ' applied, ' + failed + ' failed';
+        applyNext(idx + 1);
+      });
+  }
+
+  applyNext(0);
+}
+
+function _applyMetaAction(action) {
+  var base = 'https://graph.facebook.com/v19.0';
+  var formData = new URLSearchParams();
+  formData.append('access_token', metaToken);
+
+  if (action.type === 'pause_ad' || action.type === 'pause_adset' || action.type === 'pause_campaign') {
+    formData.append('status', 'PAUSED');
+  } else if (action.type === 'scale_budget' || action.type === 'reduce_budget') {
+    if (!action.value) return Promise.resolve();
+    formData.append('daily_budget', String(action.value));
+  } else {
+    return Promise.resolve(); // flag or unknown
+  }
+
+  return fetch(base + '/' + action.target_id, { method: 'POST', body: formData })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.error) throw new Error(d.error.message);
+    });
+}
+
 function runAutopilotNow() {
   var btn = document.getElementById('ap_run_btn');
   var st  = document.getElementById('ap_run_status');
-  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Running\u2026'; }
-  if (st)  { st.textContent = 'Contacting worker\u2026'; }
 
-  fetch('https://affdashboard-postback.darkinsidersbusiness.workers.dev/run-autopilot?token=pbkDark2026xZ')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (btn) { btn.disabled = false; btn.textContent = '\u26A1 Run Now'; }
-      if (d.status === 'started') {
-        if (st) st.textContent = '\u2713 Started \u2014 check history in ~30s';
-        showToast('\u2713 Autopilot started. Results in ~30 seconds.', 'ftd', 5000);
-        setTimeout(function() { loadAutopilotRuns(true); }, 35000);
-      } else {
-        if (st) st.textContent = 'Error: ' + escHtml((d.error || 'unknown'));
-      }
-    })
-    .catch(function(e) {
-      if (btn) { btn.disabled = false; btn.textContent = '\u26A1 Run Now'; }
-      if (st)  { st.textContent = 'Error: ' + escHtml(e.message); }
+  if (!metaToken || !metaAccountId) {
+    showToast('\u26A0 Meta token not set \u2014 configure in Settings first.', 'alert', 5000);
+    return;
+  }
+  if (!claudeApiKey) {
+    showToast('\u26A0 Claude API key not set \u2014 configure in Settings first.', 'alert', 5000);
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Analysing\u2026'; }
+  if (st)  { st.textContent = 'Fetching Meta data\u2026'; }
+
+  var actId = metaAccountId.startsWith('act_') ? metaAccountId : 'act_' + metaAccountId;
+  var tok   = encodeURIComponent(metaToken);
+  var base  = 'https://graph.facebook.com/v19.0';
+  var today = new Date().toISOString().slice(0, 10);
+
+  Promise.all([
+    fetch(base + '/' + actId + '/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget&limit=50&access_token=' + tok).then(function(r) { return r.json(); }),
+    fetch(base + '/' + actId + '/ads?fields=id,name,status,campaign_id,adset_id,insights.date_preset(last_7d){spend,clicks,impressions,ctr,cpm,actions,cost_per_action_type}&limit=100&access_token=' + tok).then(function(r) { return r.json(); }),
+    fetch(base + '/' + actId + '/adsets?fields=id,name,status,campaign_id,daily_budget,insights.date_preset(last_7d){spend,clicks,impressions,ctr,actions}&limit=100&access_token=' + tok).then(function(r) { return r.json(); })
+  ])
+  .then(function(results) {
+    var campaigns = results[0].data || [];
+    var ads       = results[1].data || [];
+    var adsets    = results[2].data || [];
+    if (results[0].error) throw new Error('Meta campaigns: ' + results[0].error.message);
+
+    if (st) st.textContent = 'Asking Claude\u2026';
+
+    var campsSummary = campaigns.slice(0, 20).map(function(c) {
+      return { id: c.id, name: c.name, status: c.status, objective: c.objective,
+               daily_budget: c.daily_budget ? (parseInt(c.daily_budget) / 100).toFixed(2) + ' EUR' : 'unknown' };
     });
+    var adsSummary = ads.slice(0, 50).map(function(a) {
+      var ins = (a.insights && a.insights.data && a.insights.data[0]) || {};
+      return { id: a.id, name: a.name, status: a.status, campaign_id: a.campaign_id,
+               spend_7d: parseFloat(ins.spend || 0).toFixed(2) + ' EUR',
+               clicks_7d: parseInt(ins.clicks || 0),
+               ctr: parseFloat(ins.ctr || 0).toFixed(3) + '%',
+               cpm: parseFloat(ins.cpm || 0).toFixed(2) + ' EUR' };
+    });
+
+    var agr = autopilotAggressiveness || 'balanced';
+    var modeGuide = {
+      conservative: 'CONSERVATIVE: Only create "flag" actions as recommendations. Never pause or change anything.',
+      balanced:     'BALANCED: Pause ads with spend > \u20ac5 and 0 clicks. Pause adsets with CTR < 0.1% and spend > \u20ac10. Flag budget issues.',
+      aggressive:   'AGGRESSIVE: Pause all ads with spend > \u20ac3 and 0 clicks. Reduce budgets on poor performers. Scale winners.'
+    };
+
+    var prompt = 'You are an expert Meta Ads manager for casino affiliate offers.\n\n' +
+      '## ACCOUNT DATA (Last 7 days)\n\nCampaigns: ' + JSON.stringify(campsSummary) + '\n\nAds: ' + JSON.stringify(adsSummary) + '\n\n' +
+      '## INSTRUCTIONS\n' + (modeGuide[agr] || modeGuide.balanced) + '\n\n' +
+      'Action types: pause_ad, pause_adset, pause_campaign, scale_budget, reduce_budget, flag\n' +
+      'Severity: critical | warning | info\n' +
+      'For budget actions, value = new daily_budget in cents (e.g. 6000 = \u20ac60)\n\n' +
+      'Return ONLY valid JSON:\n' +
+      '{"actions":[{"type":"pause_ad","target_id":"123","target_name":"Ad name","reason":"...","severity":"critical","value":null}],' +
+      '"score":72,"summary":"2-3 sentences on account health","top_issue":"Biggest problem in one sentence"}';
+
+    return fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': claudeApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+    }).then(function(r) { return r.json(); }).then(function(body) {
+      if (body.error) throw new Error(body.error.message);
+      var text = ((body.content || [])[0] || {}).text || '';
+      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+      var analysis = JSON.parse(text);
+      var planActions = analysis.actions || [];
+      // Save pending plan to Firestore
+      return db.collection('autopilot_pending').doc('latest').set({
+        ts:             new Date().toISOString(),
+        runDate:        today,
+        status:         'pending',
+        aggressiveness: agr,
+        score:          analysis.score || 0,
+        summary:        analysis.summary || '',
+        topIssue:       analysis.top_issue || '',
+        actions:        JSON.stringify(planActions),
+        campaignCount:  campaigns.length,
+        adCount:        ads.length,
+      });
+    });
+  })
+  .then(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '\u26A1 Generate Plan Now'; }
+    if (st)  { st.textContent = ''; }
+    showToast('\u2713 Plan generated \u2014 review above', 'ftd', 4000);
+    // Listener will auto-refresh the tab
+  })
+  .catch(function(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '\u26A1 Generate Plan Now'; }
+    if (st)  { st.textContent = 'Error: ' + escHtml(e.message); }
+    showToast('Autopilot error: ' + escHtml(e.message), 'alert', 6000);
+  });
 }
 
 function loadAutopilotRuns(force) {
@@ -13451,59 +13814,55 @@ function _renderAutopilotHistory(runs) {
   var hist = document.getElementById('ap_history');
   if (!hist) return;
   if (!runs || !runs.length) {
-    hist.innerHTML =
-      '<div style="text-align:center;padding:32px 0;color:var(--muted)">' +
-      '<div style="font-size:32px;margin-bottom:8px">\uD83E\uDD16</div>' +
-      '<div style="font-size:13px">No runs yet. Enable autopilot and click Run Now.</div>' +
-      '</div>';
+    hist.innerHTML = '<div style="text-align:center;padding:24px 0;color:var(--muted);font-size:13px">No runs yet. Click Generate Plan to start.</div>';
     return;
   }
   hist.innerHTML = runs.map(function(r) {
-    var score    = parseInt(r.score) || 0;
-    var grade    = _apGrade(score);
-    var sc       = score >= 70 ? 'var(--green)' : score >= 50 ? '#f0a500' : 'var(--red)';
-    var ok       = r.status === 'success';
-    var dt       = (r.runDate || r.ts || '').slice(0, 10);
-    var mode     = r.aggressiveness || 'balanced';
-    var actions  = [];
+    var score   = parseInt(r.score) || 0;
+    var grade   = _apGrade(score);
+    var sc      = score >= 70 ? 'var(--green)' : score >= 50 ? '#f0a500' : '#e74c3c';
+    var ok      = r.status === 'success' || r.status === 'partial';
+    var dt      = (r.runDate || r.ts || '').slice(0, 10);
+    var mode    = r.aggressiveness || 'balanced';
+    var applied = parseInt(r.appliedCount) || 0;
+    var failed  = parseInt(r.failedCount)  || 0;
+
+    var actions = [];
     try { actions = JSON.parse(r.actionsApplied || '[]'); } catch(e) {}
-    var applied  = actions.filter(function(a) { return a.applied; });
-    var flagged  = actions.filter(function(a) { return !a.applied; });
-    var actSum   = '';
-    if (applied.length) actSum += '<span style="color:var(--green);font-size:10px">' + applied.length + ' applied</span>';
-    if (flagged.length) actSum += (actSum ? ' \u00b7 ' : '') + '<span style="color:#f0a500;font-size:10px">' + flagged.length + ' flagged</span>';
-    if (!actSum)        actSum  = '<span style="color:var(--muted);font-size:10px">no actions</span>';
+
+    var actSum = '';
+    if (applied)  actSum += '<span style="color:var(--green);font-size:10px">' + applied + ' applied</span>';
+    if (failed)   actSum += (actSum ? ' \u00b7 ' : '') + '<span style="color:#e74c3c;font-size:10px">' + failed + ' failed</span>';
+    if (!actSum)  actSum  = '<span style="color:var(--muted);font-size:10px">no changes</span>';
+
     var did = 'apd_' + (r._id || dt).replace(/[^a-zA-Z0-9]/g, '_');
     var detail = '';
-    if (actions.length || r.summary || r.error) {
-      detail = '<div id="' + did + '" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.02);border-radius:6px;border-left:3px solid ' + sc + '">';
-      if (r.summary)  detail += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-style:italic">' + escHtml(r.summary) + '</div>';
+    if (actions.length || r.summary) {
+      detail = '<div id="' + did + '" style="display:none;margin-top:8px;padding:10px 12px;background:rgba(255,255,255,0.02);border-radius:6px;border-left:3px solid ' + sc + '">';
+      if (r.summary) detail += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-style:italic">' + escHtml(r.summary) + '</div>';
       if (r.topIssue) detail += '<div style="font-size:11px;color:#f0a500;margin-bottom:8px">\u26A0 ' + escHtml(r.topIssue) + '</div>';
       actions.forEach(function(a) {
-        var dot = a.applied ? '\u25CF' : '\u25CB';
-        var col = a.applied ? 'var(--green)' : '#f0a500';
-        var sev = a.severity === 'critical' ? '\uD83D\uDD34' : a.severity === 'warning' ? '\uD83D\uDFE1' : '\uD83D\uDD35';
-        detail += '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;font-size:11px">' +
-          '<span style="color:' + col + ';flex-shrink:0">' + dot + '</span>' +
-          '<span style="color:var(--muted);flex-shrink:0">' + sev + ' ' + escHtml(a.type || '') + '</span>' +
-          '<span style="color:var(--text);flex:1">' + escHtml(a.target_name || a.target_id || '') + '</span>' +
-          '<span style="color:var(--muted);font-size:10px">' + escHtml(a.reason || '') + '</span>' +
-          '</div>';
+        if (!a.approved) return; // only show approved
+        var col = a.applied ? 'var(--green)' : '#e74c3c';
+        detail += '<div style="display:flex;gap:6px;font-size:11px;margin-bottom:3px">' +
+          '<span style="color:' + col + '">' + (a.applied ? '\u2713' : '\u2717') + '</span>' +
+          '<span style="color:var(--muted)">' + escHtml(a.type || '') + '</span>' +
+          '<span style="color:var(--text);flex:1">' + escHtml(a.target_name || '') + '</span>' +
+        '</div>';
       });
-      if (r.error) detail += '<div style="font-size:11px;color:var(--red);margin-top:6px">Error: ' + escHtml(r.error) + '</div>';
       detail += '</div>';
     }
-    return '<div style="padding:12px 0;border-bottom:1px solid var(--border)">' +
+
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">' +
       '<div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="(function(){var d=document.getElementById(\'' + did + '\');if(d)d.style.display=d.style.display===\'none\'?\'block\':\'none\';})()">' +
-        '<span style="color:' + (ok ? 'var(--green)' : 'var(--red)') + ';font-size:14px;flex-shrink:0">' + (ok ? '\u2713' : '\u2717') + '</span>' +
-        '<span style="font-size:12px;color:var(--muted);width:90px;flex-shrink:0">' + escHtml(dt) + '</span>' +
-        '<span style="font-size:20px;font-weight:900;color:' + sc + ';width:35px;flex-shrink:0">' + grade + '</span>' +
-        '<span style="font-size:11px;color:var(--muted);width:55px;flex-shrink:0">' + score + '/100</span>' +
-        '<span style="font-size:11px;color:var(--muted);text-transform:capitalize;width:85px;flex-shrink:0">' + escHtml(mode) + '</span>' +
+        '<span style="color:' + (ok ? 'var(--green)' : '#e74c3c') + ';font-size:13px;flex-shrink:0">' + (ok ? '\u2713' : '\u2717') + '</span>' +
+        '<span style="font-size:12px;color:var(--muted);width:88px;flex-shrink:0">' + escHtml(dt) + '</span>' +
+        '<span style="font-size:18px;font-weight:900;color:' + sc + ';width:32px;flex-shrink:0">' + grade + '</span>' +
+        '<span style="font-size:11px;color:var(--muted);width:52px;flex-shrink:0">' + score + '/100</span>' +
+        '<span style="font-size:11px;color:var(--muted);text-transform:capitalize;width:82px;flex-shrink:0">' + escHtml(mode) + '</span>' +
         actSum +
         (detail ? '<span style="margin-left:auto;font-size:10px;color:var(--muted)">\u25BC</span>' : '') +
-      '</div>' +
-      detail +
+      '</div>' + detail +
     '</div>';
   }).join('');
 }

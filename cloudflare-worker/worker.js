@@ -240,11 +240,6 @@ async function runAutopilot(env) {
 
   if (!metaToken || !metaAccountId || !claudeApiKey) {
     console.error("Autopilot: missing metaToken, metaAccountId, or claudeApiKey");
-    await logAutopilotRun(PROJECT_ID, {
-      ts, runDate, status: "error",
-      error: "Missing credentials (metaToken / metaAccountId / claudeApiKey not set)",
-      aggressiveness, actionsApplied: [], actionsPlanned: [], score: 0, summary: "",
-    }, accessToken);
     return;
   }
 
@@ -254,11 +249,6 @@ async function runAutopilot(env) {
     metaData = await fetchMetaAuditData(metaAccountId, metaToken);
   } catch (e) {
     console.error("Autopilot: Meta fetch failed", e.message);
-    await logAutopilotRun(PROJECT_ID, {
-      ts, runDate, status: "error",
-      error: `Meta API error: ${e.message}`,
-      aggressiveness, actionsApplied: [], actionsPlanned: [], score: 0, summary: "",
-    }, accessToken);
     return;
   }
 
@@ -268,63 +258,39 @@ async function runAutopilot(env) {
     analysis = await callClaudeAutopilot(claudeApiKey, metaData, aggressiveness);
   } catch (e) {
     console.error("Autopilot: Claude call failed", e.message);
-    await logAutopilotRun(PROJECT_ID, {
-      ts, runDate, status: "error",
-      error: `Claude error: ${e.message}`,
-      aggressiveness, actionsApplied: [], actionsPlanned: [], score: 0, summary: "",
-    }, accessToken);
     return;
   }
 
-  const actions        = analysis.actions || [];
-  const actionsApplied = [];
-  const actionsFailed  = [];
+  const actions = analysis.actions || [];
 
-  // ── 4. Apply actions via Meta API ──────────────────────────────────────
-  for (const action of actions) {
-    if (action.type === "flag") {
-      actionsApplied.push({ ...action, applied: false, note: "flagged only" });
-      continue;
-    }
-    try {
-      await applyAutopilotAction(action, metaToken);
-      actionsApplied.push({ ...action, applied: true });
-    } catch (e) {
-      actionsFailed.push({ ...action, applied: false, error: e.message });
-    }
-  }
-
-  // ── 5. Log run to Firestore ────────────────────────────────────────────
-  await logAutopilotRun(PROJECT_ID, {
-    ts, runDate, status: "success",
-    error: "",
+  // ── 4. Save plan to Firestore for human approval ────────────────────────
+  //    The dashboard will show these and let the user approve/reject each
+  //    before anything is applied to Meta.
+  await firestoreSet(PROJECT_ID, "autopilot_pending/latest", {
+    ts,
+    runDate,
+    status:        "pending",
     aggressiveness,
-    score:          analysis.score || 0,
-    summary:        analysis.summary || "",
-    topIssue:       analysis.top_issue || "",
-    actionsPlanned: actions,
-    actionsApplied,
-    actionsFailed,
-    campaignCount:  metaData.campaigns.length,
-    adCount:        metaData.ads.length,
+    score:         analysis.score    || 0,
+    summary:       analysis.summary  || "",
+    topIssue:      analysis.top_issue || "",
+    actions:       JSON.stringify(actions),
+    campaignCount: metaData.campaigns.length,
+    adCount:       metaData.ads.length,
   }, accessToken);
 
-  // ── 6. Telegram notification ───────────────────────────────────────────
+  // ── 5. Telegram: plan ready for approval ──────────────────────────────
   if (env.TG_BOT_TOKEN && env.TG_CHAT_ID) {
-    const applied  = actionsApplied.filter(a => a.applied).length;
-    const flagged  = actionsApplied.filter(a => !a.applied).length;
-    const failed   = actionsFailed.length;
-    const grade    = scoreToGrade(analysis.score || 0);
-    const modeStr  = aggressiveness.charAt(0).toUpperCase() + aggressiveness.slice(1);
+    const count  = actions.length;
+    const grade  = scoreToGrade(analysis.score || 0);
+    const modeStr = aggressiveness.charAt(0).toUpperCase() + aggressiveness.slice(1);
 
-    let msg = `🤖 *Autopilot Report — ${runDate}*\n`;
-    msg    += `📊 Account Health: *${analysis.score || 0}/100* (${grade})\n`;
+    let msg = `🤖 *Autopilot Plan Ready \u2014 ${runDate}*\n`;
+    msg    += `📊 Score: *${analysis.score || 0}/100* (${grade})\n`;
     msg    += `⚙️ Mode: ${modeStr}\n`;
-    if (applied)  msg += `✅ Actions applied: ${applied}\n`;
-    if (flagged)  msg += `🚩 Issues flagged: ${flagged}\n`;
-    if (failed)   msg += `❌ Failed: ${failed}\n`;
-    if (analysis.top_issue) msg += `\n⚠️ *Top issue:* ${analysis.top_issue}`;
-    if (analysis.summary)   msg += `\n\n💬 ${analysis.summary}`;
+    msg    += `📋 ${count} action${count !== 1 ? "s" : ""} proposed\n`;
+    if (analysis.top_issue) msg += `\n⚠️ *Top issue:* ${analysis.top_issue}\n`;
+    msg    += `\n👉 Open the dashboard to review and approve`;
 
     fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
       method: "POST",
@@ -475,61 +441,25 @@ Return ONLY valid JSON, no markdown:
   return JSON.parse(text);
 }
 
-// ── Apply a single Meta API action ──────────────────────────────────────────
+// ── Set (create or overwrite) a Firestore document ──────────────────────────
 
-async function applyAutopilotAction(action, metaToken) {
-  if (!action.target_id || action.type === "flag") return;
-
-  let url, body;
-
-  if (action.type === "pause_ad" || action.type === "pause_adset" || action.type === "pause_campaign") {
-    url  = `${META_BASE}/${action.target_id}`;
-    body = new URLSearchParams({ status: "PAUSED", access_token: metaToken });
-  } else if (action.type === "scale_budget" || action.type === "reduce_budget") {
-    if (!action.value) return;
-    url  = `${META_BASE}/${action.target_id}`;
-    body = new URLSearchParams({ daily_budget: String(action.value), access_token: metaToken });
-  } else {
-    return; // unknown action type
+async function firestoreSet(projectId, docPath, data, token) {
+  const fields = {};
+  for (const [k, v] of Object.entries(data)) {
+    if      (typeof v === "string")  fields[k] = { stringValue: v };
+    else if (typeof v === "number")  fields[k] = { integerValue: String(Math.round(v)) };
+    else if (typeof v === "boolean") fields[k] = { booleanValue: v };
   }
-
-  const res  = await fetch(url, { method: "POST", body });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-}
-
-// ── Log autopilot run to Firestore ───────────────────────────────────────────
-
-async function logAutopilotRun(projectId, run, accessToken) {
-  // Store compact versions (Firestore has field limits)
-  const fields = {
-    ts:              { stringValue: run.ts },
-    runDate:         { stringValue: run.runDate },
-    status:          { stringValue: run.status },
-    error:           { stringValue: run.error || "" },
-    aggressiveness:  { stringValue: run.aggressiveness || "balanced" },
-    score:           { integerValue: String(run.score || 0) },
-    summary:         { stringValue: run.summary || "" },
-    topIssue:        { stringValue: run.topIssue || "" },
-    campaignCount:   { integerValue: String(run.campaignCount || 0) },
-    adCount:         { integerValue: String(run.adCount || 0) },
-    actionsCount:    { integerValue: String((run.actionsApplied || []).length) },
-    actionsApplied:  { stringValue: JSON.stringify(run.actionsApplied || []) },
-    actionsFailed:   { stringValue: JSON.stringify(run.actionsFailed || []) },
-  };
-
-  try {
-    await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/autopilot_runs`,
-      {
-        method:  "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body:    JSON.stringify({ fields }),
-      }
-    );
-  } catch (e) {
-    console.error("Failed to log autopilot run:", e.message);
-  }
+  const res = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${docPath}`,
+    {
+      method:  "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ fields }),
+    }
+  );
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
 }
 
 // ── Utility ──────────────────────────────────────────────────────────────────
