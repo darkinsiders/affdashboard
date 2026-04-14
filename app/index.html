@@ -12298,7 +12298,7 @@ function mcRenderAutoGeneratorTab(body) {
             ' style="width:100%;padding:13px;border-radius:9px;border:1px solid rgba(126,191,154,0.4);background:rgba(126,191,154,0.12);color:var(--green);font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.02em"' +
             ' onmouseenter="this.style.background=\'rgba(126,191,154,0.22)\'"' +
             ' onmouseleave="this.style.background=\'rgba(126,191,154,0.12)\'">' +
-            '✨ Generate &amp; Launch' +
+            '✨ Generate Plan' +
           '</button>' +
           '<div id="ag_preview_area"></div>' +
         '</div>' +
@@ -12356,7 +12356,7 @@ function autoGenerateCampaign() {
   if (previewArea) previewArea.innerHTML =
     '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">' +
       '<span style="animation:pulse-dot 1.2s infinite;display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:8px;vertical-align:middle"></span>' +
-      'Claude is analysing your funnel performance and generating the optimal campaign…' +
+      'Claude is designing the optimal multi-campaign test structure…' +
     '</div>';
 
   var creativeUrls = autoGenState.selectedCreativeUrls.length > 0
@@ -12369,11 +12369,11 @@ function autoGenerateCampaign() {
     })
     .then(function(config) {
       autoGenState.aiConfig = config;
-      if (btn) { btn.disabled = false; btn.textContent = '✨ Generate & Launch'; }
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Generate Plan'; }
       renderAICampaignPreview(config, funnel, budget, creativeUrls);
     })
     .catch(function(err) {
-      if (btn) { btn.disabled = false; btn.textContent = '✨ Generate & Launch'; }
+      if (btn) { btn.disabled = false; btn.textContent = '✨ Generate Plan'; }
       if (previewArea) previewArea.innerHTML =
         '<div style="padding:16px;color:var(--red);font-size:12px;background:var(--red-glow);border:1px solid rgba(212,112,128,0.3);border-radius:8px;margin-top:12px">' +
           '✗ ' + escHtml(err.message || String(err)) +
@@ -12409,78 +12409,87 @@ function mcFetchGeoPerformance(funnel, days) {
     .catch(function() { return []; });
 }
 
-// ── Claude API call — builds FULL test structure ──────────────────────────────
+// ── Claude API call — builds FULL multi-campaign plan ────────────────────────
 function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
   var lpDomain = (typeof FUNNEL_LP_DOMAIN !== 'undefined' ? FUNNEL_LP_DOMAIN[funnel] : '') || '';
-  var slDomain = (typeof FUNNEL_SMARTLINK_DOMAIN !== 'undefined' ? FUNNEL_SMARTLINK_DOMAIN[funnel] : '') || '';
   var ctaType  = (typeof FUNNEL_CTA !== 'undefined' ? FUNNEL_CTA[funnel] : '') || 'direct';
   var today    = new Date().toISOString().split('T')[0];
   var numCreatives = Math.max(creativeUrls.length, 1);
 
-  // GEO data only used if we have it — cold account falls back to best-practice defaults
   var geoDataStr = (perfData && perfData.length > 0)
     ? 'Historical FTDs by country: ' + perfData.slice(0,10).map(function(g){ return g.geo+':'+g.ftds; }).join(', ')
-    : 'COLD ACCOUNT — no historical data. Use best-practice tier-1 GEOs only.';
+    : 'COLD ACCOUNT — no historical data. Use best-practice tier-1 GEO clusters.';
+
+  var creativeSplitRule = numCreatives <= 4
+    ? numCreatives + ' creatives total — put ALL ' + numCreatives + ' creatives in EACH campaign as separate ads (max A/B signal across GEOs)'
+    : numCreatives <= 8
+      ? numCreatives + ' creatives total — SPLIT across campaigns, 2–4 per campaign, no duplicates between campaigns'
+      : numCreatives + ' creatives total — use 3–4 creatives per campaign, choose best variety, no duplicates';
 
   var prompt =
-    'You are an expert casino affiliate Meta Ads media buyer setting up a COLD account test from scratch.\n' +
-    'There is ZERO existing campaign data. Your job is to design the best possible initial test structure.\n\n' +
+    'You are an expert casino affiliate Meta Ads media buyer. Design the COMPLETE campaign plan for a COLD account.\n\n' +
 
-    '## FUNNEL INFO\n' +
+    '## INPUTS\n' +
     'Funnel: ' + funnel + '\n' +
-    'Landing page: ' + (lpDomain ? 'https://' + lpDomain + '/' : 'No LP — direct smartlink') + '\n' +
-    'CTA flow: ' + (ctaType === 'tg' ? 'LP → Telegram bot → casino' : 'Direct click to casino smartlink') + '\n' +
-    'Daily budget: €' + budget + '\n' +
-    'Number of creatives to test: ' + numCreatives + '\n\n' +
+    'Landing page: ' + (lpDomain ? 'https://' + lpDomain + '/' : 'direct smartlink') + '\n' +
+    'CTA: ' + (ctaType === 'tg' ? 'LP → Telegram bot → casino' : 'Direct click to casino') + '\n' +
+    'Total daily budget: \u20ac' + budget + '\n' +
+    'Number of creatives: ' + numCreatives + '\n' +
+    'GEO data: ' + geoDataStr + '\n\n' +
 
-    '## GEO CONTEXT\n' +
-    geoDataStr + '\n\n' +
+    '## CAMPAIGN STRUCTURE RULES\n' +
+    '1. LINK_CLICKS objective always (cold accounts need 50+ conv/week before switching)\n' +
+    '2. 1 Ad Set per campaign with the FULL campaign budget — never split budget across ad sets\n' +
+    '3. Broad targeting only (no interests), age 21–50\n' +
+    '4. Split into multiple campaigns by GEO CLUSTER for efficient CPM management:\n' +
+    '   - DACH: DE, AT, CH (highest CPM, best conv rate)\n' +
+    '   - Nordics: NO, SE, FI, DK (medium CPM)\n' +
+    '   - Benelux: NL, BE (lower CPM)\n' +
+    '5. Campaign count based on budget:\n' +
+    '   - \u20ac50/day or less → 1 campaign: mix of DACH + 1-2 Nordics\n' +
+    '   - \u20ac51–\u20ac100/day → 2 campaigns: DACH ~60% budget, Nordics ~40%\n' +
+    '   - \u20ac101–\u20ac200/day → 3 campaigns: DACH 50%, Nordics 30%, Benelux 20%\n' +
+    '   - >\u20ac200/day → 3–4 campaigns, use judgment\n' +
+    '6. Minimum \u20ac20/day per campaign (Meta cannot optimize below this)\n' +
+    '7. Campaign budgets MUST sum to exactly \u20ac' + budget + '/day\n' +
+    '8. NEVER target: US, UK, FR, IT, ES (Meta gambling ad restrictions)\n\n' +
 
-    '## COLD ACCOUNT BEST PRACTICES (follow ALL of these)\n' +
-    '1. ALWAYS use LINK_CLICKS objective for cold accounts — CONVERSIONS needs 50+ conversions/week to exit learning phase\n' +
-    '2. Use 1 single Ad Set with the FULL budget — splitting budget across multiple ad sets slows the learning phase\n' +
-    '3. Broad targeting ONLY (no interest targeting) — Meta\'s algorithm finds users better without restrictions on cold accounts\n' +
-    '4. Age 21–50 is the casino affiliate sweet spot on Meta\n' +
-    '5. Best tier-1 GEOs for casino affiliates: DE, AT, CH, NO, SE, FI, NL, BE, DK — pick 3-5 max (tighter GEO = better CPM)\n' +
-    '6. NEVER target: US, UK, FR, IT, ES — Meta gambling ad restrictions\n' +
-    '7. Create ONE ad per creative — Meta\'s delivery system automatically A/B tests them and allocates budget to the winner\n' +
-    '8. Write a DIFFERENT copy angle for each creative — test both the visual AND the messaging simultaneously\n' +
-    '9. Headlines MUST NOT contain: casino, gambling, bet, win, jackpot, real money, slots, poker (Meta policy violation)\n' +
-    '10. Copy angles that work: curiosity gap, social proof, exclusivity, mystery, FOMO, insider knowledge\n' +
-    '11. Keep headlines under 40 chars, body under 125 chars, description under 30 chars\n\n' +
+    '## CREATIVE DISTRIBUTION\n' +
+    creativeSplitRule + '\n' +
+    'Each ad MUST have a different copy angle: Curiosity, FOMO, SocialProof, Exclusivity, Mystery\n' +
+    'Headlines MUST NOT contain: casino, gambling, bet, win, jackpot, real money, slots, poker\n' +
+    'Headlines \u226440 chars | Body \u2264125 chars | Description \u226430 chars\n\n' +
 
-    '## COPY ANGLE IDEAS (use as inspiration, be creative)\n' +
-    '- Curiosity: "What these users discovered changed everything"\n' +
-    '- Exclusivity: "Members-only — not available to the public"\n' +
-    '- Social proof: "Thousands already use this daily"\n' +
-    '- FOMO: "Access closes at midnight tonight"\n' +
-    '- Mystery: "The algorithm nobody talks about"\n\n' +
-
-    '## OUTPUT FORMAT\n' +
-    'Return ONLY valid JSON. No markdown, no explanation, no extra text. Schema:\n' +
+    '## OUTPUT FORMAT — Return ONLY valid JSON, no markdown, no explanation:\n' +
     '{\n' +
-    '  "campaign_name": "' + funnel + '_{GEO1GEO2}_LC_' + today + '",\n' +
-    '  "objective": "LINK_CLICKS",\n' +
-    '  "geos": ["DE", "AT", "CH"],\n' +
-    '  "age_min": 21,\n' +
-    '  "age_max": 50,\n' +
-    '  "ad_set_name": "' + funnel + '_{GEO1GEO2}_Broad_21-50",\n' +
-    '  "ads": [\n' +
+    '  "plan_name": "' + funnel + ' Cold Launch ' + today + '",\n' +
+    '  "campaigns": [\n' +
     '    {\n' +
-    '      "name": "' + funnel + '_V1_{AngleName}",\n' +
-    '      "creative_index": 0,\n' +
-    '      "angle": "one word — e.g. Curiosity, FOMO, SocialProof",\n' +
-    '      "headline1": "max 40 chars",\n' +
-    '      "headline2": "max 40 chars",\n' +
-    '      "headline3": "max 40 chars",\n' +
-    '      "body": "max 125 chars primary text",\n' +
-    '      "description": "max 30 chars"\n' +
+    '      "name": "' + funnel + '_{GEOs}_LC_' + today + '",\n' +
+    '      "objective": "LINK_CLICKS",\n' +
+    '      "budget_per_day": 60,\n' +
+    '      "geos": ["DE","AT","CH"],\n' +
+    '      "age_min": 21,\n' +
+    '      "age_max": 50,\n' +
+    '      "ad_set_name": "' + funnel + '_{GEOs}_Broad_21-50",\n' +
+    '      "ads": [\n' +
+    '        {\n' +
+    '          "name": "' + funnel + '_V1_Curiosity",\n' +
+    '          "creative_index": 0,\n' +
+    '          "angle": "Curiosity",\n' +
+    '          "headline1": "max 40 chars",\n' +
+    '          "headline2": "max 40 chars",\n' +
+    '          "headline3": "max 40 chars",\n' +
+    '          "body": "max 125 chars primary text",\n' +
+    '          "description": "max 30 chars"\n' +
+    '        }\n' +
+    '      ]\n' +
     '    }\n' +
     '  ],\n' +
-    '  "test_strategy": "1-2 sentence explanation of the test structure and what you are testing",\n' +
-    '  "reasoning": "2-3 sentences on GEO choice and why this structure for a cold account"\n' +
+    '  "strategy": "1-2 sentences on overall test structure and what you are testing",\n' +
+    '  "reasoning": "2-3 sentences explaining GEO split and budget allocation decisions"\n' +
     '}\n\n' +
-    'IMPORTANT: The "ads" array must have exactly ' + numCreatives + ' item(s) — one per creative. creative_index 0 = first creative, 1 = second, etc.';
+    'creative_index must be 0–' + (numCreatives - 1) + '. Campaign budgets must sum to ' + budget + '.';
 
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -12492,7 +12501,7 @@ function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1200,
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }]
     })
   })
@@ -12505,105 +12514,115 @@ function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
     catch(e) { throw new Error('Claude returned invalid JSON. Raw: ' + text.substring(0,200)); }
   });
 }
-
-// ── AI Preview card — shows full test structure ───────────────────────────────
+// ── AI Campaign Plan Preview ──────────────────────────────────────────────────
 function renderAICampaignPreview(config, funnel, budget, creativeUrls) {
   var area = document.getElementById('ag_preview_area');
   if (!area) return;
 
-  var geoBadges = (config.geos || []).map(function(g) {
-    return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--badge-geo);color:var(--badge-geo-text)">' + escHtml(g) + '</span>';
-  }).join(' ');
+  var campaigns = config.campaigns || [];
+  var totalAds  = campaigns.reduce(function(s, c) { return s + (c.ads || []).length; }, 0);
+  var totalBudget = campaigns.reduce(function(s, c) { return s + (c.budget_per_day || 0); }, 0);
 
-  // Build per-ad cards
-  var ads = config.ads || [];
-  var adCards = ads.map(function(ad, i) {
-    var curl = creativeUrls && creativeUrls[ad.creative_index != null ? ad.creative_index : i];
-    var isVid = curl && /\.(mp4|webm|mov|avi)(\?.*)?$/i.test(curl);
-    var thumbHtml = curl
-      ? (isVid
-          ? '<div style="width:100%;height:100px;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:28px;border-radius:6px;margin-bottom:10px">▶</div>'
-          : '<img src="' + escHtml(curl) + '" style="width:100%;height:100px;object-fit:cover;border-radius:6px;display:block;margin-bottom:10px;background:rgba(255,255,255,0.04)" onerror="this.style.display=\'none\'">')
-      : '<div style="width:100%;height:60px;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);margin-bottom:10px">No creative uploaded yet</div>';
+  var angleColor = function(angle) {
+    return {Curiosity:'#b18cf7',FOMO:'var(--red)',SocialProof:'var(--green)',Exclusivity:'var(--yellow)',Mystery:'#f0a868'}[angle] || 'var(--accent)';
+  };
 
-    var angleColor = { Curiosity:'var(--purple)', FOMO:'var(--red)', SocialProof:'var(--green)', Exclusivity:'var(--yellow)', Mystery:'var(--orange)' }[ad.angle] || 'var(--accent)';
+  var campaignBlocks = campaigns.map(function(camp, ci) {
+    var geoBadges = (camp.geos || []).map(function(g) {
+      return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(74,144,226,0.15);color:#6ab0f5">' + escHtml(g) + '</span>';
+    }).join(' ');
 
-    return '<div style="background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:220px">' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">' +
-        '<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Ad ' + (i+1) + '</span>' +
-        (ad.angle ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,0.06);color:' + angleColor + '">' + escHtml(ad.angle) + '</span>' : '') +
+    var ads = camp.ads || [];
+    var adCards = ads.map(function(ad, i) {
+      var curl = creativeUrls && creativeUrls[ad.creative_index != null ? ad.creative_index : i];
+      var isVid = curl && /\.(mp4|webm|mov|avi)(\?.*)?$/i.test(curl);
+      var thumbHtml = curl
+        ? (isVid
+            ? '<div style="width:100%;height:75px;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:22px;border-radius:5px;margin-bottom:8px">\u25b6</div>'
+            : '<img src="' + escHtml(curl) + '" style="width:100%;height:75px;object-fit:cover;border-radius:5px;display:block;margin-bottom:8px" onerror="this.style.display='none'">')
+        : '<div style="width:100%;height:45px;border:1px dashed var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);margin-bottom:8px">No creative</div>';
+
+      return '<div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:11px;flex:1;min-width:175px;max-width:230px">' +
+        '<div style="display:flex;align-items:center;gap:5px;margin-bottom:8px">' +
+          '<span style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--muted)">Ad ' + (i+1) + '</span>' +
+          (ad.angle ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(255,255,255,0.06);color:' + angleColor(ad.angle) + '">' + escHtml(ad.angle) + '</span>' : '') +
+        '</div>' +
+        thumbHtml +
+        '<div style="font-size:10px;color:var(--text);font-weight:600;margin-bottom:4px;line-height:1.4">' + escHtml(ad.headline1 || '') + '</div>' +
+        '<div style="font-size:10px;color:var(--muted);line-height:1.4">' + escHtml(ad.body ? ad.body.substring(0,80) + (ad.body.length > 80 ? '\u2026' : '') : '') + '</div>' +
+      '</div>';
+    }).join('');
+
+    return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
+        '<div>' +
+          '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:3px">Campaign ' + (ci+1) + ' of ' + campaigns.length + '</div>' +
+          '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text);word-break:break-all">' + escHtml(camp.name || '') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+          '<span style="font-size:12px;font-weight:700;color:var(--green);background:rgba(126,191,154,0.12);padding:3px 10px;border-radius:4px">\u20ac' + (camp.budget_per_day || 0) + '/day</span>' +
+          '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.06);color:var(--text)">' + escHtml(camp.objective || 'LINK_CLICKS') + '</span>' +
+          geoBadges +
+        '</div>' +
       '</div>' +
-      thumbHtml +
-      '<div style="margin-bottom:7px">' +
-        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px">Headlines</div>' +
-        [ad.headline1, ad.headline2, ad.headline3].filter(Boolean).map(function(h, hi) {
-          return '<div style="font-size:11px;color:var(--text);padding:4px 8px;background:rgba(255,255,255,0.04);border-radius:4px;margin-bottom:3px"><span style="color:var(--muted);font-size:9px">' + (hi+1) + '. </span>' + escHtml(h) + '</div>';
-        }).join('') +
+      '<div style="font-size:10px;color:var(--muted);margin-bottom:12px;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:5px">' +
+        '<span style="color:var(--text);font-weight:600">Ad Set:</span> ' + escHtml(camp.ad_set_name || '') +
+        ' \u00b7 Broad \u00b7 Age ' + (camp.age_min||21) + '\u2013' + (camp.age_max||50) +
       '</div>' +
-      '<div style="margin-bottom:7px">' +
-        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px">Body</div>' +
-        '<div style="font-size:11px;color:var(--text);line-height:1.5;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:4px">' + escHtml(ad.body || '') + '</div>' +
-      '</div>' +
-      '<div><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Description: </span><span style="font-size:11px;color:var(--muted)">' + escHtml(ad.description || '') + '</span></div>' +
+      '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">' + ads.length + ' Ad' + (ads.length>1?'s':'') + ' \u2014 A/B Creative Test</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' + adCards + '</div>' +
     '</div>';
   }).join('');
 
   area.innerHTML =
     '<div class="mc-ai-preview">' +
-      // Header
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">' +
-        '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green)">✨ AI Test Structure</span>' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">' +
+        '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green)">\u2728 Campaign Plan</span>' +
         '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;background:rgba(126,191,154,0.12);color:var(--green);text-transform:uppercase;letter-spacing:.05em">Claude Sonnet</span>' +
+        '<span style="font-size:10px;color:var(--muted);margin-left:auto">' + escHtml(config.plan_name || '') + '</span>' +
       '</div>' +
 
-      // Structure overview
-      '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--text);line-height:1.7">' +
-        '<span style="color:var(--muted);font-size:11px">Structure: </span>' +
-        '<strong>1 Campaign</strong> → <strong>1 Ad Set</strong> (€' + budget + '/day, broad) → <strong>' + ads.length + ' Ad' + (ads.length > 1 ? 's' : '') + '</strong> (A/B creative test)' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">' +
+        '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">' +
+          '<div style="font-size:20px;font-weight:800;color:var(--text)">' + campaigns.length + '</div>' +
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px">Campaigns</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">' +
+          '<div style="font-size:20px;font-weight:800;color:var(--text)">' + campaigns.length + '</div>' +
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px">Ad Sets</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">' +
+          '<div style="font-size:20px;font-weight:800;color:var(--text)">' + totalAds + '</div>' +
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px">Total Ads</div>' +
+        '</div>' +
+        '<div style="background:rgba(126,191,154,0.08);border:1px solid rgba(126,191,154,0.2);border-radius:8px;padding:10px 12px;text-align:center">' +
+          '<div style="font-size:20px;font-weight:800;color:var(--green)">\u20ac' + totalBudget + '</div>' +
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px">Per Day</div>' +
+        '</div>' +
       '</div>' +
 
-      // Campaign + AdSet info row
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">' +
-        '<div><span class="mc-ai-preview-label">Campaign</span><div class="mc-ai-preview-value" style="font-family:var(--font-mono);font-size:10px;word-break:break-all">' + escHtml(config.campaign_name || '') + '</div></div>' +
-        '<div><span class="mc-ai-preview-label">Objective</span><div class="mc-ai-preview-value" style="font-size:12px">' + escHtml(config.objective || 'LINK_CLICKS') + '</div></div>' +
-        '<div><span class="mc-ai-preview-label">Target GEOs</span><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">' + geoBadges + '</div></div>' +
-      '</div>' +
+      campaignBlocks +
 
-      // Ad set name + targeting
-      '<div style="margin-bottom:14px">' +
-        '<span class="mc-ai-preview-label">Ad Set — ' + escHtml(config.ad_set_name || '') + '</span>' +
-        '<div style="font-size:11px;color:var(--muted)">Broad targeting · Age ' + (config.age_min||21) + '–' + (config.age_max||50) + ' · Lowest cost · Full €' + budget + '/day budget on 1 ad set</div>' +
-      '</div>' +
+      (config.strategy ? '<div style="font-size:12px;color:var(--text);background:rgba(126,191,154,0.06);border:1px solid rgba(126,191,154,0.2);border-radius:6px;padding:10px 14px;margin-bottom:10px"><strong style="color:var(--green)">Strategy:</strong> ' + escHtml(config.strategy) + '</div>' : '') +
+      (config.reasoning ? '<div class="mc-ai-reasoning" style="margin-bottom:16px">' + escHtml(config.reasoning) + '</div>' : '') +
 
-      // Per-ad cards
-      '<div style="margin-bottom:14px">' +
-        '<span class="mc-ai-preview-label">Ads (' + ads.length + ') — A/B Creative Test</span>' +
-        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">' + adCards + '</div>' +
-      '</div>' +
-
-      // Test strategy + reasoning
-      (config.test_strategy ? '<div style="font-size:12px;color:var(--text);background:rgba(126,191,154,0.06);border:1px solid rgba(126,191,154,0.2);border-radius:6px;padding:10px 14px;margin-bottom:10px"><strong style="color:var(--green)">Test strategy:</strong> ' + escHtml(config.test_strategy) + '</div>' : '') +
-      (config.reasoning ? '<div class="mc-ai-reasoning">' + escHtml(config.reasoning) + '</div>' : '') +
-
-      // Action buttons
-      '<div style="display:flex;gap:10px;margin-top:18px">' +
-        '<button id="ag_launch_btn" onclick="launchAICampaign()" style="flex:1;padding:13px;border-radius:8px;border:1px solid rgba(126,191,154,0.5);background:rgba(126,191,154,0.15);color:var(--green);font-size:14px;font-weight:700;cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(126,191,154,0.25)\'" onmouseleave="this.style.background=\'rgba(126,191,154,0.15)\'">🚀 Launch All Ads</button>' +
-        '<button onclick="autoGenerateCampaign()" style="padding:13px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">↻ Regenerate</button>' +
+      '<div style="display:flex;gap:10px;margin-top:4px">' +
+        '<button id="ag_launch_btn" onclick="launchAICampaign()" style="flex:1;padding:14px;border-radius:8px;border:1px solid rgba(126,191,154,0.5);background:rgba(126,191,154,0.15);color:var(--green);font-size:14px;font-weight:700;cursor:pointer;transition:background .15s" onmouseenter="this.style.background='rgba(126,191,154,0.25)'" onmouseleave="this.style.background='rgba(126,191,154,0.15)'">\u2705 Approve & Launch All (' + campaigns.length + ' campaign' + (campaigns.length > 1 ? 's' : '') + ')</button>' +
+        '<button onclick="autoGenerateCampaign()" style="padding:14px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">\u21bb Regenerate</button>' +
       '</div>' +
     '</div>';
 }
-
-// ── Launch: create campaign + 1 ad set + N ads (one per creative) ─────────────
+// ── Launch: iterate campaigns sequentially → adset → ads ─────────────────────
 function launchAICampaign() {
   var config  = autoGenState.aiConfig;
   var funnel  = autoGenState.funnel;
   var budget  = autoGenState.budget;
-  if (!config) return;
+  if (!config || !config.campaigns) return;
 
   var token     = (typeof metaToken !== 'undefined' ? metaToken : '') || '';
   var accountId = (typeof metaAccountId !== 'undefined' ? metaAccountId : '') || '';
   if (!token || !accountId) {
-    showToast('<div style="font-size:12px;color:var(--red)">✗ Set Meta token + account ID in Settings first.</div>', 'alert', 5000);
+    showToast('<div style="font-size:12px;color:var(--red)">\u2717 Set Meta token + account ID in Settings first.</div>', 'alert', 5000);
     return;
   }
 
@@ -12611,139 +12630,150 @@ function launchAICampaign() {
     ? autoGenState.selectedCreativeUrls
     : metaCreatives.filter(function(c) { return c.funnel === funnel; }).map(function(c) { return c.url; });
 
-  var lpUrl = mcBuildUtm(funnel, config.campaign_name || funnel, (config.geos || []).join(','));
-  if (!lpUrl) {
-    showToast('<div style="font-size:12px;color:var(--yellow)">⚠ No landing page configured for ' + escHtml(funnel) + '. Set it in Settings.</div>', 'alert', 5000);
-    return;
-  }
-
+  var actId     = accountId.startsWith('act_') ? accountId : 'act_' + accountId;
+  var campaigns = config.campaigns || [];
+  var allResults = [];
   var btn = document.getElementById('ag_launch_btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating campaign…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '\u23f3 Launching\u2026'; }
 
-  var actId = accountId.startsWith('act_') ? accountId : 'act_' + accountId;
-  var geoCountries = (config.geos || ['DE','AT']).map(function(g){ return g.trim().toUpperCase(); });
-  var ads = config.ads || [];
+  function launchNextCampaign(ci) {
+    if (ci >= campaigns.length) return Promise.resolve(allResults);
+    var camp = campaigns[ci];
+    if (btn) btn.textContent = '\u23f3 Campaign ' + (ci+1) + '/' + campaigns.length + '\u2026';
 
-  // Step 1 — Campaign
-  var p1 = new URLSearchParams({
-    name: config.campaign_name || (funnel + '_AutoGen'),
-    objective: config.objective || 'LINK_CLICKS',
-    status: 'PAUSED',
-    special_ad_categories: '[]',
-    access_token: token
-  });
+    var lpUrl = mcBuildUtm(funnel, camp.name || funnel, (camp.geos || []).join(','));
+    if (!lpUrl) {
+      showToast('<div style="font-size:12px;color:var(--yellow)">\u26a0 No landing page for ' + escHtml(funnel) + '. Set it in Settings.</div>', 'alert', 5000);
+      if (btn) { btn.disabled = false; btn.textContent = '\u2705 Approve & Launch All (' + campaigns.length + ' campaign' + (campaigns.length > 1 ? 's' : '') + ')'; }
+      return Promise.reject(new Error('No LP URL for funnel ' + funnel));
+    }
 
-  fetch('https://graph.facebook.com/v19.0/' + actId + '/campaigns', { method:'POST', body: p1 })
-  .then(function(r){ return r.json(); })
-  .then(function(camp) {
-    if (camp.error) throw new Error('Campaign: ' + camp.error.message);
-    var campId = camp.id;
-    if (btn) btn.textContent = '⏳ Creating ad set…';
+    var geoCountries = (camp.geos || ['DE']).map(function(g) { return g.trim().toUpperCase(); });
+    var ads = camp.ads || [];
 
-    // Step 2 — 1 Ad Set with full budget
-    var p2 = new URLSearchParams({
-      name: config.ad_set_name || (funnel + '_Broad_AdSet'),
-      campaign_id: campId,
-      daily_budget: Math.round(budget * 100),
-      billing_event: 'IMPRESSIONS',
-      optimization_goal: 'LINK_CLICKS',
-      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-      targeting: JSON.stringify({
-        geo_locations: { countries: geoCountries },
-        age_min: config.age_min || 21,
-        age_max: config.age_max || 50
-      }),
+    var p1 = new URLSearchParams({
+      name: camp.name || (funnel + '_Camp' + (ci+1)),
+      objective: camp.objective || 'LINK_CLICKS',
       status: 'PAUSED',
+      special_ad_categories: '[]',
       access_token: token
     });
 
-    return fetch('https://graph.facebook.com/v19.0/' + actId + '/adsets', { method:'POST', body: p2 })
-    .then(function(r){ return r.json(); })
-    .then(function(adset) {
-      if (adset.error) throw new Error('Ad Set: ' + adset.error.message);
-      if (btn) btn.textContent = '⏳ Creating ads (0/' + ads.length + ')…';
+    return fetch('https://graph.facebook.com/v19.0/' + actId + '/campaigns', { method: 'POST', body: p1 })
+    .then(function(r) { return r.json(); })
+    .then(function(campResp) {
+      if (campResp.error) throw new Error('Campaign ' + (ci+1) + ': ' + campResp.error.message);
+      var campId = campResp.id;
+      if (btn) btn.textContent = '\u23f3 C' + (ci+1) + '/' + campaigns.length + ' \u2014 ad set\u2026';
 
-      // Step 3 — Create ads sequentially, one per creative
-      var adResults = [];
-      function createNextAd(i) {
-        if (i >= ads.length) return Promise.resolve(adResults);
-        var adConf  = ads[i];
-        var curl    = creativeUrls[adConf.creative_index != null ? adConf.creative_index : i] || '';
-        if (btn) btn.textContent = '⏳ Creating ad ' + (i+1) + '/' + ads.length + '…';
+      var p2 = new URLSearchParams({
+        name: camp.ad_set_name || (funnel + '_AdSet' + (ci+1)),
+        campaign_id: campId,
+        daily_budget: Math.round((camp.budget_per_day || 20) * 100),
+        billing_event: 'IMPRESSIONS',
+        optimization_goal: 'LINK_CLICKS',
+        bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+        targeting: JSON.stringify({
+          geo_locations: { countries: geoCountries },
+          age_min: camp.age_min || 21,
+          age_max: camp.age_max || 50
+        }),
+        status: 'PAUSED',
+        access_token: token
+      });
 
-        var linkData = {
-          link:    lpUrl,
-          message: adConf.body || '',
-          name:    adConf.headline1 || '',
-          description: adConf.description || '',
-          call_to_action: { type: 'LEARN_MORE', value: { link: lpUrl } }
-        };
-        if (curl) linkData.picture = curl;
+      return fetch('https://graph.facebook.com/v19.0/' + actId + '/adsets', { method: 'POST', body: p2 })
+      .then(function(r) { return r.json(); })
+      .then(function(adset) {
+        if (adset.error) throw new Error('Ad Set C' + (ci+1) + ': ' + adset.error.message);
 
-        var p3a = new URLSearchParams({
-          name: adConf.name || (funnel + '_Ad' + (i+1)),
-          object_story_spec: JSON.stringify({ page_id: 'ME', link_data: linkData }),
-          access_token: token
-        });
+        var adResults = [];
+        function createNextAd(i) {
+          if (i >= ads.length) return Promise.resolve(adResults);
+          var adConf = ads[i];
+          var curl   = creativeUrls[adConf.creative_index != null ? adConf.creative_index : i] || '';
+          if (btn) btn.textContent = '\u23f3 C' + (ci+1) + '/' + campaigns.length + ' Ad ' + (i+1) + '/' + ads.length + '\u2026';
 
-        return fetch('https://graph.facebook.com/v19.0/' + actId + '/adcreatives', { method:'POST', body: p3a })
-        .then(function(r){ return r.json(); })
-        .then(function(creative) {
-          var creativeId = (creative && !creative.error) ? creative.id : null;
-          var p3b_data = {
-            name:     adConf.name || (funnel + '_Ad' + (i+1)),
-            adset_id: adset.id,
-            status:   'PAUSED',
-            access_token: token
+          var linkData = {
+            link: lpUrl,
+            message: adConf.body || '',
+            name: adConf.headline1 || '',
+            description: adConf.description || '',
+            call_to_action: { type: 'LEARN_MORE', value: { link: lpUrl } }
           };
-          if (creativeId) p3b_data.creative = JSON.stringify({ creative_id: creativeId });
-          var p3b = new URLSearchParams(p3b_data);
-          return fetch('https://graph.facebook.com/v19.0/' + actId + '/ads', { method:'POST', body: p3b })
-          .then(function(r){ return r.json(); })
-          .then(function(ad) {
-            adResults.push({ adId: ad.id || null, creativeId: creativeId, name: adConf.name, angle: adConf.angle });
-            return createNextAd(i + 1);
-          });
-        });
-      }
+          if (curl) linkData.picture = curl;
 
-      return createNextAd(0).then(function(results) {
-        return { campId: campId, adsetId: adset.id, ads: results };
+          var p3a = new URLSearchParams({
+            name: adConf.name || (funnel + '_Ad' + (i+1)),
+            object_story_spec: JSON.stringify({ page_id: 'ME', link_data: linkData }),
+            access_token: token
+          });
+
+          return fetch('https://graph.facebook.com/v19.0/' + actId + '/adcreatives', { method: 'POST', body: p3a })
+          .then(function(r) { return r.json(); })
+          .then(function(creative) {
+            var creativeId = (creative && !creative.error) ? creative.id : null;
+            var p3b_data = {
+              name: adConf.name || (funnel + '_Ad' + (i+1)),
+              adset_id: adset.id,
+              status: 'PAUSED',
+              access_token: token
+            };
+            if (creativeId) p3b_data.creative = JSON.stringify({ creative_id: creativeId });
+            return fetch('https://graph.facebook.com/v19.0/' + actId + '/ads', { method: 'POST', body: new URLSearchParams(p3b_data) })
+            .then(function(r) { return r.json(); })
+            .then(function(ad) {
+              adResults.push({ adId: ad.id || null, creativeId: creativeId, name: adConf.name, angle: adConf.angle });
+              return createNextAd(i + 1);
+            });
+          });
+        }
+
+        return createNextAd(0).then(function(adRes) {
+          allResults.push({ campId: campId, adsetId: adset.id, name: camp.name, ads: adRes, geos: camp.geos, budget: camp.budget_per_day });
+          return launchNextCampaign(ci + 1);
+        });
       });
     });
-  })
-  .then(function(result) {
-    if (btn) { btn.disabled = false; btn.textContent = '🚀 Launch All Ads'; }
+  }
 
-    // Log to Firebase
-    db.collection('meta_campaigns').add({
-      campaignId: result.campId,
-      adsetId:    result.adsetId,
-      ads:        result.ads,
-      name:       config.campaign_name,
-      funnel:     funnel,
-      geos:       (config.geos || []).join(', '),
-      budget:     budget,
-      objective:  config.objective || 'LINK_CLICKS',
-      adCount:    result.ads.length,
-      createdAt:  new Date().toISOString(),
-      status:     'PAUSED',
-      source:     'auto_generator'
-    }).catch(function(){});
+  var btnLabel = '\u2705 Approve & Launch All (' + campaigns.length + ' campaign' + (campaigns.length > 1 ? 's' : '') + ')';
+
+  launchNextCampaign(0)
+  .then(function(results) {
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+    var totalAds = results.reduce(function(s, r) { return s + r.ads.length; }, 0);
+
+    results.forEach(function(r) {
+      db.collection('meta_campaigns').add({
+        campaignId: r.campId,
+        adsetId:    r.adsetId,
+        ads:        r.ads,
+        name:       r.name,
+        funnel:     funnel,
+        geos:       (r.geos || []).join(', '),
+        budget:     r.budget,
+        objective:  'LINK_CLICKS',
+        adCount:    r.ads.length,
+        createdAt:  new Date().toISOString(),
+        status:     'PAUSED',
+        source:     'auto_generator'
+      }).catch(function(){});
+    });
 
     showToast(
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);margin-bottom:4px">✓ Campaign Created</div>' +
-      '<div style="font-size:12px;color:var(--text)">1 campaign · 1 ad set · <strong>' + result.ads.length + ' ads</strong> — all PAUSED</div>' +
-      '<div style="font-size:11px;color:var(--muted);margin-top:3px">Go to Meta Ads Manager to review and activate.</div>',
-      'ftd', 10000
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);margin-bottom:4px">\u2713 Plan Launched</div>' +
+      '<div style="font-size:12px;color:var(--text)"><strong>' + results.length + ' campaign' + (results.length > 1 ? 's' : '') + '</strong> \u00b7 ' + results.length + ' ad set' + (results.length > 1 ? 's' : '') + ' \u00b7 <strong>' + totalAds + ' total ads</strong> \u2014 all PAUSED</div>' +
+      '<div style="font-size:11px;color:var(--muted);margin-top:3px">Review and activate in Meta Ads Manager.</div>',
+      'ftd', 12000
     );
     mcRenderTab('campaigns');
     loadMetaCampaigns();
   })
   .catch(function(err) {
-    if (btn) { btn.disabled = false; btn.textContent = '🚀 Launch All Ads'; }
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
     showToast(
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--red);margin-bottom:3px">✗ API Error</div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--red);margin-bottom:3px">\u2717 API Error</div>' +
       '<div style="font-size:12px;color:var(--text)">' + escHtml(err.message || String(err)) + '</div>',
       'alert', 8000
     );
@@ -12751,13 +12781,14 @@ function launchAICampaign() {
 }
 
 function mcCopyAIConfigToCreator() {
-  // Switch to creator tab with the first ad's config pre-filled for manual review
   var config = autoGenState.aiConfig;
-  if (!config || !config.ads || !config.ads[0]) { mcRenderTab('creator'); return; }
-  var ad0 = config.ads[0];
+  if (!config || !config.campaigns || !config.campaigns[0]) { mcRenderTab('creator'); return; }
+  var camp0 = config.campaigns[0];
+  var ad0   = camp0.ads && camp0.ads[0];
+  if (!ad0) { mcRenderTab('creator'); return; }
   var creativeUrls = autoGenState.selectedCreativeUrls.length > 0
     ? autoGenState.selectedCreativeUrls
-    : metaCreatives.filter(function(c){ return c.funnel === autoGenState.funnel; }).map(function(c){ return c.url; });
+    : metaCreatives.filter(function(c) { return c.funnel === autoGenState.funnel; }).map(function(c) { return c.url; });
 
   mcRenderTab('creator');
   var attempts = 0;
@@ -12767,9 +12798,9 @@ function mcCopyAIConfigToCreator() {
       clearInterval(poll);
       function sv(id, val) { var el = document.getElementById(id); if (el) { el.value = val; el.dispatchEvent(new Event('input')); } }
       sv('mc_funnel',  autoGenState.funnel); metaCampaignFunnel = autoGenState.funnel;
-      sv('mc_name',    config.campaign_name || '');
-      sv('mc_geos',    (config.geos || []).join(', '));
-      sv('mc_budget',  String(autoGenState.budget)); metaCampaignBudget = autoGenState.budget;
+      sv('mc_name',    camp0.name || '');
+      sv('mc_geos',    (camp0.geos || []).join(', '));
+      sv('mc_budget',  String(camp0.budget_per_day || autoGenState.budget)); metaCampaignBudget = camp0.budget_per_day || autoGenState.budget;
       sv('mc_h1',      ad0.headline1 || '');
       sv('mc_h2',      ad0.headline2 || '');
       sv('mc_h3',      ad0.headline3 || '');
@@ -12777,11 +12808,13 @@ function mcCopyAIConfigToCreator() {
       sv('mc_desc',    ad0.description || '');
       sv('mc_creative', creativeUrls[ad0.creative_index || 0] || '');
       var objEl = document.getElementById('mc_objective');
-      if (objEl) objEl.value = config.objective || 'LINK_CLICKS';
+      if (objEl) objEl.value = camp0.objective || 'LINK_CLICKS';
       mcUpdateUtmPreview();
     }
   }, 80);
 }
+
+
 
 
 </script>
