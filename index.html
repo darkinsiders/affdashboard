@@ -8129,7 +8129,7 @@ var metaCreatives = [];           // loaded from Firebase
 var metaCampaignFunnel = 'Dark';
 var metaCampaignGeos = '';
 var metaCampaignBudget = 50;
-var metaCampaignObjective = 'LINK_CLICKS';
+var metaCampaignObjective = 'OUTCOME_TRAFFIC';
 var metaAutoTab = 'creator';   // 'creator' | 'auto' | 'campaigns' | 'creatives'
 var autoGenState = { funnel: 'Dark', budget: 50, selectedCreativeUrls: [], aiConfig: null };
 
@@ -8467,7 +8467,7 @@ function createMetaCampaign() {
   var step1Body = new URLSearchParams({
     name:      state.name,
     objective: state.objective,
-    status:    'PAUSED',
+    status:    (document.getElementById('mc_launch_active') && document.getElementById('mc_launch_active').checked) ? 'ACTIVE' : 'PAUSED',
     special_ad_categories: '[]',
     access_token: token
   });
@@ -8489,14 +8489,14 @@ function createMetaCampaign() {
         campaign_id:      campId,
         daily_budget:     Math.round(state.budget * 100),
         billing_event:    'IMPRESSIONS',
-        optimization_goal: state.objective === 'CONVERSIONS' ? 'OFFSITE_CONVERSIONS' : 'LINK_CLICKS',
+        optimization_goal: state.objective === 'OUTCOME_SALES' ? 'OFFSITE_CONVERSIONS' : 'LINK_CLICKS',
         bid_strategy:     'LOWEST_COST_WITHOUT_CAP',
         targeting:        JSON.stringify({
           geo_locations: { countries: geoCountries },
           age_min: 21,
           age_max: 65
         }),
-        status: 'PAUSED',
+        status:    (document.getElementById('mc_launch_active') && document.getElementById('mc_launch_active').checked) ? 'ACTIVE' : 'PAUSED',
         access_token: token
       });
 
@@ -8507,6 +8507,17 @@ function createMetaCampaign() {
 
           // Step 3 — Create Ad Creative then Ad
           var step3aUrl = 'https://graph.facebook.com/v21.0/' + actId + '/adcreatives';
+          // Creative fallback: use Creatives Library if no URL entered
+          var creativeUrl = state.creative;
+          if (!creativeUrl && typeof metaCreatives !== 'undefined') {
+            var fallbackCreative = metaCreatives.find(function(c) { return c.funnel === state.funnel; });
+            if (fallbackCreative) creativeUrl = fallbackCreative.url;
+          }
+          if (!creativeUrl) {
+            showToast('<div style="font-size:12px;color:var(--yellow)">\u26a0 No creative image for <strong>' + escHtml(state.funnel) + '</strong>. Upload one in Creatives Library first.</div>', 'alert', 5000);
+            if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create Campaign via API'; }
+            return;
+          }
           var creativeSpec = {
             link_data: {
               link:    lpUrl,
@@ -8516,9 +8527,7 @@ function createMetaCampaign() {
               call_to_action: { type: 'LEARN_MORE', value: { link: lpUrl } }
             }
           };
-          if (state.creative) {
-            creativeSpec.link_data.picture = state.creative;
-          }
+          creativeSpec.link_data.picture = creativeUrl;
 
           var step3aBody = new URLSearchParams({
             name:         state.name + ' — Creative',
@@ -8539,7 +8548,7 @@ function createMetaCampaign() {
               var step3bPayload = {
                 name:     state.name + ' — Ad',
                 adset_id: adset.id,
-                status:   'PAUSED',
+                status:   (document.getElementById('mc_launch_active') && document.getElementById('mc_launch_active').checked) ? 'ACTIVE' : 'PAUSED',
                 access_token: token
               };
               if (creativeId) step3bPayload.creative = JSON.stringify({ creative_id: creativeId });
@@ -8802,9 +8811,9 @@ function mcRenderCreatorTab(body) {
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">',
           '<div><label style="' + LABEL + '">Daily Budget (€)</label><input id="mc_budget" type="number" min="1" step="1" value="' + metaCampaignBudget + '" style="' + IS + '"></div>',
           '<div><label style="' + LABEL + '">Objective</label><select id="mc_objective" style="' + IS + ';cursor:pointer">',
-            '<option value="LINK_CLICKS"' + (metaCampaignObjective === 'LINK_CLICKS' ? ' selected' : '') + '>Traffic (Link Clicks)</option>',
-            '<option value="CONVERSIONS"' + (metaCampaignObjective === 'CONVERSIONS' ? ' selected' : '') + '>Conversions</option>',
-            '<option value="APP_INSTALLS"' + (metaCampaignObjective === 'APP_INSTALLS' ? ' selected' : '') + '>App Installs</option>',
+            '<option value="OUTCOME_TRAFFIC"' + (metaCampaignObjective === 'OUTCOME_TRAFFIC' ? ' selected' : '') + '>Traffic (Link Clicks)</option>',
+            '<option value="OUTCOME_SALES"' + (metaCampaignObjective === 'OUTCOME_SALES' ? ' selected' : '') + '>Conversions</option>',
+            '<option value="OUTCOME_APP_PROMOTION"' + (metaCampaignObjective === 'OUTCOME_APP_PROMOTION' ? ' selected' : '') + '>App Installs</option>',
           '</select></div>',
         '</div>',
         '<div style="border-top:1px solid var(--border);padding-top:16px">',
@@ -8823,9 +8832,16 @@ function mcRenderCreatorTab(body) {
           '<div><label style="' + LABEL + '">Landing Page URL <span style="color:var(--muted);font-weight:400;text-transform:none">(auto-filled)</span></label><div style="display:flex;gap:8px"><input id="mc_lp_url" type="text" readonly value="' + escHtml(initLp) + '" style="' + IS + ';flex:1;color:var(--muted);background:rgba(0,0,0,0.5)"></div></div>',
           '<div><label style="' + LABEL + '">UTM Preview <span style="color:var(--muted);font-weight:400;text-transform:none">(auto-built)</span></label><div style="display:flex;gap:8px;align-items:center"><input id="mc_utm_preview" type="text" readonly value="' + escHtml(initUtm) + '" style="' + IS_MONO + ';flex:1;color:var(--muted);background:rgba(0,0,0,0.5);font-size:10px"><button onclick="copyToClipboard(document.getElementById(\'mc_utm_preview\').value,this,ICON_COPY)" style="flex-shrink:0;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card2);color:var(--muted);cursor:pointer;display:flex;align-items:center">' + ICON_COPY + '</button></div></div>',
         '</div>',
-        '<div style="border-top:1px solid var(--border);padding-top:16px;display:flex;gap:10px">',
-          '<button id="mc_create_btn" onclick="createMetaCampaign()" style="flex:1;padding:11px 16px;border-radius:8px;border:1px solid rgba(24,119,242,0.4);background:rgba(24,119,242,0.14);color:#4a9eff;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;letter-spacing:.02em" onmouseenter="this.style.background=\'rgba(24,119,242,0.22)\'" onmouseleave="this.style.background=\'rgba(24,119,242,0.14)\'">Create Campaign via API</button>',
-          '<button onclick="mcCopyConfig()" style="padding:11px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s;white-space:nowrap" onmouseenter="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseleave="this.style.background=\'var(--card2)\'">Copy Config</button>',
+        '<div style="border-top:1px solid var(--border);padding-top:16px;display:flex;flex-direction:column;gap:10px">',
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,165,0,0.25);background:rgba(255,165,0,0.07)">' +
+            '<input type="checkbox" id="mc_launch_active" style="width:14px;height:14px;accent-color:var(--yellow);cursor:pointer">' +
+            '<span style="font-size:12px;font-weight:700;color:var(--yellow)">Launch as ACTIVE</span>' +
+            '<span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px">(unchecked = created PAUSED, safe to review first)</span>' +
+          '</label>',
+          '<div style="display:flex;gap:10px">' +
+            '<button id="mc_create_btn" onclick="createMetaCampaign()" style="flex:1;padding:11px 16px;border-radius:8px;border:1px solid rgba(24,119,242,0.4);background:rgba(24,119,242,0.14);color:#4a9eff;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;letter-spacing:.02em" onmouseenter="this.style.background=\'rgba(24,119,242,0.22)\'" onmouseleave="this.style.background=\'rgba(24,119,242,0.14)\'">Create Campaign via API</button>' +
+            '<button onclick="mcCopyConfig()" style="padding:11px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s;white-space:nowrap" onmouseenter="this.style.background=\'rgba(255,255,255,0.06)\'" onmouseleave="this.style.background=\'var(--card2)\'">Copy Config</button>' +
+          '</div>',
         '</div>',
       '</div>',
     '</div>'
@@ -12571,7 +12587,7 @@ function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
     'GEO data: ' + geoDataStr + '\n\n' +
 
     '## CAMPAIGN STRUCTURE RULES (follow exactly)\n' +
-    '1. LINK_CLICKS objective always — cold accounts need 50+ conv/week before switching\n' +
+    '1. OUTCOME_TRAFFIC objective always — cold accounts need 50+ conv/week before switching to OUTCOME_SALES\n' +
     '2. 1 Ad Set per campaign with FULL campaign budget — never split budget\n' +
     '3. Broad targeting only (no interests), age 21–50\n' +
     '4. Split by GEO cluster for efficient CPM:\n' +
@@ -12604,7 +12620,7 @@ function getAIMetaCampaignConfig(funnel, budget, creativeUrls, perfData) {
     '  "campaigns": [\n' +
     '    {\n' +
     '      "name": "' + funnel + '_{GEOs}_LC_' + today + '",\n' +
-    '      "objective": "LINK_CLICKS",\n' +
+    '      "objective": "OUTCOME_TRAFFIC",\n' +
     '      "budget_per_day": 60,\n' +
     '      "geos": ["DE","AT","CH"],\n' +
     '      "age_min": 21,\n' +
@@ -12699,7 +12715,7 @@ function renderAICampaignPreview(config, funnel, budget, creativeUrls) {
         '</div>' +
         '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
           '<span style="font-size:12px;font-weight:700;color:var(--green);background:rgba(126,191,154,0.12);padding:3px 10px;border-radius:4px">\u20ac' + (camp.budget_per_day || 0) + '/day</span>' +
-          '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.06);color:var(--text)">' + escHtml(camp.objective || 'LINK_CLICKS') + '</span>' +
+          '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(255,255,255,0.06);color:var(--text)">' + escHtml(camp.objective || 'OUTCOME_TRAFFIC') + '</span>' +
           geoBadges +
         '</div>' +
       '</div>' +
@@ -12795,7 +12811,7 @@ function launchAICampaign() {
 
     var p1 = new URLSearchParams({
       name: camp.name || (funnel + '_Camp' + (ci+1)),
-      objective: camp.objective || 'LINK_CLICKS',
+      objective: camp.objective || 'OUTCOME_TRAFFIC',
       status: 'PAUSED',
       special_ad_categories: '[]',
       access_token: token
@@ -12813,7 +12829,7 @@ function launchAICampaign() {
         campaign_id: campId,
         daily_budget: Math.round((camp.budget_per_day || 20) * 100),
         billing_event: 'IMPRESSIONS',
-        optimization_goal: 'LINK_CLICKS',
+        optimization_goal: (camp.objective === 'OUTCOME_SALES') ? 'OFFSITE_CONVERSIONS' : 'LINK_CLICKS',
         bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
         targeting: JSON.stringify({
           geo_locations: { countries: geoCountries },
@@ -12895,7 +12911,7 @@ function launchAICampaign() {
         funnel:     funnel,
         geos:       (r.geos || []).join(', '),
         budget:     r.budget,
-        objective:  'LINK_CLICKS',
+        objective:  'OUTCOME_TRAFFIC',
         adCount:    r.ads.length,
         createdAt:  new Date().toISOString(),
         status:     'PAUSED',
@@ -12950,7 +12966,7 @@ function mcCopyAIConfigToCreator() {
       sv('mc_desc',    ad0.description || '');
       sv('mc_creative', creativeUrls[ad0.creative_index || 0] || '');
       var objEl = document.getElementById('mc_objective');
-      if (objEl) objEl.value = camp0.objective || 'LINK_CLICKS';
+      if (objEl) objEl.value = camp0.objective || 'OUTCOME_TRAFFIC';
       mcUpdateUtmPreview();
     }
   }, 80);
