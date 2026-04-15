@@ -3022,6 +3022,7 @@ var sortDir = 1;    // 1 = desc, -1 = asc
 var currentFunnel = null; // null = Universal
 var metaToken = '';
 var metaAccountId = '';
+var metaPageId = '';
 var tgAdminBotToken = '';   // Cloudflare Worker env — stored in wrangler secrets, not here
 var tgAdminChatId = '';     // Your personal Telegram chat ID for alerts
 var manualSpendEntries = [];
@@ -4617,6 +4618,7 @@ function saveToFirebase() {
       manualSpendEntries: manualSpendEntries,
       metaToken: metaToken,
       metaAccountId: metaAccountId,
+      metaPageId: metaPageId,
       customTrafficSources: customTrafficSources,
       linkHistory: linkHistory,
       funnelPaused: funnelPaused,
@@ -4690,6 +4692,7 @@ DOC_REF.onSnapshot(function(doc) {
       manualSpendEntries = data.manualSpendEntries || [];
       if (data.metaToken) metaToken = data.metaToken;
       if (data.metaAccountId) metaAccountId = data.metaAccountId;
+      if (data.metaPageId) metaPageId = data.metaPageId;
       if (data.customTrafficSources) customTrafficSources = data.customTrafficSources;
       if (data.funnelPaused) funnelPaused = data.funnelPaused;
       if (data.claudeApiKey) claudeApiKey = data.claudeApiKey;
@@ -4826,6 +4829,7 @@ DOC_REF.onSnapshot(function(doc) {
   manualSpendEntries = data.manualSpendEntries || manualSpendEntries;
   if (data.metaToken) metaToken = data.metaToken;
   if (data.metaAccountId) metaAccountId = data.metaAccountId;
+  if (data.metaPageId) metaPageId = data.metaPageId;
   if (data.customTrafficSources) customTrafficSources = data.customTrafficSources;
   if (data.funnelPaused) funnelPaused = data.funnelPaused;
   if (data.claudeApiKey !== undefined) claudeApiKey = data.claudeApiKey;
@@ -6953,6 +6957,10 @@ function renderSettingsPage() {
           '<div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Ad Account ID</label>' +
             '<input id="settings-meta-account" value="' + escHtml(metaAccountId) + '" placeholder="act_123456789" style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none"></div>' +
         '</div>' +
+        '<div style="margin-bottom:14px">' +
+          '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:5px">Facebook Page ID <span style="color:var(--muted);font-weight:400">(required for ad creatives)</span></label>' +
+          '<input id="settings-meta-pageid" value="' + escHtml(metaPageId) + '" placeholder="946854041272203" style="width:100%;max-width:260px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;font-family:var(--font-mono);outline:none">' +
+        '</div>' +
         '<button onclick="saveMetaSettings()" style="background:var(--accent);border:none;border-radius:6px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save Meta Settings</button>' +
         '<span id="metaSaveMsg" style="margin-left:12px;font-size:12px;color:var(--green);display:none">Saved \u2713</span>' +
       '</div>' +
@@ -7196,6 +7204,7 @@ function saveTeamPin() {
 function saveMetaSettings() {
   metaToken = (document.getElementById('settings-meta-token')||{}).value || '';
   metaAccountId = (document.getElementById('settings-meta-account')||{}).value || '';
+  metaPageId = (document.getElementById('settings-meta-pageid')||{}).value || '';
   saveToFirebase();
   var msg = document.getElementById('metaSaveMsg');
   if (msg) { msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 2000); }
@@ -8275,7 +8284,7 @@ function loadMetaCampaigns() {
       'Loading campaigns from Meta API…' +
     '</td></tr>';
 
-  var url = 'https://graph.facebook.com/v19.0/' + encodeURIComponent(accountId) +
+  var url = 'https://graph.facebook.com/v21.0/' + encodeURIComponent(accountId) +
     '/campaigns?fields=id,name,status,daily_budget,objective,spend_cap,insights{spend,impressions,clicks}&limit=50&access_token=' + encodeURIComponent(token);
 
   fetch(url)
@@ -8390,7 +8399,7 @@ function mcToggleCampaign(campaignId, currentStatus) {
   }
 
   var newStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-  var url = 'https://graph.facebook.com/v19.0/' + encodeURIComponent(campaignId) +
+  var url = 'https://graph.facebook.com/v21.0/' + encodeURIComponent(campaignId) +
     '?status=' + newStatus + '&access_token=' + encodeURIComponent(token);
 
   fetch(url, { method: 'POST' })
@@ -8454,7 +8463,7 @@ function createMetaCampaign() {
   var actId = accountId.startsWith('act_') ? accountId : 'act_' + accountId;
 
   // Step 1 — Create Campaign
-  var step1Url = 'https://graph.facebook.com/v19.0/' + actId + '/campaigns';
+  var step1Url = 'https://graph.facebook.com/v21.0/' + actId + '/campaigns';
   var step1Body = new URLSearchParams({
     name:      state.name,
     objective: state.objective,
@@ -8470,7 +8479,7 @@ function createMetaCampaign() {
       var campId = camp.id;
 
       // Step 2 — Create Ad Set
-      var step2Url = 'https://graph.facebook.com/v19.0/' + actId + '/adsets';
+      var step2Url = 'https://graph.facebook.com/v21.0/' + actId + '/adsets';
       var geoCountries = state.geos
         ? state.geos.split(',').map(function(g) { return g.trim().toUpperCase(); }).filter(Boolean)
         : ['US'];
@@ -8497,7 +8506,7 @@ function createMetaCampaign() {
           if (adset.error) throw new Error('Ad Set creation: ' + adset.error.message);
 
           // Step 3 — Create Ad Creative then Ad
-          var step3aUrl = 'https://graph.facebook.com/v19.0/' + actId + '/adcreatives';
+          var step3aUrl = 'https://graph.facebook.com/v21.0/' + actId + '/adcreatives';
           var creativeSpec = {
             link_data: {
               link:    lpUrl,
@@ -8514,7 +8523,7 @@ function createMetaCampaign() {
           var step3aBody = new URLSearchParams({
             name:         state.name + ' — Creative',
             object_story_spec: JSON.stringify({
-              page_id: 'ME',
+              page_id: (typeof metaPageId !== 'undefined' && metaPageId) ? metaPageId : '946854041272203',
               link_data: creativeSpec.link_data
             }),
             access_token: token
@@ -8526,7 +8535,7 @@ function createMetaCampaign() {
               // Creative creation may fail due to page_id; still create the ad record
               var creativeId = (creative && !creative.error) ? creative.id : null;
 
-              var step3bUrl = 'https://graph.facebook.com/v19.0/' + actId + '/ads';
+              var step3bUrl = 'https://graph.facebook.com/v21.0/' + actId + '/ads';
               var step3bPayload = {
                 name:     state.name + ' — Ad',
                 adset_id: adset.id,
@@ -10164,7 +10173,7 @@ function _fetchMetaCampaigns(days) {
     var d = new Date(); d.setDate(d.getDate() - days);
     since = d.toISOString().split('T')[0];
   }
-  var url = 'https://graph.facebook.com/v19.0/act_' + metaAccountId + '/campaigns' +
+  var url = 'https://graph.facebook.com/v21.0/act_' + metaAccountId + '/campaigns' +
     '?fields=name,status,insights{spend,clicks,impressions,ctr,cpc,actions}' +
     '&date_preset=last_' + days + '_days' +
     '&access_token=' + metaToken;
@@ -12792,7 +12801,7 @@ function launchAICampaign() {
       access_token: token
     });
 
-    return fetch('https://graph.facebook.com/v19.0/' + actId + '/campaigns', { method: 'POST', body: p1 })
+    return fetch('https://graph.facebook.com/v21.0/' + actId + '/campaigns', { method: 'POST', body: p1 })
     .then(function(r) { return r.json(); })
     .then(function(campResp) {
       if (campResp.error) throw new Error('Campaign ' + (ci+1) + ': ' + campResp.error.message);
@@ -12815,7 +12824,7 @@ function launchAICampaign() {
         access_token: token
       });
 
-      return fetch('https://graph.facebook.com/v19.0/' + actId + '/adsets', { method: 'POST', body: p2 })
+      return fetch('https://graph.facebook.com/v21.0/' + actId + '/adsets', { method: 'POST', body: p2 })
       .then(function(r) { return r.json(); })
       .then(function(adset) {
         if (adset.error) throw new Error('Ad Set C' + (ci+1) + ': ' + adset.error.message);
@@ -12838,11 +12847,11 @@ function launchAICampaign() {
 
           var p3a = new URLSearchParams({
             name: adConf.name || (funnel + '_Ad' + (i+1)),
-            object_story_spec: JSON.stringify({ page_id: 'ME', link_data: linkData }),
+            object_story_spec: JSON.stringify({ page_id: (typeof metaPageId !== 'undefined' && metaPageId) ? metaPageId : '946854041272203', link_data: linkData }),
             access_token: token
           });
 
-          return fetch('https://graph.facebook.com/v19.0/' + actId + '/adcreatives', { method: 'POST', body: p3a })
+          return fetch('https://graph.facebook.com/v21.0/' + actId + '/adcreatives', { method: 'POST', body: p3a })
           .then(function(r) { return r.json(); })
           .then(function(creative) {
             var creativeId = (creative && !creative.error) ? creative.id : null;
@@ -12853,7 +12862,7 @@ function launchAICampaign() {
               access_token: token
             };
             if (creativeId) p3b_data.creative = JSON.stringify({ creative_id: creativeId });
-            return fetch('https://graph.facebook.com/v19.0/' + actId + '/ads', { method: 'POST', body: new URLSearchParams(p3b_data) })
+            return fetch('https://graph.facebook.com/v21.0/' + actId + '/ads', { method: 'POST', body: new URLSearchParams(p3b_data) })
             .then(function(r) { return r.json(); })
             .then(function(ad) {
               adResults.push({ adId: ad.id || null, creativeId: creativeId, name: adConf.name, angle: adConf.angle });
@@ -13054,7 +13063,7 @@ function runCampaignAudit() {
 function mcFetchAuditData(onProgress) {
   var actId = metaAccountId.startsWith('act_') ? metaAccountId : 'act_' + metaAccountId;
   var tok   = encodeURIComponent(metaToken);
-  var base  = 'https://graph.facebook.com/v19.0/';
+  var base  = 'https://graph.facebook.com/v21.0/';
 
   function apiFetch(url) { return fetch(url).then(function(r){ return r.json(); }); }
 
@@ -13667,7 +13676,7 @@ function applyAutopilotApproved() {
 }
 
 function _applyMetaAction(action) {
-  var base = 'https://graph.facebook.com/v19.0';
+  var base = 'https://graph.facebook.com/v21.0';
   var formData = new URLSearchParams();
   formData.append('access_token', metaToken);
 
@@ -13705,7 +13714,7 @@ function runAutopilotNow() {
 
   var actId = metaAccountId.startsWith('act_') ? metaAccountId : 'act_' + metaAccountId;
   var tok   = encodeURIComponent(metaToken);
-  var base  = 'https://graph.facebook.com/v19.0';
+  var base  = 'https://graph.facebook.com/v21.0';
   var today = new Date().toISOString().slice(0, 10);
 
   Promise.all([
