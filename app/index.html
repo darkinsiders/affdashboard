@@ -2347,6 +2347,11 @@
       </div>
 
       <div class="form-section-label">Access &amp; Contact</div>
+      <div class="form-group">
+        <label class="form-label">Dashboard Login URL</label>
+        <input class="form-input" id="f-dashboardurl" type="url" placeholder="https://track.padrinopartners.com" autocomplete="off">
+        <div class="form-hint">Base URL of the affiliate dashboard (used for auto stats sync)</div>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Username</label>
@@ -2742,7 +2747,7 @@ function setPage(page) {
   } else if (page === 'analytics') {
     var el = document.getElementById('analyticsPage');
     if (el) el.style.display = '';
-    var subLabel = {clicks:'Clicks',performance:'Performance',deals:'Deals',sources:'Sources',roi:'ROI & Spend',overview:'Overview',report:'Reports'}[analyticsTab] || 'Analytics';
+    var subLabel = {clicks:'Clicks',performance:'Performance',deals:'Deals',sources:'Sources',roi:'ROI & Spend',overview:'Overview',report:'Reports',cxstats:'CX Stats'}[analyticsTab] || 'Analytics';
     setNavActive(analyticsTab, 'analytics');
     updateBreadcrumb('Analytics', subLabel);
     renderAnalyticsPage();
@@ -3714,6 +3719,7 @@ function openEditModal(id) {
   document.getElementById('f-bgaming').checked = !!deal.bgaming;
   document.getElementById('f-deposit').value  = deal.deposit;
   document.getElementById('f-revshare').value = deal.revshare;
+  document.getElementById('f-dashboardurl').value = deal.dashboardUrl || '';
   document.getElementById('f-username').value = deal.username || '';
   document.getElementById('f-password').value = deal.password || '';
   document.getElementById('f-contact').value  = deal.contact  || '';
@@ -3734,6 +3740,7 @@ function saveDeal(e) {
   var bgaming  = document.getElementById('f-bgaming').checked;
   var deposit  = parseInt(document.getElementById('f-deposit').value, 10);
   var revshare = parseInt(document.getElementById('f-revshare').value, 10);
+  var dashboardUrl = document.getElementById('f-dashboardurl').value.trim();
   var username = document.getElementById('f-username').value.trim();
   var password = document.getElementById('f-password').value.trim();
   var contact  = document.getElementById('f-contact').value.trim();
@@ -3742,12 +3749,12 @@ function saveDeal(e) {
     var idx = deals.findIndex(function(d) { return d.id === editingId; });
     if (idx !== -1) {
       var existing = deals[idx];
-      deals[idx] = { id: existing.id, name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, username: username, password: password, contact: contact,
+      deals[idx] = { id: existing.id, name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, dashboardUrl: dashboardUrl, username: username, password: password, contact: contact,
         status: existing.status || 'active', dealType: existing.dealType || 'RS', network: getNetworkId(url), cpaAmount: existing.cpaAmount || 0 };
     }
     saveDeals(); closeModal(); render();
   } else {
-    var newDeal = { id: nextId(), name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, username: username, password: password, contact: contact,
+    var newDeal = { id: nextId(), name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, dashboardUrl: dashboardUrl, username: username, password: password, contact: contact,
       status: 'active', dealType: 'RS', network: getNetworkId(url), cpaAmount: 0 };
     deals.push(newDeal);
     saveDeals();
@@ -4924,6 +4931,7 @@ function renderAnalyticsPage() {
         tabBtn('deals', 'Deals') +
         tabBtn('sources', 'Sources') +
         tabBtn('roi', 'ROI') +
+        tabBtn('cxstats', 'CX Stats') +
       '</div>' +
     '</div>' +
     '<div id="analyticsTabBody"></div>';
@@ -4933,6 +4941,194 @@ function renderAnalyticsPage() {
   else if (analyticsTab === 'deals') renderDealsAnalyticsTab();
   else if (analyticsTab === 'sources') renderSourcesTab();
   else if (analyticsTab === 'roi') renderRoiTab();
+  else if (analyticsTab === 'cxstats') renderCxStatsTab();
+}
+
+// ── Analytics: CX Stats Tab ──────────────────────────────────────────────────
+var _cxFilterBrand    = '';
+var _cxFilterCountry  = '';
+var _cxFilterTracking = '';
+var _cxSortCol        = 'Day';
+var _cxSortDir        = -1; // -1 = desc, 1 = asc
+
+function renderCxStatsTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  body.innerHTML = '<div style="padding:40px 32px;color:var(--muted);font-size:13px">Loading affiliate stats...</div>';
+  db.collection('affiliate_stats').doc('current').get().then(function(snap) {
+    if (!snap.exists) {
+      body.innerHTML =
+        '<div style="padding:40px 32px;text-align:center">' +
+          '<div style="font-size:15px;font-weight:600;margin-bottom:8px">No data yet</div>' +
+          '<div style="font-size:13px;color:var(--muted)">Deploy the affiliate-stats-worker and run it once to populate this tab.</div>' +
+        '</div>';
+      return;
+    }
+    var d = snap.data();
+    var allRows = [];
+    var brandsMeta = [];
+    try {
+      var brands = JSON.parse(d.data || '[]');
+      brands.forEach(function(b) {
+        brandsMeta.push({ name: b.dealName, error: b.error || null, count: (b.rows || []).length });
+        (b.rows || []).forEach(function(r) {
+          allRows.push({
+            Day:        r.Day || '',
+            Tracking:   r.Tracking_Code || r['Tracking Code'] || '',
+            Country:    r.Country || '',
+            Brand:      r.Brand || b.dealName || '',
+            Visitors:   parseInt(r.Unique_Visitors || r['Unique Visitors']) || 0,
+            Regs:       parseInt(r.Registrations) || 0,
+            FTDs:       parseInt(r.QFTD) || 0,
+            Commission: parseFloat(r.Commission) || 0,
+          });
+        });
+      });
+    } catch(e) { console.error('CX stats parse error', e); }
+    _renderCxStatsContent(body, allRows, brandsMeta, d.fetchedAt || '', d.monthStart || '', d.today || '');
+  }).catch(function(e) {
+    body.innerHTML = '<div style="padding:32px;color:var(--red)">Error loading stats: ' + escHtml(e.message) + '</div>';
+  });
+}
+
+function _renderCxStatsContent(body, allRows, brandsMeta, fetchedAt, monthStart, today) {
+  // ── Build filter options ────────────────────────────────────────────────
+  var brands    = Array.from(new Set(allRows.map(function(r) { return r.Brand; }))).filter(Boolean).sort();
+  var countries = Array.from(new Set(allRows.map(function(r) { return r.Country; }))).filter(Boolean).sort();
+  var trackings = Array.from(new Set(allRows.map(function(r) { return r.Tracking; }))).filter(Boolean).sort();
+
+  function selOpts(arr, cur) {
+    return '<option value="">All</option>' + arr.map(function(v) {
+      return '<option value="' + escHtml(v) + '"' + (cur === v ? ' selected' : '') + '>' + escHtml(v) + '</option>';
+    }).join('');
+  }
+
+  var selStyle = 'background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;min-width:120px';
+
+  // ── Apply filters ───────────────────────────────────────────────────────
+  var rows = allRows.filter(function(r) {
+    if (_cxFilterBrand    && r.Brand    !== _cxFilterBrand)    return false;
+    if (_cxFilterCountry  && r.Country  !== _cxFilterCountry)  return false;
+    if (_cxFilterTracking && r.Tracking !== _cxFilterTracking) return false;
+    return true;
+  });
+
+  // ── Sort ────────────────────────────────────────────────────────────────
+  rows.sort(function(a, b) {
+    var av = a[_cxSortCol], bv = b[_cxSortCol];
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    return av < bv ? _cxSortDir : av > bv ? -_cxSortDir : 0;
+  });
+
+  // ── Summary totals ──────────────────────────────────────────────────────
+  var totClicks = rows.reduce(function(s, r) { return s + r.Visitors; }, 0);
+  var totRegs   = rows.reduce(function(s, r) { return s + r.Regs; }, 0);
+  var totFTDs   = rows.reduce(function(s, r) { return s + r.FTDs; }, 0);
+  var totComm   = rows.reduce(function(s, r) { return s + r.Commission; }, 0);
+
+  var fetchedStr = fetchedAt ? fetchedAt.slice(0, 16).replace('T', ' ') + ' UTC' : 'never';
+  var periodStr  = monthStart && today ? monthStart + ' → ' + today : 'MTD';
+
+  // ── Build error badges ──────────────────────────────────────────────────
+  var errorBrands = brandsMeta.filter(function(b) { return b.error; });
+  var errorHtml = errorBrands.length
+    ? '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 16px;margin:0 32px 20px;font-size:12px;color:var(--red)">' +
+        '⚠️ Failed to fetch: ' + errorBrands.map(function(b) { return escHtml(b.name) + ' (' + escHtml(b.error) + ')'; }).join(' · ') +
+      '</div>'
+    : '';
+
+  // ── Sortable header helper ──────────────────────────────────────────────
+  function th(col, label) {
+    var active = _cxSortCol === col;
+    var arrow  = active ? (_cxSortDir === -1 ? ' ↓' : ' ↑') : '';
+    return '<th onclick="_cxSortCol=\'' + col + '\';_cxSortDir*=-1;renderCxStatsTab()" style="padding:10px 14px;text-align:' + (col === 'Day' || col === 'Tracking' || col === 'Country' || col === 'Brand' ? 'left' : 'right') + ';font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:' + (active ? 'var(--text)' : 'var(--muted)') + ';cursor:pointer;white-space:nowrap;user-select:none;border-bottom:1px solid var(--border)">' + label + escHtml(arrow) + '</th>';
+  }
+
+  // ── Rows HTML ───────────────────────────────────────────────────────────
+  var rowsHtml = rows.length === 0
+    ? '<tr><td colspan="8" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No data matching filters</td></tr>'
+    : rows.map(function(r) {
+        return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
+          '<td style="padding:9px 14px;font-size:12px;color:var(--muted)">' + escHtml(r.Day.replace(/\//g, '-')) + '</td>' +
+          '<td style="padding:9px 14px;font-size:12px">' + escHtml(r.Tracking || '—') + '</td>' +
+          '<td style="padding:9px 14px;font-size:12px">' + escHtml(r.Country || '—') + '</td>' +
+          '<td style="padding:9px 14px;font-size:12px">' + escHtml(r.Brand || '—') + '</td>' +
+          '<td style="padding:9px 14px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">' + r.Visitors + '</td>' +
+          '<td style="padding:9px 14px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">' + r.Regs + '</td>' +
+          '<td style="padding:9px 14px;font-size:12px;text-align:right;font-weight:' + (r.FTDs > 0 ? '700' : '400') + ';color:' + (r.FTDs > 0 ? 'var(--green)' : 'var(--text)') + ';font-variant-numeric:tabular-nums">' + r.FTDs + '</td>' +
+          '<td style="padding:9px 14px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">€' + r.Commission.toFixed(2) + '</td>' +
+        '</tr>';
+      }).join('');
+
+  body.innerHTML =
+    // ── Header ──
+    '<div style="padding:28px 32px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+      '<div>' +
+        '<div style="font-size:18px;font-weight:700">CX Stats</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:3px">CellXpert affiliate breakdown · ' + escHtml(periodStr) + ' · Last synced: ' + escHtml(fetchedStr) + '</div>' +
+      '</div>' +
+      '<button onclick="renderCxStatsTab()" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text);font-size:12px;cursor:pointer">&#8635; Reload</button>' +
+    '</div>' +
+
+    // ── Error badges ──
+    errorHtml +
+
+    // ── Summary cards ──
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:0 32px 20px">' +
+      _cxStatCard('Clicks', totClicks, 'var(--accent)') +
+      _cxStatCard('Registrations', totRegs, 'var(--yellow)') +
+      _cxStatCard('FTDs', totFTDs, 'var(--green)') +
+      _cxStatCard('Commission', '€' + totComm.toFixed(2), '#a855f7') +
+    '</div>' +
+
+    // ── Filters ──
+    '<div style="padding:0 32px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.6px">Filter:</span>' +
+      '<select onchange="_cxFilterBrand=this.value;renderCxStatsTab()" style="' + selStyle + '">' + selOpts(brands,    _cxFilterBrand)    + '</select>' +
+      '<select onchange="_cxFilterCountry=this.value;renderCxStatsTab()" style="' + selStyle + '">' + selOpts(countries, _cxFilterCountry)  + '</select>' +
+      '<select onchange="_cxFilterTracking=this.value;renderCxStatsTab()" style="' + selStyle + '">' + selOpts(trackings, _cxFilterTracking) + '</select>' +
+      ((_cxFilterBrand || _cxFilterCountry || _cxFilterTracking)
+        ? '<button onclick="_cxFilterBrand=\'\';_cxFilterCountry=\'\';_cxFilterTracking=\'\';renderCxStatsTab()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--muted);font-size:11px;cursor:pointer">✕ Clear</button>'
+        : '') +
+      '<span style="font-size:11px;color:var(--muted);margin-left:auto">' + rows.length + ' row' + (rows.length !== 1 ? 's' : '') + '</span>' +
+    '</div>' +
+
+    // ── Table ──
+    '<div style="padding:0 32px 40px;overflow-x:auto">' +
+      '<table style="width:100%;border-collapse:collapse;font-family:var(--font-body)">' +
+        '<thead>' +
+          '<tr style="border-bottom:1px solid var(--border)">' +
+            th('Day',        'Day') +
+            th('Tracking',   'Tracking Code') +
+            th('Country',    'Country') +
+            th('Brand',      'Brand') +
+            th('Visitors',   'Clicks') +
+            th('Regs',       'Regs') +
+            th('FTDs',       'FTDs') +
+            th('Commission', 'Commission') +
+          '</tr>' +
+        '</thead>' +
+        '<tbody>' + rowsHtml + '</tbody>' +
+        // ── Totals row ──
+        (rows.length > 0
+          ? '<tfoot><tr style="border-top:2px solid var(--border);font-weight:700">' +
+              '<td colspan="4" style="padding:10px 14px;font-size:12px">Total (' + rows.length + ' rows)</td>' +
+              '<td style="padding:10px 14px;font-size:12px;text-align:right">' + totClicks + '</td>' +
+              '<td style="padding:10px 14px;font-size:12px;text-align:right">' + totRegs + '</td>' +
+              '<td style="padding:10px 14px;font-size:12px;text-align:right;color:var(--green)">' + totFTDs + '</td>' +
+              '<td style="padding:10px 14px;font-size:12px;text-align:right">€' + totComm.toFixed(2) + '</td>' +
+            '</tr></tfoot>'
+          : '') +
+      '</table>' +
+    '</div>';
+}
+
+function _cxStatCard(label, value, color) {
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px">' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin-bottom:6px">' + label + '</div>' +
+    '<div style="font-size:24px;font-weight:800;color:' + color + ';font-variant-numeric:tabular-nums">' + value + '</div>' +
+  '</div>';
 }
 
 // ── Analytics: Overview Tab ──────────────────────────────────────────────────
