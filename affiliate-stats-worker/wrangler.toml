@@ -3,7 +3,7 @@ main = "worker.js"
 compatibility_date = "2024-01-01"
 workers_dev = true
 
-[triggers]
-crons = ["0 * * * *"]
-# Runs every hour at :00
-# To change: "0 * * * *" = hourly | "*/30 * * * *" = every 30 min | "0 */2 * * *" = every 2h
+# Cron disabled — PebbleHost Python script handles all brands now
+# The /run-stats endpoint still works for manual testing
+# [triggers]
+# crons = ["0 * * * *"]

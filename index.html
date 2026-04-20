@@ -4950,7 +4950,7 @@ function renderAnalyticsPage() {
   else if (analyticsTab === 'cxstats') renderCxStatsTab();
 }
 
-// ── CX Stats: Advanced Analytics ──────────────────────────────────────────────
+// ── CX Stats: Advanced Analytics v2 ──────────────────────────────────────────
 var _cxFilterBrand    = '';
 var _cxFilterCountry  = '';
 var _cxFilterTracking = '';
@@ -4958,7 +4958,8 @@ var _cxFilterDateFrom = '';
 var _cxFilterDateTo   = '';
 var _cxSortCol        = 'Day';
 var _cxSortDir        = -1;
-var _cxGroupBy        = '';    // '' | 'Day' | 'Brand' | 'Country' | 'Tracking'
+var _cxGroupBy        = '';
+var _cxView           = 'overview'; // 'overview' | 'table'
 var _cxAllRows        = [];
 var _cxBrandsMeta     = [];
 var _cxFetchedAt      = '';
@@ -4966,448 +4967,414 @@ var _cxMonthStart     = '';
 var _cxToday          = '';
 var _cxLoaded         = false;
 
+var _CX_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+
 function renderCxStatsTab() {
   var body = document.getElementById('analyticsTabBody');
   if (!body) return;
-  if (!_cxLoaded) {
-    body.innerHTML = '<div style="padding:40px 32px;color:var(--muted);font-size:13px">Loading affiliate stats...</div>';
-  }
+  if (!_cxLoaded) body.innerHTML = '<div style="padding:40px 32px;color:var(--muted);font-size:13px">Loading affiliate stats...</div>';
   db.collection('affiliate_stats').doc('current').get().then(function(snap) {
-    if (!snap.exists) {
-      body.innerHTML =
-        '<div style="padding:40px 32px;text-align:center">' +
-          '<div style="font-size:15px;font-weight:600;margin-bottom:8px">No data yet</div>' +
-          '<div style="font-size:13px;color:var(--muted)">Deploy the affiliate-stats-worker and run it once to populate this tab.</div>' +
-        '</div>';
-      return;
-    }
+    if (!snap.exists) { body.innerHTML = '<div style="padding:40px 32px;text-align:center"><div style="font-size:15px;font-weight:600;margin-bottom:8px">No data yet</div><div style="font-size:13px;color:var(--muted)">Stats will appear after the first hourly sync.</div></div>'; return; }
     var d = snap.data();
-    _cxAllRows = [];
-    _cxBrandsMeta = [];
+    _cxAllRows = []; _cxBrandsMeta = [];
     try {
-      var brands = JSON.parse(d.data || '[]');
-      brands.forEach(function(b) {
-        _cxBrandsMeta.push({ name: b.dealName, error: b.error || null, count: (b.rows || []).length });
-        (b.rows || []).forEach(function(r) {
+      JSON.parse(d.data || '[]').forEach(function(b) {
+        _cxBrandsMeta.push({ name: b.dealName, error: b.error || null, count: (b.rows||[]).length });
+        (b.rows||[]).forEach(function(r) {
           _cxAllRows.push({
-            Day:        r.Day || '',
-            Tracking:   r.Tracking_Code || r['Tracking Code'] || '',
-            Country:    r.Country || '',
-            Brand:      r.Brand || b.dealName || '',
-            Visitors:   parseInt(r.Unique_Visitors || r['Unique Visitors']) || 0,
-            Regs:       parseInt(r.Registrations) || 0,
-            FTDs:       parseInt(r.QFTD) || 0,
-            Deposits:   parseFloat(r.Deposits) || 0,
-            Commission: parseFloat(r.Commission) || 0,
-            CPA:        parseFloat(r.CPA_Commissions || r['CPA Commissions']) || 0,
-            Revshare:   parseFloat(r.Revshare_Commissions || r['Revshare Commissions']) || 0,
+            Day: r.Day||'', Tracking: r.Tracking_Code||r['Tracking Code']||'', Country: r.Country||'',
+            Brand: r.Brand||b.dealName||'', Visitors: parseInt(r.Unique_Visitors||r['Unique Visitors'])||0,
+            Regs: parseInt(r.Registrations)||0, FTDs: parseInt(r.QFTD)||0, Deposits: parseFloat(r.Deposits)||0,
+            Commission: parseFloat(r.Commission)||0, CPA: parseFloat(r.CPA_Commissions||r['CPA Commissions'])||0,
+            Revshare: parseFloat(r.Revshare_Commissions||r['Revshare Commissions'])||0,
           });
         });
       });
-    } catch(e) { console.error('CX stats parse error', e); }
-    _cxFetchedAt  = d.fetchedAt || '';
-    _cxMonthStart = d.monthStart || '';
-    _cxToday      = d.today || '';
-    _cxLoaded     = true;
-    _cxRender(body);
-  }).catch(function(e) {
-    body.innerHTML = '<div style="padding:32px;color:var(--red)">Error loading stats: ' + escHtml(e.message) + '</div>';
-  });
+    } catch(e) { console.error('CX parse', e); }
+    _cxFetchedAt = d.fetchedAt||''; _cxMonthStart = d.monthStart||''; _cxToday = d.today||'';
+    _cxLoaded = true; _cxRender(body);
+  }).catch(function(e) { body.innerHTML = '<div style="padding:32px;color:var(--red)">Error: '+escHtml(e.message)+'</div>'; });
 }
 
-function _cxRefresh() {
-  var body = document.getElementById('analyticsTabBody');
-  if (body && _cxLoaded) _cxRender(body);
-}
+function _cxRefresh() { var b = document.getElementById('analyticsTabBody'); if (b && _cxLoaded) _cxRender(b); }
 
 function _cxRender(body) {
-  var allRows = _cxAllRows;
+  var all = _cxAllRows;
+  var brands = _cxU(all,'Brand'), countries = _cxU(all,'Country'), trackings = _cxU(all,'Tracking'), days = _cxU(all,'Day').sort();
+  if (!_cxFilterDateFrom && days.length) _cxFilterDateFrom = days[0].replace(/\//g,'-');
+  if (!_cxFilterDateTo && days.length) _cxFilterDateTo = days[days.length-1].replace(/\//g,'-');
 
-  // ── Unique values for filters ──
-  var brands    = _cxUniq(allRows, 'Brand');
-  var countries = _cxUniq(allRows, 'Country');
-  var trackings = _cxUniq(allRows, 'Tracking');
-  var days      = _cxUniq(allRows, 'Day').sort();
-
-  // ── Date range defaults ──
-  if (!_cxFilterDateFrom && days.length) _cxFilterDateFrom = days[0].replace(/\//g, '-');
-  if (!_cxFilterDateTo   && days.length) _cxFilterDateTo   = days[days.length - 1].replace(/\//g, '-');
-
-  // ── Apply filters ──
-  var rows = allRows.filter(function(r) {
-    if (_cxFilterBrand    && r.Brand    !== _cxFilterBrand)    return false;
-    if (_cxFilterCountry  && r.Country  !== _cxFilterCountry)  return false;
+  var rows = all.filter(function(r) {
+    if (_cxFilterBrand && r.Brand !== _cxFilterBrand) return false;
+    if (_cxFilterCountry && r.Country !== _cxFilterCountry) return false;
     if (_cxFilterTracking && r.Tracking !== _cxFilterTracking) return false;
-    if (_cxFilterDateFrom || _cxFilterDateTo) {
-      var d = r.Day.replace(/\//g, '-');
-      if (_cxFilterDateFrom && d < _cxFilterDateFrom) return false;
-      if (_cxFilterDateTo   && d > _cxFilterDateTo)   return false;
-    }
+    if (_cxFilterDateFrom || _cxFilterDateTo) { var d = r.Day.replace(/\//g,'-'); if (_cxFilterDateFrom && d < _cxFilterDateFrom) return false; if (_cxFilterDateTo && d > _cxFilterDateTo) return false; }
     return true;
   });
+  rows.sort(function(a,b) { var av=a[_cxSortCol],bv=b[_cxSortCol]; if(typeof av==='string')av=av.toLowerCase(); if(typeof bv==='string')bv=bv.toLowerCase(); return av<bv?_cxSortDir:av>bv?-_cxSortDir:0; });
 
-  // ── Sort ──
-  rows.sort(function(a, b) {
-    var av = a[_cxSortCol], bv = b[_cxSortCol];
-    if (typeof av === 'string') av = av.toLowerCase();
-    if (typeof bv === 'string') bv = bv.toLowerCase();
-    return av < bv ? _cxSortDir : av > bv ? -_cxSortDir : 0;
-  });
+  var t = _cxT(rows);
+  var c2r = t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0.0';
+  var r2f = t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0.0';
+  var fetchedStr = _cxFetchedAt ? _cxFetchedAt.slice(0,16).replace('T',' ')+' UTC' : 'never';
+  var periodStr = _cxMonthStart && _cxToday ? _cxMonthStart+' to '+_cxToday : 'MTD';
 
-  // ── Totals ──
-  var tot = _cxTotals(rows);
-  var c2r = tot.clicks > 0 ? (tot.regs / tot.clicks * 100).toFixed(1) : '0.0';
-  var r2f = tot.regs > 0 ? (tot.ftds / tot.regs * 100).toFixed(1) : '0.0';
+  var err = _cxBrandsMeta.filter(function(b){return b.error;});
+  var errH = err.length ? '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 16px;margin:0 24px 16px;font-size:12px;color:var(--red)">'+err.map(function(b){return escHtml(b.name);}).join(', ')+' failed to sync</div>' : '';
 
-  var fetchedStr = _cxFetchedAt ? _cxFetchedAt.slice(0, 16).replace('T', ' ') + ' UTC' : 'never';
-  var periodStr  = _cxMonthStart && _cxToday ? _cxMonthStart + ' to ' + _cxToday : 'MTD';
+  var ss='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;min-width:90px';
+  var bs='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text);font-size:12px;cursor:pointer';
+  var ds='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;color-scheme:dark';
 
-  // ── Error badges ──
-  var errorBrands = _cxBrandsMeta.filter(function(b) { return b.error; });
-  var errorHtml = errorBrands.length
-    ? '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 16px;margin:0 32px 16px;font-size:12px;color:var(--red)">' +
-        errorBrands.map(function(b) { return escHtml(b.name) + ' (' + escHtml(b.error) + ')'; }).join(' · ') +
-      '</div>'
-    : '';
+  function so(arr,cur,ph){return '<option value="">'+(ph||'All')+'</option>'+arr.map(function(v){return '<option value="'+escHtml(v)+'"'+(cur===v?' selected':'')+'>'+escHtml(v)+'</option>';}).join('');}
+  function vBtn(v,l){var a=_cxView===v;return '<button onclick="_cxView=\''+v+'\';_cxRefresh()" style="'+bs+';'+(a?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">'+l+'</button>';}
 
-  // ── Build HTML ──
-  var selStyle = 'background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;min-width:100px';
-  var btnStyle = 'background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text);font-size:12px;cursor:pointer';
-  var dateStyle = 'background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;color-scheme:dark';
-
-  function selOpts(arr, cur, placeholder) {
-    return '<option value="">' + (placeholder || 'All') + '</option>' + arr.map(function(v) {
-      return '<option value="' + escHtml(v) + '"' + (cur === v ? ' selected' : '') + '>' + escHtml(v) + '</option>';
-    }).join('');
-  }
-
-  function gbBtn(val, label) {
-    var active = _cxGroupBy === val;
-    return '<button onclick="_cxGroupBy=\'' + val + '\';_cxRefresh()" style="' + btnStyle + ';' + (active ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : '') + '">' + label + '</button>';
-  }
-
-  var html = '';
-
+  var h = '';
   // ── Header ──
-  html += '<div style="padding:24px 32px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">' +
-    '<div>' +
-      '<div style="font-size:20px;font-weight:700">CX Stats</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-top:3px">CellXpert affiliate breakdown &middot; ' + escHtml(periodStr) + ' &middot; Synced: ' + escHtml(fetchedStr) + '</div>' +
-    '</div>' +
-    '<div style="display:flex;gap:8px">' +
-      '<button onclick="_cxExportCSV()" style="' + btnStyle + '">Export CSV</button>' +
-      '<button onclick="_cxLoaded=false;renderCxStatsTab()" style="' + btnStyle + '">&#8635; Reload</button>' +
-    '</div>' +
+  h += '<div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">' +
+    '<div><div style="font-size:20px;font-weight:700">CX Stats</div><div style="font-size:12px;color:var(--muted);margin-top:2px">'+escHtml(periodStr)+' &middot; Synced: '+escHtml(fetchedStr)+'</div></div>' +
+    '<div style="display:flex;gap:6px">'+vBtn('overview','Overview')+vBtn('table','Data Table')+'<button onclick="_cxExportCSV()" style="'+bs+'">Export CSV</button><button onclick="_cxLoaded=false;renderCxStatsTab()" style="'+bs+'">&#8635;</button></div></div>';
+  h += errH;
+
+  // ── KPI Cards ──
+  h += '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:0 24px 16px">' +
+    _cxKPI('Clicks',_cxF(t.clicks),'var(--accent)','') + _cxKPI('Registrations',_cxF(t.regs),'var(--yellow)','') +
+    _cxKPI('FTDs',_cxF(t.ftds),'var(--green)','') + _cxKPI('Commission','\u20AC'+_cxF(t.comm,2),'#a855f7','') +
+    _cxKPI('Click\u2192Reg',c2r+'%','var(--accent)','C2R') + _cxKPI('Reg\u2192FTD',r2f+'%','var(--green)','R2F') +
   '</div>';
 
-  // ── Errors ──
-  html += errorHtml;
+  // ── Filters ──
+  h += '<div style="padding:0 24px 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+    '<input type="date" value="'+(_cxFilterDateFrom||'').replace(/\//g,'-')+'" onchange="_cxFilterDateFrom=this.value;_cxRefresh()" style="'+ds+'">' +
+    '<span style="color:var(--muted);font-size:11px">to</span>' +
+    '<input type="date" value="'+(_cxFilterDateTo||'').replace(/\//g,'-')+'" onchange="_cxFilterDateTo=this.value;_cxRefresh()" style="'+ds+'">' +
+    '<span style="width:1px;height:18px;background:var(--border);margin:0 2px"></span>' +
+    '<select onchange="_cxFilterBrand=this.value;_cxRefresh()" style="'+ss+'">'+so(brands,_cxFilterBrand,'All Brands')+'</select>' +
+    '<select onchange="_cxFilterCountry=this.value;_cxRefresh()" style="'+ss+'">'+so(countries,_cxFilterCountry,'All Countries')+'</select>' +
+    '<select onchange="_cxFilterTracking=this.value;_cxRefresh()" style="'+ss+'">'+so(trackings,_cxFilterTracking,'All Tracking')+'</select>' +
+    ((_cxFilterBrand||_cxFilterCountry||_cxFilterTracking)?'<button onclick="_cxFilterBrand=\'\';_cxFilterCountry=\'\';_cxFilterTracking=\'\';_cxRefresh()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);font-size:11px;cursor:pointer">Clear</button>':'') +
+    '<span style="margin-left:auto;font-size:11px;color:var(--muted)">'+rows.length+' rows</span></div>';
 
-  // ── Summary cards ──
-  html += '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:0 32px 16px">' +
-    _cxStatCard('Clicks', _cxFmtNum(tot.clicks), 'var(--accent)') +
-    _cxStatCard('Registrations', _cxFmtNum(tot.regs), 'var(--yellow)') +
-    _cxStatCard('FTDs', _cxFmtNum(tot.ftds), 'var(--green)') +
-    _cxStatCard('Commission', '\u20AC' + _cxFmtNum(tot.comm, 2), '#a855f7') +
-    _cxStatCard('C2R %', c2r + '%', 'var(--accent)') +
-    _cxStatCard('R2F %', r2f + '%', 'var(--green)') +
-  '</div>';
-
-  // ── Brand breakdown cards ──
-  var brandTots = _cxGroupTotals(rows, 'Brand');
-  if (brandTots.length > 1) {
-    html += '<div style="padding:0 32px 16px;display:flex;gap:8px;flex-wrap:wrap">';
-    brandTots.forEach(function(bt) {
-      var bc2r = bt.clicks > 0 ? (bt.regs / bt.clicks * 100).toFixed(1) : '0';
-      html += '<div onclick="_cxFilterBrand=(_cxFilterBrand===\'' + escHtml(bt.key) + '\'?\'\':' + '\'' + escHtml(bt.key) + '\'' + ');_cxRefresh()" style="background:var(--card);border:1px solid ' + (_cxFilterBrand === bt.key ? 'var(--accent)' : 'var(--border)') + ';border-radius:8px;padding:10px 14px;cursor:pointer;min-width:140px;transition:border-color 0.15s">' +
-        '<div style="font-size:11px;font-weight:700;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">' + escHtml(bt.key) + '</div>' +
-        '<div style="display:flex;gap:12px;font-size:12px;font-variant-numeric:tabular-nums">' +
-          '<span style="color:var(--accent)">' + bt.clicks + ' clicks</span>' +
-          '<span style="color:var(--green)">' + bt.ftds + ' FTDs</span>' +
-          '<span style="color:var(--muted)">' + bc2r + '% C2R</span>' +
-        '</div>' +
-      '</div>';
-    });
-    html += '</div>';
-  }
-
-  // ── Daily trend chart ──
-  html += _cxDailyChart(rows);
-
-  // ── Filters row ──
-  html += '<div style="padding:0 32px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-    '<span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Date:</span>' +
-    '<input type="date" value="' + (_cxFilterDateFrom || '').replace(/\//g,'-') + '" onchange="_cxFilterDateFrom=this.value;_cxRefresh()" style="' + dateStyle + '">' +
-    '<span style="color:var(--muted);font-size:12px">to</span>' +
-    '<input type="date" value="' + (_cxFilterDateTo || '').replace(/\//g,'-') + '" onchange="_cxFilterDateTo=this.value;_cxRefresh()" style="' + dateStyle + '">' +
-    '<span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>' +
-    '<select onchange="_cxFilterBrand=this.value;_cxRefresh()" style="' + selStyle + '">' + selOpts(brands, _cxFilterBrand, 'All Brands') + '</select>' +
-    '<select onchange="_cxFilterCountry=this.value;_cxRefresh()" style="' + selStyle + '">' + selOpts(countries, _cxFilterCountry, 'All Countries') + '</select>' +
-    '<select onchange="_cxFilterTracking=this.value;_cxRefresh()" style="' + selStyle + '">' + selOpts(trackings, _cxFilterTracking, 'All Tracking') + '</select>' +
-    ((_cxFilterBrand || _cxFilterCountry || _cxFilterTracking)
-      ? '<button onclick="_cxFilterBrand=\'\';_cxFilterCountry=\'\';_cxFilterTracking=\'\';_cxRefresh()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--muted);font-size:11px;cursor:pointer">Clear</button>'
-      : '') +
-    '<span style="margin-left:auto;font-size:11px;color:var(--muted)">' + rows.length + ' row' + (rows.length !== 1 ? 's' : '') + '</span>' +
-  '</div>';
-
-  // ── Group-by bar ──
-  html += '<div style="padding:0 32px 12px;display:flex;gap:6px;align-items:center">' +
-    '<span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Group by:</span>' +
-    gbBtn('', 'None') +
-    gbBtn('Day', 'Day') +
-    gbBtn('Brand', 'Brand') +
-    gbBtn('Country', 'Country') +
-    gbBtn('Tracking', 'Tracking') +
-  '</div>';
-
-  // ── Table ──
-  if (_cxGroupBy) {
-    html += _cxGroupedTable(rows);
+  if (_cxView === 'overview') {
+    h += _cxOverview(rows, t);
   } else {
-    html += _cxDetailTable(rows, tot);
+    h += _cxTableView(rows, t);
   }
-
-  body.innerHTML = html;
+  body.innerHTML = h;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// OVERVIEW VIEW
+// ══════════════════════════════════════════════════════════════════════════════
 
-function _cxUniq(arr, key) {
-  return Array.from(new Set(arr.map(function(r) { return r[key]; }))).filter(Boolean).sort();
+function _cxOverview(rows, t) {
+  var h = '';
+
+  // ── Conversion Funnel ──
+  h += '<div style="padding:0 24px 16px"><div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 24px">' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:16px">Conversion Funnel</div>' +
+    _cxFunnel(t.clicks, t.regs, t.ftds) +
+  '</div></div>';
+
+  // ── Charts row: Daily Trend + Brand Breakdown ──
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 16px">';
+  h += _cxDailyChart(rows);
+  h += _cxBrandDonut(rows, t);
+  h += '</div>';
+
+  // ── Second row: Top Countries + Top Tracking Codes ──
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 16px">';
+  h += _cxTopBarChart(rows, 'Country', 'Top Countries', 8);
+  h += _cxTopBarChart(rows, 'Tracking', 'Top Tracking Codes', 8);
+  h += '</div>';
+
+  // ── Performance Insights ──
+  h += _cxInsights(rows);
+
+  // ── Brand Performance Table ──
+  h += _cxBrandTable(rows, t);
+
+  return h;
 }
 
-function _cxTotals(rows) {
-  var clicks = 0, regs = 0, ftds = 0, comm = 0, deps = 0;
-  rows.forEach(function(r) { clicks += r.Visitors; regs += r.Regs; ftds += r.FTDs; comm += r.Commission; deps += r.Deposits; });
-  return { clicks: clicks, regs: regs, ftds: ftds, comm: comm, deps: deps };
-}
-
-function _cxFmtNum(n, dec) {
-  if (dec !== undefined) return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-}
-
-function _cxGroupTotals(rows, key) {
-  var map = {};
-  rows.forEach(function(r) {
-    var k = r[key] || '(empty)';
-    if (!map[k]) map[k] = { key: k, clicks: 0, regs: 0, ftds: 0, comm: 0 };
-    map[k].clicks += r.Visitors; map[k].regs += r.Regs; map[k].ftds += r.FTDs; map[k].comm += r.Commission;
-  });
-  return Object.values(map).sort(function(a, b) { return b.clicks - a.clicks; });
-}
-
-function _cxStatCard(label, value, color) {
-  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:4px">' + label + '</div>' +
-    '<div style="font-size:22px;font-weight:800;color:' + color + ';font-variant-numeric:tabular-nums">' + value + '</div>' +
+// ── Conversion Funnel ──
+function _cxFunnel(clicks, regs, ftds) {
+  var c2r = clicks > 0 ? (regs/clicks*100).toFixed(1) : '0';
+  var r2f = regs > 0 ? (ftds/regs*100).toFixed(1) : '0';
+  var c2f = clicks > 0 ? (ftds/clicks*100).toFixed(2) : '0';
+  var maxW = 100;
+  var rW = clicks > 0 ? Math.max(8, regs/clicks*100) : 8;
+  var fW = clicks > 0 ? Math.max(4, ftds/clicks*100) : 4;
+  return '<div style="display:flex;align-items:center;gap:0">' +
+    // Clicks bar
+    '<div style="flex:1;text-align:center">' +
+      '<div style="background:var(--accent);border-radius:8px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 2px">' +
+        '<span style="color:#fff;font-weight:800;font-size:18px">'+_cxF(clicks)+'</span></div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:600">CLICKS</div></div>' +
+    // Arrow + C2R
+    '<div style="padding:0 8px;text-align:center;flex:0 0 60px">' +
+      '<div style="font-size:14px;font-weight:800;color:var(--accent)">'+c2r+'%</div>' +
+      '<div style="color:var(--muted);font-size:16px">\u2192</div></div>' +
+    // Regs bar
+    '<div style="flex:0 0 '+rW+'%;min-width:60px;text-align:center">' +
+      '<div style="background:var(--yellow);border-radius:8px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 2px">' +
+        '<span style="color:#000;font-weight:800;font-size:18px">'+_cxF(regs)+'</span></div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:600">REGS</div></div>' +
+    // Arrow + R2F
+    '<div style="padding:0 8px;text-align:center;flex:0 0 60px">' +
+      '<div style="font-size:14px;font-weight:800;color:var(--green)">'+r2f+'%</div>' +
+      '<div style="color:var(--muted);font-size:16px">\u2192</div></div>' +
+    // FTDs bar
+    '<div style="flex:0 0 '+fW+'%;min-width:50px;text-align:center">' +
+      '<div style="background:var(--green);border-radius:8px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 2px">' +
+        '<span style="color:#fff;font-weight:800;font-size:18px">'+_cxF(ftds)+'</span></div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:600">FTDs</div></div>' +
+    // Overall C2F
+    '<div style="padding:0 0 0 16px;text-align:center;flex:0 0 70px;border-left:1px solid var(--border);margin-left:12px">' +
+      '<div style="font-size:20px;font-weight:800;color:#a855f7">'+c2f+'%</div>' +
+      '<div style="font-size:9px;color:var(--muted);font-weight:600">CLICK\u2192FTD</div></div>' +
   '</div>';
 }
 
-// ── Sortable header ──
-function _cxTh(col, label, align) {
-  var active = _cxSortCol === col;
-  var arrow  = active ? (_cxSortDir === -1 ? ' \u2193' : ' \u2191') : '';
-  var al = align || (col === 'Day' || col === 'Tracking' || col === 'Country' || col === 'Brand' ? 'left' : 'right');
-  return '<th onclick="_cxSortCol=\'' + col + '\';_cxSortDir*=-1;_cxRefresh()" style="padding:10px 12px;text-align:' + al + ';font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:' + (active ? 'var(--text)' : 'var(--muted)') + ';cursor:pointer;white-space:nowrap;user-select:none;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card)">' + label + escHtml(arrow) + '</th>';
-}
-
-// ── Detail table ──
-function _cxDetailTable(rows, tot) {
-  var rh = rows.length === 0
-    ? '<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No data matching filters</td></tr>'
-    : rows.map(function(r) {
-        var c2r = r.Visitors > 0 ? (r.Regs / r.Visitors * 100).toFixed(1) : '-';
-        var r2f = r.Regs > 0 ? (r.FTDs / r.Regs * 100).toFixed(1) : '-';
-        return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
-          '<td style="padding:8px 12px;font-size:12px;color:var(--muted);white-space:nowrap">' + escHtml(r.Day.replace(/\//g, '-')) + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px">' + escHtml(r.Tracking || '\u2014') + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px">' + escHtml(r.Country || '\u2014') + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px">' + escHtml(r.Brand || '\u2014') + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">' + r.Visitors + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">' + r.Regs + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-weight:' + (r.FTDs > 0 ? '700' : '400') + ';color:' + (r.FTDs > 0 ? 'var(--green)' : 'var(--text)') + ';font-variant-numeric:tabular-nums">' + r.FTDs + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">\u20AC' + r.Commission.toFixed(2) + '</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums">' + c2r + '%</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums">' + r2f + '%</td>' +
-        '</tr>';
-      }).join('');
-
-  return '<div style="padding:0 32px 40px;overflow-x:auto;max-height:600px;overflow-y:auto">' +
-    '<table style="width:100%;border-collapse:collapse">' +
-      '<thead>' +
-        '<tr>' +
-          _cxTh('Day', 'Day') +
-          _cxTh('Tracking', 'Tracking') +
-          _cxTh('Country', 'Country') +
-          _cxTh('Brand', 'Brand') +
-          _cxTh('Visitors', 'Clicks') +
-          _cxTh('Regs', 'Regs') +
-          _cxTh('FTDs', 'FTDs') +
-          _cxTh('Commission', 'Commission') +
-          _cxTh('_c2r', 'C2R%') +
-          _cxTh('_r2f', 'R2F%') +
-        '</tr>' +
-      '</thead>' +
-      '<tbody>' + rh + '</tbody>' +
-      (rows.length > 0
-        ? '<tfoot><tr style="border-top:2px solid var(--border);font-weight:700">' +
-            '<td colspan="4" style="padding:10px 12px;font-size:12px">Total (' + rows.length + ' rows)</td>' +
-            '<td style="padding:10px 12px;font-size:12px;text-align:right">' + _cxFmtNum(tot.clicks) + '</td>' +
-            '<td style="padding:10px 12px;font-size:12px;text-align:right">' + _cxFmtNum(tot.regs) + '</td>' +
-            '<td style="padding:10px 12px;font-size:12px;text-align:right;color:var(--green)">' + _cxFmtNum(tot.ftds) + '</td>' +
-            '<td style="padding:10px 12px;font-size:12px;text-align:right">\u20AC' + _cxFmtNum(tot.comm, 2) + '</td>' +
-            '<td style="padding:10px 12px;font-size:12px;text-align:right">' + (tot.clicks > 0 ? (tot.regs/tot.clicks*100).toFixed(1) : '0') + '%</td>' +
-            '<td style="padding:10px 12px;font-size:12px;text-align:right">' + (tot.regs > 0 ? (tot.ftds/tot.regs*100).toFixed(1) : '0') + '%</td>' +
-          '</tr></tfoot>'
-        : '') +
-    '</table>' +
-  '</div>';
-}
-
-// ── Grouped table ──
-function _cxGroupedTable(rows) {
-  var groups = _cxGroupTotals(rows, _cxGroupBy);
-  // Sort groups
-  groups.sort(function(a, b) {
-    var av = a[_cxSortCol === _cxGroupBy ? 'key' : (_cxSortCol === 'Visitors' ? 'clicks' : _cxSortCol === 'Regs' ? 'regs' : _cxSortCol === 'FTDs' ? 'ftds' : _cxSortCol === 'Commission' ? 'comm' : 'key')];
-    var bv = b[_cxSortCol === _cxGroupBy ? 'key' : (_cxSortCol === 'Visitors' ? 'clicks' : _cxSortCol === 'Regs' ? 'regs' : _cxSortCol === 'FTDs' ? 'ftds' : _cxSortCol === 'Commission' ? 'comm' : 'key')];
-    if (typeof av === 'string') { av = av.toLowerCase(); bv = (bv||'').toLowerCase(); }
-    return av < bv ? _cxSortDir : av > bv ? -_cxSortDir : 0;
-  });
-
-  var tot = _cxTotals(rows);
-  var rh = groups.map(function(g) {
-    var c2r = g.clicks > 0 ? (g.regs / g.clicks * 100).toFixed(1) : '-';
-    var r2f = g.regs > 0 ? (g.ftds / g.regs * 100).toFixed(1) : '-';
-    var pct = tot.clicks > 0 ? (g.clicks / tot.clicks * 100).toFixed(0) : 0;
-    return '<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
-      '<td style="padding:10px 12px;font-size:13px;font-weight:600">' + escHtml(g.key) + '</td>' +
-      '<td style="padding:10px 12px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums">' + _cxFmtNum(g.clicks) + '</td>' +
-      '<td style="padding:10px 12px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums">' + _cxFmtNum(g.regs) + '</td>' +
-      '<td style="padding:10px 12px;font-size:13px;text-align:right;font-weight:' + (g.ftds > 0 ? '700' : '400') + ';color:' + (g.ftds > 0 ? 'var(--green)' : 'var(--text)') + ';font-variant-numeric:tabular-nums">' + _cxFmtNum(g.ftds) + '</td>' +
-      '<td style="padding:10px 12px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums">\u20AC' + _cxFmtNum(g.comm, 2) + '</td>' +
-      '<td style="padding:10px 12px;font-size:12px;text-align:right;color:var(--muted)">' + c2r + '%</td>' +
-      '<td style="padding:10px 12px;font-size:12px;text-align:right;color:var(--muted)">' + r2f + '%</td>' +
-      '<td style="padding:10px 12px;width:120px"><div style="background:var(--card2);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;background:var(--accent);width:' + pct + '%"></div></div></td>' +
-    '</tr>';
-  }).join('');
-
-  return '<div style="padding:0 32px 40px;overflow-x:auto">' +
-    '<table style="width:100%;border-collapse:collapse">' +
-      '<thead><tr>' +
-        _cxTh(_cxGroupBy, _cxGroupBy, 'left') +
-        _cxTh('Visitors', 'Clicks') +
-        _cxTh('Regs', 'Regs') +
-        _cxTh('FTDs', 'FTDs') +
-        _cxTh('Commission', 'Commission') +
-        '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border)">C2R%</th>' +
-        '<th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border)">R2F%</th>' +
-        '<th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border)">Share</th>' +
-      '</tr></thead>' +
-      '<tbody>' + rh + '</tbody>' +
-      '<tfoot><tr style="border-top:2px solid var(--border);font-weight:700">' +
-        '<td style="padding:10px 12px;font-size:12px">Total (' + groups.length + ')</td>' +
-        '<td style="padding:10px 12px;font-size:12px;text-align:right">' + _cxFmtNum(tot.clicks) + '</td>' +
-        '<td style="padding:10px 12px;font-size:12px;text-align:right">' + _cxFmtNum(tot.regs) + '</td>' +
-        '<td style="padding:10px 12px;font-size:12px;text-align:right;color:var(--green)">' + _cxFmtNum(tot.ftds) + '</td>' +
-        '<td style="padding:10px 12px;font-size:12px;text-align:right">\u20AC' + _cxFmtNum(tot.comm, 2) + '</td>' +
-        '<td style="padding:10px 12px;font-size:12px;text-align:right">' + (tot.clicks > 0 ? (tot.regs/tot.clicks*100).toFixed(1) : '0') + '%</td>' +
-        '<td style="padding:10px 12px;font-size:12px;text-align:right">' + (tot.regs > 0 ? (tot.ftds/tot.regs*100).toFixed(1) : '0') + '%</td>' +
-        '<td></td>' +
-      '</tr></tfoot>' +
-    '</table>' +
-  '</div>';
-}
-
-// ── Daily trend chart (inline SVG) ──
+// ── Daily Trend Chart ──
 function _cxDailyChart(rows) {
-  // Aggregate by day
-  var dayMap = {};
-  rows.forEach(function(r) {
-    var d = r.Day.replace(/\//g, '-');
-    if (!dayMap[d]) dayMap[d] = { clicks: 0, regs: 0, ftds: 0 };
-    dayMap[d].clicks += r.Visitors;
-    dayMap[d].regs   += r.Regs;
-    dayMap[d].ftds   += r.FTDs;
-  });
-  var dayKeys = Object.keys(dayMap).sort();
-  if (dayKeys.length < 2) return '';
+  var dm = {};
+  rows.forEach(function(r) { var d=r.Day.replace(/\//g,'-'); if(!dm[d])dm[d]={c:0,r:0,f:0}; dm[d].c+=r.Visitors; dm[d].r+=r.Regs; dm[d].f+=r.FTDs; });
+  var dk = Object.keys(dm).sort();
+  if (dk.length < 2) return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;color:var(--muted);font-size:12px">Not enough daily data for chart</div>';
 
-  var maxC = Math.max.apply(null, dayKeys.map(function(k) { return dayMap[k].clicks; })) || 1;
-  var W = 800, H = 160, PX = 40, PY = 16, PB = 24;
-  var usableW = W - PX * 2;
-  var usableH = H - PY - PB;
-  var step = usableW / Math.max(1, dayKeys.length - 1);
+  var maxC = Math.max.apply(null,dk.map(function(k){return dm[k].c;}))||1;
+  var W=700,H=180,PX=8,PY=12,PB=22;
+  var uW=W-PX*2, uH=H-PY-PB, step=uW/Math.max(1,dk.length-1);
 
-  // Build polyline points for clicks
-  var clickPts = dayKeys.map(function(k, i) {
-    return (PX + i * step).toFixed(1) + ',' + (PY + usableH - Math.round(dayMap[k].clicks / maxC * usableH)).toFixed(1);
-  }).join(' ');
+  var cPts=dk.map(function(k,i){return (PX+i*step).toFixed(1)+','+(PY+uH-Math.round(dm[k].c/maxC*uH)).toFixed(1);}).join(' ');
+  var rPts=dk.map(function(k,i){return (PX+i*step).toFixed(1)+','+(PY+uH-Math.round(dm[k].r/maxC*uH)).toFixed(1);}).join(' ');
 
-  // Build bar rects for FTDs
-  var barW = Math.max(4, Math.min(20, step * 0.5));
-  var ftdBars = dayKeys.map(function(k, i) {
-    var ftds = dayMap[k].ftds;
-    if (ftds === 0) return '';
-    var bh = Math.max(3, Math.round(ftds / maxC * usableH));
-    var bx = PX + i * step - barW / 2;
-    var by = PY + usableH - bh;
-    return '<rect x="' + bx.toFixed(1) + '" y="' + by + '" width="' + barW + '" height="' + bh + '" fill="var(--green)" opacity="0.6" rx="2"/>';
-  }).join('');
+  var barW=Math.max(3,Math.min(16,step*0.4));
+  var fBars=dk.map(function(k,i){var f=dm[k].f;if(!f)return '';var bh=Math.max(3,Math.round(f/maxC*uH));return '<rect x="'+(PX+i*step-barW/2).toFixed(1)+'" y="'+(PY+uH-bh)+'" width="'+barW+'" height="'+bh+'" fill="var(--green)" opacity="0.5" rx="2"/>';}).join('');
 
-  // Fill area under clicks line
-  var firstPt = PX + ',' + (PY + usableH);
-  var lastPt = (PX + (dayKeys.length - 1) * step) + ',' + (PY + usableH);
-  var areaPath = 'M ' + firstPt + ' L ' + clickPts.split(' ').join(' L ') + ' L ' + lastPt + ' Z';
+  var fp=PX+','+(PY+uH); var lp=(PX+(dk.length-1)*step)+','+(PY+uH);
+  var area='M '+fp+' L '+cPts.split(' ').join(' L ')+' L '+lp+' Z';
+  var ls=Math.max(1,Math.ceil(dk.length/7));
+  var labs=dk.map(function(k,i){if(i%ls!==0&&i!==dk.length-1)return '';return '<text x="'+(PX+i*step).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle" fill="var(--muted)" font-size="8.5">'+k.slice(5)+'</text>';}).join('');
 
-  // X-axis labels (show ~8 labels max)
-  var labelStep = Math.max(1, Math.ceil(dayKeys.length / 8));
-  var labels = dayKeys.map(function(k, i) {
-    if (i % labelStep !== 0 && i !== dayKeys.length - 1) return '';
-    var x = PX + i * step;
-    var label = k.slice(5); // MM-DD
-    return '<text x="' + x.toFixed(1) + '" y="' + (H - 4) + '" text-anchor="middle" fill="var(--muted)" font-size="9">' + label + '</text>';
-  }).join('');
+  // Tooltips — hover dots
+  var dots = dk.map(function(k,i){var x=PX+i*step,y=PY+uH-Math.round(dm[k].c/maxC*uH);return '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3" fill="var(--accent)" opacity="0"><title>'+k+' | '+dm[k].c+' clicks, '+dm[k].r+' regs, '+dm[k].f+' FTDs</title></circle>';}).join('');
 
-  return '<div style="padding:0 32px 16px">' +
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">Daily Trend</span>' +
-        '<div style="display:flex;gap:14px;font-size:10px">' +
-          '<span><span style="display:inline-block;width:8px;height:2px;background:var(--accent);vertical-align:middle;margin-right:4px;border-radius:1px"></span>Clicks</span>' +
-          '<span><span style="display:inline-block;width:8px;height:8px;background:var(--green);opacity:0.6;vertical-align:middle;margin-right:4px;border-radius:2px"></span>FTDs</span>' +
-        '</div>' +
-      '</div>' +
-      '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' +
-        '<defs><linearGradient id="cxArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.15"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
-        '<path d="' + areaPath + '" fill="url(#cxArea)"/>' +
-        '<polyline points="' + clickPts + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
-        ftdBars +
-        labels +
-      '</svg>' +
-    '</div>' +
-  '</div>';
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">Daily Trend</span>' +
+      '<div style="display:flex;gap:12px;font-size:9px;color:var(--muted)">' +
+        '<span style="display:flex;align-items:center;gap:3px"><span style="width:10px;height:2px;background:var(--accent);border-radius:1px"></span>Clicks</span>' +
+        '<span style="display:flex;align-items:center;gap:3px"><span style="width:10px;height:2px;background:var(--yellow);border-radius:1px"></span>Regs</span>' +
+        '<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:var(--green);opacity:0.5;border-radius:2px"></span>FTDs</span></div></div>' +
+    '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">' +
+      '<defs><linearGradient id="cxA2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.12"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
+      '<path d="'+area+'" fill="url(#cxA2)"/>' +
+      '<polyline points="'+cPts+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<polyline points="'+rPts+'" fill="none" stroke="var(--yellow)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4,3"/>' +
+      fBars + labs + dots +
+    '</svg></div>';
 }
 
-// ── CSV Export ──
-function _cxExportCSV() {
-  var rows = _cxAllRows;
-  if (!rows.length) return;
-  var header = 'Day,Tracking,Country,Brand,Clicks,Registrations,FTDs,Commission,C2R%,R2F%';
-  var lines = rows.map(function(r) {
-    var c2r = r.Visitors > 0 ? (r.Regs / r.Visitors * 100).toFixed(1) : '0';
-    var r2f = r.Regs > 0 ? (r.FTDs / r.Regs * 100).toFixed(1) : '0';
-    return [r.Day, r.Tracking, r.Country, r.Brand, r.Visitors, r.Regs, r.FTDs, r.Commission.toFixed(2), c2r, r2f].map(function(v) {
-      return '"' + String(v).replace(/"/g, '""') + '"';
-    }).join(',');
+// ── Brand Donut Chart ──
+function _cxBrandDonut(rows, tot) {
+  var bg = _cxGT(rows,'Brand');
+  if (bg.length === 0) return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;color:var(--muted);font-size:12px">No brand data</div>';
+
+  var cx=80,cy=80,R=65,r=42;
+  var total = bg.reduce(function(s,b){return s+b.clicks;},0)||1;
+  var angle = -Math.PI/2;
+  var arcs = '';
+  var legend = '';
+  bg.forEach(function(b,i) {
+    var pct = b.clicks/total;
+    var a1 = angle, a2 = angle + pct*2*Math.PI;
+    var large = pct > 0.5 ? 1 : 0;
+    var x1o=cx+R*Math.cos(a1),y1o=cy+R*Math.sin(a1),x2o=cx+R*Math.cos(a2),y2o=cy+R*Math.sin(a2);
+    var x1i=cx+r*Math.cos(a2),y1i=cy+r*Math.sin(a2),x2i=cx+r*Math.cos(a1),y2i=cy+r*Math.sin(a1);
+    var col = _CX_COLORS[i%_CX_COLORS.length];
+    if (pct > 0.001) arcs += '<path d="M'+x1o.toFixed(1)+','+y1o.toFixed(1)+' A'+R+','+R+' 0 '+large+' 1 '+x2o.toFixed(1)+','+y2o.toFixed(1)+' L'+x1i.toFixed(1)+','+y1i.toFixed(1)+' A'+r+','+r+' 0 '+large+' 0 '+x2i.toFixed(1)+','+y2i.toFixed(1)+'Z" fill="'+col+'"><title>'+b.key+': '+b.clicks+' clicks ('+(pct*100).toFixed(1)+'%)</title></path>';
+    var bc2r = b.clicks>0?(b.regs/b.clicks*100).toFixed(1):'0';
+    legend += '<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0">' +
+      '<span style="width:8px;height:8px;border-radius:2px;background:'+col+';flex-shrink:0"></span>' +
+      '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(b.key)+'</span>' +
+      '<span style="color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap">'+_cxF(b.clicks)+' <span style="color:var(--green);font-weight:600">'+b.ftds+'</span> <span style="font-size:10px">'+bc2r+'%</span></span></div>';
+    angle = a2;
   });
-  var csv = header + '\n' + lines.join('\n');
-  var blob = new Blob([csv], { type: 'text/csv' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'cx-stats-' + new Date().toISOString().slice(0, 10) + '.csv';
-  a.click();
+
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px">' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:10px">Brand Breakdown</div>' +
+    '<div style="display:flex;align-items:center;gap:16px">' +
+      '<svg viewBox="0 0 160 160" style="width:130px;height:130px;flex-shrink:0">'+arcs+
+        '<text x="80" y="76" text-anchor="middle" fill="var(--text)" font-size="16" font-weight="800">'+_cxF(tot.ftds)+'</text>' +
+        '<text x="80" y="92" text-anchor="middle" fill="var(--muted)" font-size="9">FTDs</text></svg>' +
+      '<div style="flex:1;overflow:hidden">'+legend+'</div></div></div>';
+}
+
+// ── Top Bar Chart (Countries / Tracking Codes) ──
+function _cxTopBarChart(rows, key, title, max) {
+  var groups = _cxGT(rows, key).slice(0, max);
+  if (!groups.length) return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;color:var(--muted);font-size:12px">No '+key.toLowerCase()+' data</div>';
+  var maxClicks = groups[0].clicks || 1;
+
+  var bars = groups.map(function(g, i) {
+    var pct = Math.round(g.clicks/maxClicks*100);
+    var c2r = g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'0';
+    var col = _CX_COLORS[i%_CX_COLORS.length];
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+      '<div style="width:70px;font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);flex-shrink:0" title="'+escHtml(g.key)+'">'+escHtml(g.key)+'</div>' +
+      '<div style="flex:1;background:var(--card2);border-radius:3px;height:18px;overflow:hidden;position:relative">' +
+        '<div style="height:100%;border-radius:3px;background:'+col+';opacity:0.7;width:'+pct+'%;transition:width 0.3s"></div>' +
+        '<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--muted);font-variant-numeric:tabular-nums">'+_cxF(g.clicks)+' clicks &middot; '+g.ftds+' FTDs &middot; '+c2r+'%</span>' +
+      '</div></div>';
+  }).join('');
+
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px">' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:10px">'+title+'</div>' +
+    bars + '</div>';
+}
+
+// ── Performance Insights ──
+function _cxInsights(rows) {
+  if (rows.length < 3) return '';
+  var byCountry = _cxGT(rows,'Country').filter(function(g){return g.clicks>=5;});
+  var byTracking = _cxGT(rows,'Tracking').filter(function(g){return g.clicks>=5;});
+  var byBrand = _cxGT(rows,'Brand').filter(function(g){return g.clicks>=3;});
+
+  var insights = [];
+  // Best C2R country
+  var bc = byCountry.slice().sort(function(a,b){return (b.clicks>0?b.regs/b.clicks:0)-(a.clicks>0?a.regs/a.clicks:0);});
+  if (bc.length) { var b=bc[0]; var pct=(b.regs/b.clicks*100).toFixed(1); insights.push({icon:'\uD83C\uDDFA\uD83C\uDDF3',title:b.key+' leads C2R',desc:pct+'% conversion from '+_cxF(b.clicks)+' clicks',color:'var(--accent)'}); }
+  // Best FTD brand
+  var bf = byBrand.slice().sort(function(a,b){return b.ftds-a.ftds;});
+  if (bf.length) { var b2=bf[0]; insights.push({icon:'\uD83C\uDFC6',title:b2.key+' top FTDs',desc:b2.ftds+' FTDs from '+_cxF(b2.clicks)+' clicks',color:'var(--green)'}); }
+  // Best tracking code
+  var bt = byTracking.slice().sort(function(a,b){return b.ftds-a.ftds;});
+  if (bt.length) { var b3=bt[0]; insights.push({icon:'\uD83C\uDFAF',title:b3.key+' best tracker',desc:b3.ftds+' FTDs, '+_cxF(b3.clicks)+' clicks',color:'#a855f7'}); }
+  // Highest R2F country
+  var rc = byCountry.filter(function(g){return g.regs>=2;}).sort(function(a,b){return (b.regs>0?b.ftds/b.regs:0)-(a.regs>0?a.ftds/a.regs:0);});
+  if (rc.length && rc[0].ftds > 0) { var b4=rc[0]; insights.push({icon:'\uD83D\uDCA1',title:b4.key+' best R2F',desc:(b4.ftds/b4.regs*100).toFixed(1)+'% from '+b4.regs+' regs',color:'var(--yellow)'}); }
+
+  if (!insights.length) return '';
+  return '<div style="display:grid;grid-template-columns:repeat('+Math.min(insights.length,4)+',1fr);gap:10px;padding:0 24px 16px">' +
+    insights.map(function(ins) {
+      return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
+        '<div style="font-size:18px;margin-bottom:6px">'+ins.icon+'</div>' +
+        '<div style="font-size:13px;font-weight:700;color:'+ins.color+';margin-bottom:2px">'+escHtml(ins.title)+'</div>' +
+        '<div style="font-size:11px;color:var(--muted)">'+escHtml(ins.desc)+'</div></div>';
+    }).join('') + '</div>';
+}
+
+// ── Brand Performance Table ──
+function _cxBrandTable(rows, tot) {
+  var bg = _cxGT(rows,'Brand');
+  if (bg.length < 2) return '';
+  var rh = bg.map(function(g,i) {
+    var c2r=g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'-';
+    var r2f=g.regs>0?(g.ftds/g.regs*100).toFixed(1):'-';
+    var share=tot.clicks>0?(g.clicks/tot.clicks*100).toFixed(0):0;
+    var col=_CX_COLORS[i%_CX_COLORS.length];
+    return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
+      '<td style="padding:10px 14px;font-size:13px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+col+';margin-right:8px;vertical-align:middle"></span>'+escHtml(g.key)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.clicks)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.regs)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:'+(g.ftds>0?'700':'400')+';color:'+(g.ftds>0?'var(--green)':'var(--text)')+';font-variant-numeric:tabular-nums">'+_cxF(g.ftds)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">\u20AC'+_cxF(g.comm,2)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:12px;color:var(--muted)">'+c2r+'%</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:12px;color:var(--muted)">'+r2f+'%</td>' +
+      '<td style="padding:10px 14px;width:80px"><div style="background:var(--card2);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;background:'+col+';width:'+share+'%"></div></div></td></tr>';
+  }).join('');
+
+  var ths='padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border)';
+  return '<div style="padding:0 24px 16px"><div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
+    '<div style="padding:14px 18px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">Brand Performance</div>' +
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+      '<thead><tr><th style="'+ths+';text-align:left">Brand</th><th style="'+ths+';text-align:right">Clicks</th><th style="'+ths+';text-align:right">Regs</th><th style="'+ths+';text-align:right">FTDs</th><th style="'+ths+';text-align:right">Commission</th><th style="'+ths+';text-align:right">C2R</th><th style="'+ths+';text-align:right">R2F</th><th style="'+ths+'">Share</th></tr></thead>' +
+      '<tbody>'+rh+'</tbody></table></div></div></div>';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TABLE VIEW
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _cxTableView(rows, t) {
+  var h = '';
+  var bs='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text);font-size:12px;cursor:pointer';
+  function gb(v,l){var a=_cxGroupBy===v;return '<button onclick="_cxGroupBy=\''+v+'\';_cxRefresh()" style="'+bs+';'+(a?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">'+l+'</button>';}
+
+  h += '<div style="padding:0 24px 10px;display:flex;gap:6px;align-items:center">' +
+    '<span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Group:</span>' +
+    gb('','None')+gb('Day','Day')+gb('Brand','Brand')+gb('Country','Country')+gb('Tracking','Tracking')+'</div>';
+
+  if (_cxGroupBy) { h += _cxGroupedTbl(rows); } else { h += _cxDetailTbl(rows, t); }
+  return h;
+}
+
+function _cxTh(col,label,align){var a=_cxSortCol===col,ar=a?(_cxSortDir===-1?' \u2193':' \u2191'):'',al=align||(col==='Day'||col==='Tracking'||col==='Country'||col==='Brand'?'left':'right');return '<th onclick="_cxSortCol=\''+col+'\';_cxSortDir*=-1;_cxRefresh()" style="padding:9px 12px;text-align:'+al+';font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:'+(a?'var(--text)':'var(--muted)')+';cursor:pointer;white-space:nowrap;user-select:none;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card)">'+label+escHtml(ar)+'</th>';}
+
+function _cxDetailTbl(rows, t) {
+  var rh = !rows.length ? '<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No data</td></tr>'
+    : rows.map(function(r){var c2r=r.Visitors>0?(r.Regs/r.Visitors*100).toFixed(1):'-',r2f=r.Regs>0?(r.FTDs/r.Regs*100).toFixed(1):'-';
+        return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
+          '<td style="padding:8px 12px;font-size:12px;color:var(--muted);white-space:nowrap">'+escHtml(r.Day.replace(/\//g,'-'))+'</td>' +
+          '<td style="padding:8px 12px;font-size:12px">'+escHtml(r.Tracking||'\u2014')+'</td>' +
+          '<td style="padding:8px 12px;font-size:12px">'+escHtml(r.Country||'\u2014')+'</td>' +
+          '<td style="padding:8px 12px;font-size:12px">'+escHtml(r.Brand||'\u2014')+'</td>' +
+          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">'+r.Visitors+'</td>' +
+          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">'+r.Regs+'</td>' +
+          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-weight:'+(r.FTDs>0?'700':'400')+';color:'+(r.FTDs>0?'var(--green)':'var(--text)')+';font-variant-numeric:tabular-nums">'+r.FTDs+'</td>' +
+          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">\u20AC'+r.Commission.toFixed(2)+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px;text-align:right;color:var(--muted)">'+c2r+'%</td>' +
+          '<td style="padding:8px 12px;font-size:11px;text-align:right;color:var(--muted)">'+r2f+'%</td></tr>';}).join('');
+
+  return '<div style="padding:0 24px 40px;overflow-x:auto;max-height:600px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
+    _cxTh('Day','Day')+_cxTh('Tracking','Tracking')+_cxTh('Country','Country')+_cxTh('Brand','Brand')+_cxTh('Visitors','Clicks')+_cxTh('Regs','Regs')+_cxTh('FTDs','FTDs')+_cxTh('Commission','Comm.')+_cxTh('_c2r','C2R%')+_cxTh('_r2f','R2F%')+'</tr></thead><tbody>'+rh+'</tbody>' +
+    (rows.length?'<tfoot><tr style="border-top:2px solid var(--border);font-weight:700"><td colspan="4" style="padding:10px 12px;font-size:12px">Total ('+rows.length+')</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+_cxF(t.clicks)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+_cxF(t.regs)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right;color:var(--green)">'+_cxF(t.ftds)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right">\u20AC'+_cxF(t.comm,2)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+(t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0')+'%</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+(t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0')+'%</td></tr></tfoot>':'') +
+    '</table></div>';
+}
+
+function _cxGroupedTbl(rows) {
+  var groups = _cxGT(rows,_cxGroupBy);
+  groups.sort(function(a,b){var k=_cxSortCol===_cxGroupBy?'key':(_cxSortCol==='Visitors'?'clicks':_cxSortCol==='Regs'?'regs':_cxSortCol==='FTDs'?'ftds':_cxSortCol==='Commission'?'comm':'key');var av=a[k],bv=b[k];if(typeof av==='string'){av=av.toLowerCase();bv=(bv||'').toLowerCase();}return av<bv?_cxSortDir:av>bv?-_cxSortDir:0;});
+  var t=_cxT(rows);
+  var rh=groups.map(function(g){var c2r=g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'-',r2f=g.regs>0?(g.ftds/g.regs*100).toFixed(1):'-',pct=t.clicks>0?(g.clicks/t.clicks*100).toFixed(0):0;
+    return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
+      '<td style="padding:10px 12px;font-size:13px;font-weight:600">'+escHtml(g.key)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.clicks)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.regs)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-weight:'+(g.ftds>0?'700':'400')+';color:'+(g.ftds>0?'var(--green)':'var(--text)')+';font-variant-numeric:tabular-nums">'+_cxF(g.ftds)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums">\u20AC'+_cxF(g.comm,2)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--muted)">'+c2r+'%</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--muted)">'+r2f+'%</td>' +
+      '<td style="padding:10px 12px;width:100px"><div style="background:var(--card2);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;background:var(--accent);width:'+pct+'%"></div></div></td></tr>';}).join('');
+  var ths='padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--muted);border-bottom:1px solid var(--border)';
+  return '<div style="padding:0 24px 40px;overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'+
+    _cxTh(_cxGroupBy,_cxGroupBy,'left')+_cxTh('Visitors','Clicks')+_cxTh('Regs','Regs')+_cxTh('FTDs','FTDs')+_cxTh('Commission','Comm.')+
+    '<th style="'+ths+';text-align:right">C2R</th><th style="'+ths+';text-align:right">R2F</th><th style="'+ths+'">Share</th></tr></thead><tbody>'+rh+'</tbody>' +
+    '<tfoot><tr style="border-top:2px solid var(--border);font-weight:700"><td style="padding:10px 12px;font-size:12px">Total ('+groups.length+')</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+_cxF(t.clicks)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+_cxF(t.regs)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--green)">'+_cxF(t.ftds)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px">\u20AC'+_cxF(t.comm,2)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+(t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0')+'%</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+(t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0')+'%</td><td></td></tr></tfoot></table></div>';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _cxU(a,k){return Array.from(new Set(a.map(function(r){return r[k];}))).filter(Boolean).sort();}
+function _cxT(rows){var c=0,r=0,f=0,cm=0,d=0;rows.forEach(function(x){c+=x.Visitors;r+=x.Regs;f+=x.FTDs;cm+=x.Commission;d+=x.Deposits;});return {clicks:c,regs:r,ftds:f,comm:cm,deps:d};}
+function _cxF(n,dec){if(dec!==undefined)return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g,',');return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function _cxGT(rows,key){var m={};rows.forEach(function(r){var k=r[key]||'(empty)';if(!m[k])m[k]={key:k,clicks:0,regs:0,ftds:0,comm:0};m[k].clicks+=r.Visitors;m[k].regs+=r.Regs;m[k].ftds+=r.FTDs;m[k].comm+=r.Commission;});return Object.values(m).sort(function(a,b){return b.clicks-a.clicks;});}
+
+function _cxKPI(label,value,color) {
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px">' +
+    '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:3px">'+label+'</div>' +
+    '<div style="font-size:20px;font-weight:800;color:'+color+';font-variant-numeric:tabular-nums;line-height:1.1">'+value+'</div></div>';
+}
+
+function _cxExportCSV() {
+  var rows=_cxAllRows;if(!rows.length)return;
+  var h='Day,Tracking,Country,Brand,Clicks,Registrations,FTDs,Commission,C2R%,R2F%';
+  var l=rows.map(function(r){var c=r.Visitors>0?(r.Regs/r.Visitors*100).toFixed(1):'0',f=r.Regs>0?(r.FTDs/r.Regs*100).toFixed(1):'0';return [r.Day,r.Tracking,r.Country,r.Brand,r.Visitors,r.Regs,r.FTDs,r.Commission.toFixed(2),c,f].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');});
+  var csv=h+'\n'+l.join('\n');var b=new Blob([csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='cx-stats-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 
 
