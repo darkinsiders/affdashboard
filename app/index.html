@@ -5292,41 +5292,12 @@ function renderHomePage() {
     '</div>';
   }).join('');
 
-  var funnelCardsHtml = FUNNEL_NAMES.map(function(f) {
-    var color = FUNNEL_COLORS[f] || '#707078';
-    var isPaused = funnelPaused && funnelPaused[f];
-    var fAssigned = !!(assignments[f] && assignments[f].length > 0);
-    var dealCount = (assignments[f]||[]).length;
-    var status = isPaused ? 'PAUSED' : fAssigned ? 'LIVE' : 'EMPTY';
-    var statusBg = isPaused ? 'rgba(240,180,41,0.12)' : fAssigned ? 'rgba(74,222,128,0.1)' : 'rgba(212,112,128,0.1)';
-    var statusCol = isPaused ? '#f0b429' : fAssigned ? 'var(--green)' : 'var(--red)';
-    return '<div onclick="setPage(\'funnels\')" style="background:var(--card);border:1px solid var(--border);border-top:2px solid ' + color + ';border-radius:10px;padding:14px 15px;cursor:pointer;transition:all 0.18s" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.background=\'var(--card)\';this.style.transform=\'\'">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
-        '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;color:' + color + '">' + escHtml(f) + '</span>' +
-        '<span style="font-size:9px;font-weight:700;font-family:var(--font-mono);padding:2px 7px;border-radius:3px;background:' + statusBg + ';color:' + statusCol + '">' + status + '</span>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;text-align:center;margin-bottom:10px">' +
-        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--text)" id="hfc-clicks-' + f + '">&#8212;</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">Clicks</div></div>' +
-        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--green)" id="hfc-ftds-' + f + '">&#8212;</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">FTDs</div></div>' +
-        '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)" id="hfc-rev-' + f + '">&#8212;</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">Rev</div></div>' +
-      '</div>' +
-      '<div style="height:2px;background:var(--card2);border-radius:2px;overflow:hidden"><div id="hfc-bar-' + f + '" style="height:2px;background:' + color + ';border-radius:2px;width:0%;transition:width 0.6s ease;opacity:0.7"></div></div>' +
-      '<div style="font-size:9px;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between;align-items:center">' +
-        '<span>' + dealCount + ' deal' + (dealCount !== 1 ? 's' : '') + '</span>' +
-        '<span onclick="event.stopPropagation();toggleFunnelPaused(\'' + escHtml(f) + '\')" style="color:' + (isPaused ? 'var(--green)' : 'rgba(240,180,41,0.8)') + ';cursor:pointer;font-weight:700;font-size:9px">' + (isPaused ? 'Resume' : 'Pause') + '</span>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-
   el.innerHTML =
     '<div style="padding:20px 28px 40px;max-width:1800px;margin:0 auto">' +
 
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">' +
         '<div style="font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted)">' + escHtml(greeting) + ' &#183; Command Center</div>' +
         '<div style="display:flex;gap:6px;align-items:center">' +
-          '<select id="homeFilterDays" onchange="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer">' +
-            '<option value="1">Today</option><option value="7" selected>7 days</option><option value="30">30 days</option><option value="0">All time</option>' +
-          '</select>' +
           '<button onclick="loadHomeData()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--muted);font-size:14px;cursor:pointer" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--muted)\'">&#8635;</button>' +
         '</div>' +
       '</div>' +
@@ -5335,56 +5306,51 @@ function renderHomePage() {
 
       '<div style="display:grid;grid-template-columns:1fr 190px;gap:12px;margin-bottom:12px;align-items:start">' +
 
+        // ── Hero Card: CX Stats Commission + Waterfall ──
         '<div style="background:var(--card);border:1px solid rgba(74,222,128,0.18);border-radius:12px;overflow:hidden;position:relative">' +
           '<div style="position:absolute;inset:0;background:radial-gradient(ellipse 50% 140% at 5% 50%,rgba(74,222,128,0.06) 0%,transparent 70%);pointer-events:none"></div>' +
           '<div style="position:relative;padding:22px 24px 0">' +
             '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px">' +
               '<div>' +
-                '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:rgba(74,222,128,0.7);margin-bottom:6px">Total Revenue &#183; <span id="homePeriodLabel">7d</span></div>' +
+                '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:rgba(74,222,128,0.7);margin-bottom:6px">Total Commission &#183; <span id="homePeriodLabel">MTD</span></div>' +
                 '<div id="homeHeroRevenue" style="font-family:var(--font-mono);font-size:54px;font-weight:800;color:#fff;line-height:1;letter-spacing:-0.03em">&#8364;0</div>' +
               '</div>' +
               '<div id="homeSparkline" style="flex-shrink:0;padding-top:4px"><svg width="160" height="48"><text x="80" y="28" text-anchor="middle" fill="rgba(255,255,255,0.1)" font-size="11">&#8230;</text></svg></div>' +
             '</div>' +
+            '<div style="font-size:9px;color:rgba(255,255,255,0.2);margin-top:6px;font-family:var(--font-mono)" id="homeSyncLabel">Loading CX Stats\u2026</div>' +
           '</div>' +
-          // Conversion funnel waterfall — visually distinct from overview's KPI boxes
+          // Conversion waterfall from CX Stats
           '<div style="margin-top:16px;padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:0">' +
-            // Clicks stage
             '<div style="flex:1;text-align:center">' +
               '<div style="font-size:9px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">Clicks</div>' +
               '<div id="homeHero-clicks" style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:rgba(255,255,255,0.7)">&#8212;</div>' +
               '<div style="margin-top:6px;height:4px;background:rgba(255,255,255,0.12);border-radius:2px;overflow:hidden"><div style="width:100%;height:100%;background:rgba(255,255,255,0.25);border-radius:2px"></div></div>' +
             '</div>' +
-            // Arrow + drop %
             '<div style="padding:0 8px;text-align:center;flex-shrink:0">' +
               '<div id="homeConv-c2r" style="font-size:9px;font-family:var(--font-mono);color:var(--muted);margin-bottom:2px">&#8212;</div>' +
               '<div style="color:var(--muted);font-size:14px">&#8594;</div>' +
             '</div>' +
-            // Regs stage
             '<div style="flex:1;text-align:center">' +
               '<div style="font-size:9px;color:rgba(99,179,237,0.6);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">Regs</div>' +
               '<div id="homeHero-regs" style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#63b3ed">&#8212;</div>' +
               '<div style="margin-top:6px;height:4px;background:rgba(99,179,237,0.12);border-radius:2px;overflow:hidden"><div id="homeBar-regs" style="width:0%;height:100%;background:#63b3ed;border-radius:2px;transition:width 0.8s ease;opacity:0.7"></div></div>' +
             '</div>' +
-            // Arrow + drop %
             '<div style="padding:0 8px;text-align:center;flex-shrink:0">' +
               '<div id="homeConv-r2f" style="font-size:9px;font-family:var(--font-mono);color:var(--muted);margin-bottom:2px">&#8212;</div>' +
               '<div style="color:var(--muted);font-size:14px">&#8594;</div>' +
             '</div>' +
-            // FTDs stage
             '<div style="flex:1;text-align:center">' +
               '<div style="font-size:9px;color:rgba(74,222,128,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">FTDs</div>' +
               '<div id="homeHero-ftds" style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--green)">&#8212;</div>' +
               '<div style="margin-top:6px;height:4px;background:rgba(74,222,128,0.12);border-radius:2px;overflow:hidden"><div id="homeBar-ftds" style="width:0%;height:100%;background:var(--green);border-radius:2px;transition:width 0.8s ease;opacity:0.8"></div></div>' +
             '</div>' +
-            // Arrow + avg rev
             '<div style="padding:0 8px;text-align:center;flex-shrink:0">' +
-              '<div id="homeHero-avgrev" style="font-size:9px;font-family:var(--font-mono);color:var(--yellow);margin-bottom:2px">&#8212;</div>' +
+              '<div id="homeHero-avgcomm" style="font-size:9px;font-family:var(--font-mono);color:var(--yellow);margin-bottom:2px">&#8212;</div>' +
               '<div style="color:var(--muted);font-size:14px">&#8594;</div>' +
             '</div>' +
-            // Revenue (already shown above but shown as final stage)
             '<div style="flex:1;text-align:center">' +
-              '<div style="font-size:9px;color:rgba(240,180,41,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">Revenue</div>' +
-              '<div id="homeHero-rev2" style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)">&#8212;</div>' +
+              '<div style="font-size:9px;color:rgba(240,180,41,0.7);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px">Commission</div>' +
+              '<div id="homeHero-comm2" style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)">&#8212;</div>' +
               '<div style="margin-top:6px;height:4px;background:rgba(240,180,41,0.12);border-radius:2px;overflow:hidden"><div style="width:100%;height:100%;background:var(--yellow);border-radius:2px;opacity:0.6"></div></div>' +
             '</div>' +
           '</div>' +
@@ -5397,14 +5363,16 @@ function renderHomePage() {
 
       '</div>' +
 
+      // ── Brand Performance Cards ──
       '<div style="margin-bottom:12px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
-          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Funnels &#183; <span id="homeFunnelPeriod">7d</span></div>' +
-          '<div style="font-size:9px;color:var(--muted)">Click a funnel to configure &#183; Use Pause/Resume to take offline</div>' +
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Brand Performance &#183; <span id="homeBrandPeriod">MTD</span></div>' +
+          '<div style="font-size:9px;color:var(--muted);cursor:pointer" onclick="analyticsTab=\'cxstats\';setPage(\'analytics\')">View full analytics &#8594;</div>' +
         '</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">' + funnelCardsHtml + '</div>' +
+        '<div id="homeBrandCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px"><div style="color:var(--muted);font-size:11px;padding:16px">Loading\u2026</div></div>' +
       '</div>' +
 
+      // ── Charts Row: Daily Activity + Top Countries ──
       '<div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:12px">' +
 
         '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px">' +
@@ -5415,26 +5383,50 @@ function renderHomePage() {
               '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#4ade80;vertical-align:middle;margin-right:3px;opacity:0.8"></span>FTDs</span>' +
             '</div>' +
           '</div>' +
-          '<div id="homeDailyChart" style="height:100px"><svg width="100%" height="100"><text x="50%" y="50" text-anchor="middle" fill="rgba(255,255,255,0.1)" font-size="11">Loading&#8230;</text></svg></div>' +
+          '<div id="homeDailyChart" style="height:100px"><svg width="100%" height="100"><text x="50%" y="50" text-anchor="middle" fill="rgba(255,255,255,0.1)" font-size="11">Loading\u2026</text></svg></div>' +
           '<div id="homeDailyLabels" style="display:flex;justify-content:space-between;margin-top:5px;font-size:9px;color:rgba(255,255,255,0.25);font-family:var(--font-mono)"></div>' +
         '</div>' +
 
         '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px">' +
-          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:12px">Traffic Sources</div>' +
-          '<div style="display:flex;gap:12px;align-items:flex-start">' +
-            '<div id="homeSourceDonut" style="flex-shrink:0;width:80px;height:80px"></div>' +
-            '<div id="homeSources" style="flex:1;min-width:0"><div style="color:var(--muted);font-size:11px">Loading&#8230;</div></div>' +
-          '</div>' +
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:12px">Top Countries</div>' +
+          '<div id="homeTopCountries"><div style="color:var(--muted);font-size:11px">Loading\u2026</div></div>' +
         '</div>' +
 
       '</div>' +
 
-      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
-        '<div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">' +
-          '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Recent Events</span>' +
-          '<div style="display:flex;align-items:center;gap:6px"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse-dot 2s infinite"></span><span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">live</span></div>' +
+      // ── Top Tracking Codes ──
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px">' +
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:12px">Top Tracking Codes</div>' +
+        '<div id="homeTopTracking"><div style="color:var(--muted);font-size:11px">Loading\u2026</div></div>' +
+      '</div>' +
+
+      // ── Funnels (dimmed, management only) ──
+      '<div style="margin-bottom:12px;opacity:0.4">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Funnels &#183; Rotation Management</div>' +
+          '<div style="font-size:9px;color:var(--muted)">Pause/Resume to take offline</div>' +
         '</div>' +
-        '<div id="homeEvents"><div style="padding:12px 16px;color:var(--muted);font-size:12px">Loading&#8230;</div></div>' +
+        '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">' +
+          FUNNEL_NAMES.map(function(f) {
+            var color = FUNNEL_COLORS[f] || '#707078';
+            var isPaused = funnelPaused && funnelPaused[f];
+            var fAssigned = !!(assignments[f] && assignments[f].length > 0);
+            var dealCount = (assignments[f]||[]).length;
+            var status = isPaused ? 'PAUSED' : fAssigned ? 'LIVE' : 'EMPTY';
+            var statusBg = isPaused ? 'rgba(240,180,41,0.12)' : fAssigned ? 'rgba(74,222,128,0.1)' : 'rgba(212,112,128,0.1)';
+            var statusCol = isPaused ? '#f0b429' : fAssigned ? 'var(--green)' : 'var(--red)';
+            return '<div onclick="setPage(\'funnels\')" style="background:var(--card);border:1px solid var(--border);border-top:2px solid ' + color + ';border-radius:10px;padding:12px 14px;cursor:pointer;transition:all 0.18s" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'var(--card)\'">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+                '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;color:' + color + '">' + escHtml(f) + '</span>' +
+                '<span style="font-size:9px;font-weight:700;font-family:var(--font-mono);padding:2px 7px;border-radius:3px;background:' + statusBg + ';color:' + statusCol + '">' + status + '</span>' +
+              '</div>' +
+              '<div style="font-size:9px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">' +
+                '<span>' + dealCount + ' deal' + (dealCount !== 1 ? 's' : '') + '</span>' +
+                '<span onclick="event.stopPropagation();toggleFunnelPaused(\'' + escHtml(f) + '\')" style="color:' + (isPaused ? 'var(--green)' : 'rgba(240,180,41,0.8)') + ';cursor:pointer;font-weight:700;font-size:9px">' + (isPaused ? 'Resume' : 'Pause') + '</span>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
       '</div>' +
 
     '</div>';
@@ -5450,214 +5442,171 @@ function toggleFunnelPaused(f) {
 }
 
 function loadHomeData() {
-  var daysSel = document.getElementById('homeFilterDays');
-  var days = daysSel ? +daysSel.value : 7;
-  var pLabel = days === 0 ? 'all' : days === 1 ? '1d' : days + 'd';
-  var pEl = document.getElementById('homeFunnelPeriod'); if (pEl) pEl.textContent = pLabel;
-  var plEl = document.getElementById('homePeriodLabel'); if (plEl) plEl.textContent = pLabel;
+  db.collection('affiliate_stats').doc('current').get().then(function(snap) {
+    if (!snap.exists) {
+      var h = document.getElementById('homeHeroRevenue');
+      if (h) h.textContent = 'No data';
+      return;
+    }
+    var d = snap.data();
+    var rows = [];
+    try {
+      JSON.parse(d.data || '[]').forEach(function(b) {
+        (b.rows||[]).forEach(function(r) {
+          rows.push({
+            Day: r.Day||'', Brand: r.Brand||b.dealName||'', Country: r.Country||'',
+            Tracking: r.Tracking_Code||r['Tracking Code']||'',
+            Visitors: parseInt(r.Unique_Visitors||r['Unique Visitors'])||0,
+            Regs: parseInt(r.Registrations)||0, FTDs: parseInt(r.QFTD)||0,
+            Commission: parseFloat(r.Commission)||0, Deposits: parseFloat(r.Deposits)||0,
+          });
+        });
+      });
+    } catch(e) { console.error('Home CX parse', e); }
 
-  var cutoffTs = null, cutoffDate = null;
-  if (days > 0) {
-    var cd = new Date(); cd.setDate(cd.getDate() - days);
-    cutoffDate = cd.toISOString().split('T')[0];
-    cutoffTs = new Date(cutoffDate + 'T00:00:00Z');
-  }
-
-  Promise.all([
-    db.collection('clicks').orderBy('ts','desc').limit(2000).get(),
-    db.collection('conversions').get(),
-    db.collection('postbacks').orderBy('ts','desc').limit(20).get()
-  ]).then(function(results) {
-    var clickSnap = results[0], convSnap = results[1], pbSnap = results[2];
-
-    var totalClicks = 0, clicksByFunnel = {}, clicksBySrc = {}, clicksByDay = {};
-    clickSnap.forEach(function(doc) {
-      var d = doc.data();
-      var ts = d.ts ? new Date(d.ts) : null;
-      if (cutoffTs && ts && ts < cutoffTs) return;
-      totalClicks++;
-      var f = d.funnel || 'Unknown';
-      clicksByFunnel[f] = (clicksByFunnel[f] || 0) + 1;
-      var s = d.src || 'NoSource';
-      clicksBySrc[s] = (clicksBySrc[s] || 0) + 1;
-      if (ts) {
-        var dk = ts.getFullYear() + '-' + String(ts.getMonth()+1).padStart(2,'0') + '-' + String(ts.getDate()).padStart(2,'0');
-        if (!clicksByDay[dk]) clicksByDay[dk] = { clicks:0, ftds:0 };
-        clicksByDay[dk].clicks++;
-      }
+    var totalClicks=0, totalRegs=0, totalFtds=0, totalComm=0;
+    var byBrand={}, byCountry={}, byTracking={}, byDay={};
+    rows.forEach(function(r) {
+      totalClicks += r.Visitors; totalRegs += r.Regs; totalFtds += r.FTDs; totalComm += r.Commission;
+      var b=r.Brand; if(!byBrand[b])byBrand[b]={clicks:0,regs:0,ftds:0,comm:0}; byBrand[b].clicks+=r.Visitors; byBrand[b].regs+=r.Regs; byBrand[b].ftds+=r.FTDs; byBrand[b].comm+=r.Commission;
+      var c=r.Country; if(c){if(!byCountry[c])byCountry[c]={clicks:0,regs:0,ftds:0}; byCountry[c].clicks+=r.Visitors; byCountry[c].regs+=r.Regs; byCountry[c].ftds+=r.FTDs;}
+      var t=r.Tracking; if(t){if(!byTracking[t])byTracking[t]={clicks:0,regs:0,ftds:0}; byTracking[t].clicks+=r.Visitors; byTracking[t].regs+=r.Regs; byTracking[t].ftds+=r.FTDs;}
+      var day=r.Day.replace(/\//g,'-'); if(!byDay[day])byDay[day]={clicks:0,ftds:0}; byDay[day].clicks+=r.Visitors; byDay[day].ftds+=r.FTDs;
     });
 
-    var totalRegs = 0, totalFtds = 0, totalRevenue = 0, byFunnel = {}, revenueByDay = {};
-    convSnap.forEach(function(doc) {
-      var d = doc.data();
-      if (cutoffDate && d.date < cutoffDate) return;
-      var f = d.funnel || 'Unknown';
-      if (!byFunnel[f]) byFunnel[f] = { regs:0, ftds:0, revenue:0 };
-      byFunnel[f].regs    += +(d.regs    || 0);
-      byFunnel[f].ftds    += +(d.ftds    || 0);
-      byFunnel[f].revenue += +(d.revenue || 0);
-      totalRegs    += +(d.regs    || 0);
-      totalFtds    += +(d.ftds    || 0);
-      totalRevenue += +(d.revenue || 0);
-      if (d.date) {
-        if (!revenueByDay[d.date]) revenueByDay[d.date] = { revenue:0, ftds:0 };
-        revenueByDay[d.date].revenue += +(d.revenue || 0);
-        revenueByDay[d.date].ftds    += +(d.ftds    || 0);
-        if (clicksByDay[d.date]) clicksByDay[d.date].ftds += +(d.ftds||0);
-        else clicksByDay[d.date] = { clicks:0, ftds:+(d.ftds||0) };
-      }
-    });
+    var periodStr = (d.monthStart||'') && (d.today||'') ? d.monthStart+' \u2013 '+d.today : 'MTD';
+    var fetchedStr = d.fetchedAt ? d.fetchedAt.slice(0,16).replace('T',' ')+' UTC' : '';
 
     function hset(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
-    hset('homeHeroRevenue', String.fromCharCode(8364) + totalRevenue.toFixed(0));
-    hset('homeHero-ftds',   totalFtds);
-    hset('homeHero-regs',   totalRegs);
+    hset('homeHeroRevenue', '\u20AC' + totalComm.toFixed(0));
+    hset('homePeriodLabel', periodStr);
+    hset('homeBrandPeriod', periodStr);
+    hset('homeSyncLabel', fetchedStr ? 'Synced '+fetchedStr : '');
     hset('homeHero-clicks', totalClicks);
-    hset('homeHero-avgrev', totalFtds > 0 ? String.fromCharCode(8364)+(totalRevenue/totalFtds).toFixed(0) : '—');
-    hset('homeHero-cr',     totalClicks > 0 ? (totalFtds/totalClicks*100).toFixed(1)+'%' : '0%');
-    hset('homeHero-rev2',   String.fromCharCode(8364) + totalRevenue.toFixed(0));
-    hset('homeConv-c2r',    totalClicks > 0 ? (totalRegs/totalClicks*100).toFixed(1)+'%' : '—');
-    hset('homeConv-r2f',    totalRegs > 0 ? (totalFtds/totalRegs*100).toFixed(1)+'%' : '—');
+    hset('homeHero-regs', totalRegs);
+    hset('homeHero-ftds', totalFtds);
+    hset('homeHero-comm2', '\u20AC' + totalComm.toFixed(0));
+    hset('homeHero-avgcomm', totalFtds > 0 ? '\u20AC'+(totalComm/totalFtds).toFixed(0)+'/FTD' : '\u2014');
+    hset('homeConv-c2r', totalClicks > 0 ? (totalRegs/totalClicks*100).toFixed(1)+'%' : '\u2014');
+    hset('homeConv-r2f', totalRegs > 0 ? (totalFtds/totalRegs*100).toFixed(1)+'%' : '\u2014');
     var regBar = document.getElementById('homeBar-regs');
     if (regBar) regBar.style.width = (totalClicks > 0 ? Math.min(100, totalRegs/totalClicks*100) : 0) + '%';
     var ftdBar = document.getElementById('homeBar-ftds');
     if (ftdBar) ftdBar.style.width = (totalRegs > 0 ? Math.min(100, totalFtds/totalRegs*100) : 0) + '%';
 
-    var maxFC = Math.max(1, FUNNEL_NAMES.reduce(function(m,f){ return Math.max(m,clicksByFunnel[f]||0); }, 0));
-    FUNNEL_NAMES.forEach(function(f) {
-      var conv = byFunnel[f] || { regs:0, ftds:0, revenue:0 };
-      hset('hfc-clicks-'+f, clicksByFunnel[f]||0);
-      hset('hfc-ftds-'+f,   conv.ftds);
-      hset('hfc-rev-'+f,    conv.revenue > 0 ? String.fromCharCode(8364)+conv.revenue.toFixed(0) : '—');
-      var bar = document.getElementById('hfc-bar-'+f);
-      if (bar) bar.style.width = Math.round((clicksByFunnel[f]||0)/maxFC*100)+'%';
-    });
-
-    // Revenue sparkline
-    var sparkEl = document.getElementById('homeSparkline');
-    if (sparkEl) {
-      var nsp = days > 0 ? Math.min(days,14) : 14;
-      var spKeys = [];
-      for (var i = nsp-1; i >= 0; i--) {
-        var d2 = new Date(); d2.setDate(d2.getDate()-i);
-        spKeys.push(d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0')+'-'+String(d2.getDate()).padStart(2,'0'));
-      }
-      var spVals = spKeys.map(function(k){ return (revenueByDay[k]||{}).revenue||0; });
-      var spMax = Math.max(1, Math.max.apply(null, spVals));
-      var SW=160, SH=48, sp=6;
-      var pts = spVals.map(function(v,ii){ return (sp + ii*(SW-sp*2)/Math.max(1,spVals.length-1)).toFixed(1)+','+(SH-sp-Math.round(v/spMax*(SH-sp*2))).toFixed(1); }).join(' ');
-      var aBase = SH-sp;
-      var fp0 = sp+','+(SH-sp-Math.round(spVals[0]/spMax*(SH-sp*2)));
-      var lx0 = spVals.length>1 ? sp+(spVals.length-1)*(SW-sp*2)/Math.max(1,spVals.length-1) : SW-sp;
-      var ly0 = spVals.length>0 ? SH-sp-Math.round(spVals[spVals.length-1]/spMax*(SH-sp*2)) : aBase;
-      var hasData = spVals.some(function(v){ return v>0; });
-      var aPath = 'M '+fp0.replace(',',' ')+' '+pts.split(' ').slice(1).map(function(p){ return 'L '+p.replace(',',' '); }).join(' ')+' L '+lx0+' '+aBase+' L '+sp+' '+aBase+' Z';
-      sparkEl.innerHTML = '<svg width="'+SW+'" height="'+SH+'">' +
-        '<defs><linearGradient id="spGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4ade80" stop-opacity="0.3"/><stop offset="100%" stop-color="#4ade80" stop-opacity="0"/></linearGradient></defs>' +
-        (hasData ? '<path d="'+aPath+'" fill="url(#spGrad2)"/>' : '') +
-        (pts.indexOf(' ')!==-1 ? '<polyline points="'+pts+'" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' : '') +
-      '</svg>';
+    // ── Brand cards ──
+    var brandEl = document.getElementById('homeBrandCards');
+    if (brandEl) {
+      var brandKeys = Object.keys(byBrand).sort(function(a,b){ return byBrand[b].clicks - byBrand[a].clicks; });
+      var maxBC = Math.max(1, brandKeys.reduce(function(m,k){ return Math.max(m,byBrand[k].clicks); }, 0));
+      brandEl.innerHTML = brandKeys.length ? brandKeys.map(function(bk) {
+        var bd = byBrand[bk];
+        var c2r = bd.clicks>0?(bd.regs/bd.clicks*100).toFixed(1):'0';
+        return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 15px;cursor:pointer;transition:all 0.18s" onclick="analyticsTab=\'cxstats\';setPage(\'analytics\')" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.background=\'var(--card)\';this.style.transform=\'\'">' +
+          '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;color:var(--text);margin-bottom:10px">' + escHtml(bk) + '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;text-align:center;margin-bottom:8px">' +
+            '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--text)">' + bd.clicks + '</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">Clicks</div></div>' +
+            '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--green)">' + bd.ftds + '</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">FTDs</div></div>' +
+            '<div><div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:var(--yellow)">' + (bd.comm > 0 ? '\u20AC'+bd.comm.toFixed(0) : '\u2014') + '</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px">Comm</div></div>' +
+          '</div>' +
+          '<div style="height:2px;background:var(--card2);border-radius:2px;overflow:hidden"><div style="height:2px;background:rgba(255,255,255,0.25);border-radius:2px;width:'+Math.round(bd.clicks/maxBC*100)+'%;transition:width 0.6s ease;opacity:0.7"></div></div>' +
+          '<div style="font-size:9px;color:var(--muted);margin-top:6px">' + c2r + '% C2R &middot; ' + bd.regs + ' regs</div>' +
+        '</div>';
+      }).join('') : '<div style="color:var(--muted);font-size:11px;padding:16px">No brand data yet</div>';
     }
 
-    // Daily bar chart
+    // ── Commission sparkline ──
+    var sparkEl = document.getElementById('homeSparkline');
+    if (sparkEl) {
+      var dayKeys = Object.keys(byDay).sort();
+      var spKeys = dayKeys.slice(-14);
+      if (spKeys.length > 1) {
+        // Build commission by day for sparkline
+        var commByDay = {};
+        rows.forEach(function(r){ var dk=r.Day.replace(/\//g,'-'); commByDay[dk]=(commByDay[dk]||0)+r.Commission; });
+        var spVals = spKeys.map(function(k){ return commByDay[k]||0; });
+        var spMax = Math.max(1, Math.max.apply(null, spVals));
+        var SW=160, SH=48, sp=6;
+        var pts = spVals.map(function(v,ii){ return (sp + ii*(SW-sp*2)/Math.max(1,spVals.length-1)).toFixed(1)+','+(SH-sp-Math.round(v/spMax*(SH-sp*2))).toFixed(1); }).join(' ');
+        var hasData = spVals.some(function(v){ return v>0; });
+        var fp0 = sp+','+(SH-sp-Math.round(spVals[0]/spMax*(SH-sp*2)));
+        var lx0 = sp+(spVals.length-1)*(SW-sp*2)/Math.max(1,spVals.length-1);
+        var aPath = 'M '+fp0.replace(',',' ')+' '+pts.split(' ').slice(1).map(function(p){ return 'L '+p.replace(',',' '); }).join(' ')+' L '+lx0+' '+(SH-sp)+' L '+sp+' '+(SH-sp)+' Z';
+        sparkEl.innerHTML = '<svg width="'+SW+'" height="'+SH+'">' +
+          '<defs><linearGradient id="spGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4ade80" stop-opacity="0.3"/><stop offset="100%" stop-color="#4ade80" stop-opacity="0"/></linearGradient></defs>' +
+          (hasData ? '<path d="'+aPath+'" fill="url(#spGrad2)"/>' : '') +
+          '<polyline points="'+pts+'" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' +
+        '</svg>';
+      }
+    }
+
+    // ── Daily chart ──
     var chartEl = document.getElementById('homeDailyChart');
     var labelsEl = document.getElementById('homeDailyLabels');
     if (chartEl) {
-      var nDays = days > 0 ? Math.min(days,30) : 14;
-      var dKeys = [];
-      for (var i2 = nDays-1; i2 >= 0; i2--) {
-        var d3 = new Date(); d3.setDate(d3.getDate()-i2);
-        dKeys.push(d3.getFullYear()+'-'+String(d3.getMonth()+1).padStart(2,'0')+'-'+String(d3.getDate()).padStart(2,'0'));
-      }
-      var maxV = Math.max(1, dKeys.reduce(function(m,k){ return Math.max(m,(clicksByDay[k]||{}).clicks||0); }, 0));
-      var H=100, bGap=2;
-      var bW = Math.max(4, Math.floor((600-bGap*dKeys.length)/dKeys.length));
-      var svgW = dKeys.length*(bW+bGap);
-      var svgBars = dKeys.map(function(k,i3) {
-        var dat = clicksByDay[k]||{clicks:0,ftds:0};
-        var cH = Math.round(dat.clicks/maxV*(H-10));
-        var fH = Math.round(dat.ftds/maxV*(H-10));
-        var x = i3*(bW+bGap);
-        return (cH>0?'<rect x="'+x+'" y="'+(H-10-cH)+'" width="'+bW+'" height="'+cH+'" fill="rgba(112,112,120,0.45)" rx="1.5"/>':'') +
-               (fH>0?'<rect x="'+x+'" y="'+(H-10-fH)+'" width="'+bW+'" height="'+fH+'" fill="#4ade80" rx="1.5" opacity="0.85"/>':'');
-      }).join('');
-      chartEl.innerHTML = '<svg width="100%" height="'+H+'" viewBox="0 0 '+svgW+' '+H+'" preserveAspectRatio="none">'+svgBars+'</svg>';
-      if (labelsEl) {
-        var step = Math.ceil(dKeys.length/8);
-        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        labelsEl.innerHTML = dKeys.map(function(k,i4) {
-          if (i4%step!==0 && i4!==dKeys.length-1) return '<span></span>';
-          var p = k.split('-');
-          return '<span>'+parseInt(p[2])+' '+months[parseInt(p[1])-1]+'</span>';
+      var dKeys = Object.keys(byDay).sort();
+      if (dKeys.length > 0) {
+        var maxV = Math.max(1, dKeys.reduce(function(m,k){ return Math.max(m,byDay[k].clicks); }, 0));
+        var H=100, bGap=2;
+        var bW = Math.max(4, Math.floor((600-bGap*dKeys.length)/dKeys.length));
+        var svgW = dKeys.length*(bW+bGap);
+        var svgBars = dKeys.map(function(k,i3) {
+          var dat = byDay[k];
+          var cH = Math.round(dat.clicks/maxV*(H-10));
+          var fH = Math.round(dat.ftds/maxV*(H-10));
+          var x = i3*(bW+bGap);
+          return (cH>0?'<rect x="'+x+'" y="'+(H-10-cH)+'" width="'+bW+'" height="'+cH+'" fill="rgba(112,112,120,0.45)" rx="1.5"><title>'+k+': '+dat.clicks+' clicks</title></rect>':'') +
+                 (fH>0?'<rect x="'+x+'" y="'+(H-10-fH)+'" width="'+bW+'" height="'+fH+'" fill="#4ade80" rx="1.5" opacity="0.85"><title>'+k+': '+dat.ftds+' FTDs</title></rect>':'');
         }).join('');
+        chartEl.innerHTML = '<svg width="100%" height="'+H+'" viewBox="0 0 '+svgW+' '+H+'" preserveAspectRatio="none">'+svgBars+'</svg>';
+        if (labelsEl) {
+          var step = Math.ceil(dKeys.length/8);
+          var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          labelsEl.innerHTML = dKeys.map(function(k,i4) {
+            if (i4%step!==0 && i4!==dKeys.length-1) return '<span></span>';
+            var p = k.split('-');
+            return '<span>'+parseInt(p[2])+' '+months[parseInt(p[1])-1]+'</span>';
+          }).join('');
+        }
+      } else {
+        chartEl.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;padding:30px">No daily data yet</div>';
       }
     }
 
-    // Source donut + bars
-    var srcList = Object.keys(clicksBySrc).sort(function(a,b){ return clicksBySrc[b]-clicksBySrc[a]; }).slice(0,6);
-    var maxSrc = Math.max(1, clicksBySrc[srcList[0]]||0);
-    var srcEl = document.getElementById('homeSources');
-    var donutEl = document.getElementById('homeSourceDonut');
-    if (srcEl) {
-      srcEl.innerHTML = srcList.length ? srcList.map(function(sid) {
-        var sc = getTrafficSources().find(function(ts){ return ts.id===sid; });
-        var n = clicksBySrc[sid];
-        var pct = totalClicks>0 ? Math.round(n/totalClicks*100) : 0;
-        var col = sc ? sc.color : '#707078';
+    // ── Top Countries ──
+    var countryEl = document.getElementById('homeTopCountries');
+    if (countryEl) {
+      var ck = Object.keys(byCountry).sort(function(a,b){ return byCountry[b].clicks-byCountry[a].clicks; }).slice(0,8);
+      var maxCC = ck.length ? byCountry[ck[0]].clicks : 1;
+      countryEl.innerHTML = ck.length ? ck.map(function(c) {
+        var cd = byCountry[c];
+        var pct = Math.round(cd.clicks/maxCC*100);
         return '<div style="margin-bottom:7px">' +
           '<div style="display:flex;justify-content:space-between;margin-bottom:2px">' +
-            '<span style="font-size:10px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:4px"><span style="width:5px;height:5px;border-radius:50%;background:'+col+';flex-shrink:0;display:inline-block"></span>'+escHtml(sc?sc.name:sid)+'</span>' +
-            '<span style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">'+n+'</span>' +
+            '<span style="font-size:10px;font-weight:600;color:var(--text)">' + escHtml(c) + '</span>' +
+            '<span style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">' + cd.clicks + ' clicks &middot; <span style="color:var(--green)">' + cd.ftds + '</span> FTDs</span>' +
           '</div>' +
-          '<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:1px;overflow:hidden"><div style="width:'+Math.round(n/maxSrc*100)+'%;height:100%;background:'+col+';opacity:0.75;border-radius:1px"></div></div>' +
+          '<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:1px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:rgba(255,255,255,0.2);border-radius:1px"></div></div>' +
         '</div>';
-      }).join('') : '<div style="color:var(--muted);font-size:11px">No data yet</div>';
-    }
-    if (donutEl && srcList.length > 0) {
-      var DS=80, DR=26, dc=DS/2, sA=-Math.PI/2, slices='';
-      srcList.forEach(function(sid) {
-        var sc2 = getTrafficSources().find(function(ts){ return ts.id===sid; });
-        var col2 = sc2 ? sc2.color : '#707078';
-        var frac = clicksBySrc[sid]/totalClicks;
-        var angle = frac*Math.PI*2;
-        if (frac > 0.01) {
-          var x1=(dc+DR*Math.cos(sA)).toFixed(1), y1=(dc+DR*Math.sin(sA)).toFixed(1);
-          var x2=(dc+DR*Math.cos(sA+angle)).toFixed(1), y2=(dc+DR*Math.sin(sA+angle)).toFixed(1);
-          slices+='<path d="M '+dc+' '+dc+' L '+x1+' '+y1+' A '+DR+' '+DR+' 0 '+(angle>Math.PI?1:0)+' 1 '+x2+' '+y2+' Z" fill="'+col2+'" opacity="0.85"/>';
-        }
-        sA += angle;
-      });
-      slices+='<circle cx="'+dc+'" cy="'+dc+'" r="'+Math.round(DR*0.52)+'" fill="var(--card)"/>';
-      slices+='<text x="'+dc+'" y="'+(dc+1)+'" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,0.5)" font-size="9" font-family="monospace" font-weight="700">'+totalClicks+'</text>';
-      donutEl.innerHTML = '<svg width="'+DS+'" height="'+DS+'">'+slices+'</svg>';
-    } else if (donutEl) {
-      donutEl.innerHTML = '';
+      }).join('') : '<div style="color:var(--muted);font-size:11px">No country data</div>';
     }
 
-    // Recent events
-    var evEl = document.getElementById('homeEvents');
-    if (evEl) {
-      var evs = [];
-      pbSnap.forEach(function(doc){ evs.push(doc.data()); });
-      evEl.innerHTML = evs.length
-        ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">' +
-          evs.map(function(d) {
-            var isFtd = d.eventType==='ftd', isReg = d.eventType==='reg';
-            var bc = isFtd ? 'var(--green)' : isReg ? 'var(--accent)' : 'var(--muted)';
-            var bl = isFtd ? 'FTD' : isReg ? 'REG' : (d.eventType||'?').toUpperCase();
-            var ts = d.ts ? new Date(d.ts) : null;
-            var tStr = ts ? ts.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' '+ts.toLocaleDateString([],{month:'short',day:'numeric'}) : '—';
-            var f = d.funnelKey||d.funnel||'?';
-            var fc = FUNNEL_COLORS[f]||'var(--muted)';
-            return '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-              '<span style="font-size:9px;font-weight:800;letter-spacing:0.04em;color:'+bc+';background:'+bc+'1a;padding:2px 6px;border-radius:3px;border:1px solid '+bc+'44;white-space:nowrap;flex-shrink:0">'+bl+'</span>' +
-              '<span style="font-size:11px;font-weight:700;color:'+fc+';white-space:nowrap;flex-shrink:0">'+escHtml(f)+'</span>' +
-              '<span style="font-size:10px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(d.source||d.src||'—')+'</span>' +
-              (d.revenue>0?'<span style="font-size:11px;font-family:var(--font-mono);color:var(--yellow);white-space:nowrap">'+String.fromCharCode(8364)+(+d.revenue).toFixed(0)+'</span>':'') +
-              '<span style="font-size:9px;font-family:var(--font-mono);color:rgba(255,255,255,0.18);white-space:nowrap">'+tStr+'</span>' +
-            '</div>';
-          }).join('') + '</div>'
-        : '<div style="padding:12px 16px;color:var(--muted);font-size:12px;text-align:center">No events yet</div>';
+    // ── Top Tracking Codes ──
+    var trackEl = document.getElementById('homeTopTracking');
+    if (trackEl) {
+      var tk = Object.keys(byTracking).sort(function(a,b){ return byTracking[b].clicks-byTracking[a].clicks; }).slice(0,6);
+      var maxTC = tk.length ? byTracking[tk[0]].clicks : 1;
+      trackEl.innerHTML = tk.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px">' + tk.map(function(t) {
+        var td = byTracking[t];
+        var pct = Math.round(td.clicks/maxTC*100);
+        var c2r = td.clicks>0?(td.regs/td.clicks*100).toFixed(1):'0';
+        return '<div style="display:flex;align-items:center;gap:8px">' +
+          '<div style="width:100px;font-size:10px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);flex-shrink:0" title="'+escHtml(t)+'">' + escHtml(t) + '</div>' +
+          '<div style="flex:1;background:rgba(255,255,255,0.04);border-radius:2px;height:16px;overflow:hidden;position:relative">' +
+            '<div style="height:100%;border-radius:2px;background:rgba(255,255,255,0.12);width:'+pct+'%"></div>' +
+            '<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:8px;color:var(--muted);font-family:var(--font-mono)">' + td.clicks + ' clicks &middot; ' + td.ftds + ' FTDs &middot; ' + c2r + '%</span>' +
+          '</div></div>';
+      }).join('') + '</div>' : '<div style="color:var(--muted);font-size:11px">No tracking data</div>';
     }
 
     markDataFresh('home');
@@ -5667,7 +5616,6 @@ function loadHomeData() {
     console.error('Home data error:', err);
   });
 }
-
 
 function renderOverviewTab() {
   var body = document.getElementById('analyticsTabBody');
