@@ -4950,7 +4950,7 @@ function renderAnalyticsPage() {
   else if (analyticsTab === 'cxstats') renderCxStatsTab();
 }
 
-// ── CX Stats: Advanced Analytics v2 ──────────────────────────────────────────
+// ── CX Stats: Clean Analytics ─────────────────────────────────────────────────
 var _cxFilterBrand    = '';
 var _cxFilterCountry  = '';
 var _cxFilterTracking = '';
@@ -4959,20 +4959,18 @@ var _cxFilterDateTo   = '';
 var _cxSortCol        = 'Day';
 var _cxSortDir        = -1;
 var _cxGroupBy        = '';
-var _cxView           = 'overview'; // 'overview' | 'table'
 var _cxAllRows        = [];
 var _cxBrandsMeta     = [];
 var _cxFetchedAt      = '';
 var _cxMonthStart     = '';
 var _cxToday          = '';
 var _cxLoaded         = false;
-
-var _CX_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+var _cxShowTable      = false;
 
 function renderCxStatsTab() {
   var body = document.getElementById('analyticsTabBody');
   if (!body) return;
-  if (!_cxLoaded) body.innerHTML = '<div style="padding:40px 32px;color:var(--muted);font-size:13px">Loading affiliate stats...</div>';
+  if (!_cxLoaded) body.innerHTML = '<div style="padding:40px 32px;color:var(--muted);font-size:13px">Loading affiliate stats\u2026</div>';
   db.collection('affiliate_stats').doc('current').get().then(function(snap) {
     if (!snap.exists) { body.innerHTML = '<div style="padding:40px 32px;text-align:center"><div style="font-size:15px;font-weight:600;margin-bottom:8px">No data yet</div><div style="font-size:13px;color:var(--muted)">Stats will appear after the first hourly sync.</div></div>'; return; }
     var d = snap.data();
@@ -5017,123 +5015,71 @@ function _cxRender(body) {
   var c2r = t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0.0';
   var r2f = t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0.0';
   var fetchedStr = _cxFetchedAt ? _cxFetchedAt.slice(0,16).replace('T',' ')+' UTC' : 'never';
-  var periodStr = _cxMonthStart && _cxToday ? _cxMonthStart+' to '+_cxToday : 'MTD';
+  var periodStr = _cxMonthStart && _cxToday ? _cxMonthStart+' \u2013 '+_cxToday : 'MTD';
 
   var err = _cxBrandsMeta.filter(function(b){return b.error;});
-  var errH = err.length ? '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 16px;margin:0 24px 16px;font-size:12px;color:var(--red)">'+err.map(function(b){return escHtml(b.name);}).join(', ')+' failed to sync</div>' : '';
+  var errH = err.length ? '<div style="background:rgba(212,112,128,0.07);border:1px solid rgba(212,112,128,0.22);border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:9px;align-items:flex-start"><span style="color:var(--red);font-size:15px;line-height:1;flex-shrink:0">&#9888;</span><div style="font-size:11px;color:var(--red);line-height:1.5">'+err.map(function(b){return escHtml(b.name);}).join(', ')+' failed to sync</div></div>' : '';
 
-  var ss='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;min-width:90px';
-  var bs='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text);font-size:12px;cursor:pointer';
+  var ss='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer';
   var ds='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;color-scheme:dark';
-
   function so(arr,cur,ph){return '<option value="">'+(ph||'All')+'</option>'+arr.map(function(v){return '<option value="'+escHtml(v)+'"'+(cur===v?' selected':'')+'>'+escHtml(v)+'</option>';}).join('');}
-  function vBtn(v,l){var a=_cxView===v;return '<button onclick="_cxView=\''+v+'\';_cxRefresh()" style="'+bs+';'+(a?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">'+l+'</button>';}
 
-  var h = '';
-  // ── Header ──
-  h += '<div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">' +
-    '<div><div style="font-size:20px;font-weight:700">CX Stats</div><div style="font-size:12px;color:var(--muted);margin-top:2px">'+escHtml(periodStr)+' &middot; Synced: '+escHtml(fetchedStr)+'</div></div>' +
-    '<div style="display:flex;gap:6px">'+vBtn('overview','Overview')+vBtn('table','Data Table')+'<button onclick="_cxExportCSV()" style="'+bs+'">Export CSV</button><button onclick="_cxLoaded=false;renderCxStatsTab()" style="'+bs+'">&#8635;</button></div></div>';
+  var h = '<div style="padding:24px 32px 40px;max-width:1800px;margin:0 auto">';
+
+  // ── Header row ──
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">' +
+    '<div>' +
+      '<div style="font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted)">CX Stats &#183; '+escHtml(periodStr)+'</div>' +
+      '<div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:2px;font-family:var(--font-mono)">Synced '+escHtml(fetchedStr)+'</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px;align-items:center">' +
+      '<button onclick="_cxExportCSV()" style="'+ss+'">&#8595; CSV</button>' +
+      '<button onclick="_cxLoaded=false;renderCxStatsTab()" style="'+ss+'" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--text)\'">&#8635; Refresh</button>' +
+    '</div></div>';
+
   h += errH;
 
-  // ── KPI Cards ──
-  h += '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:0 24px 16px">' +
-    _cxKPI('Clicks',_cxF(t.clicks),'var(--accent)','') + _cxKPI('Registrations',_cxF(t.regs),'var(--yellow)','') +
-    _cxKPI('FTDs',_cxF(t.ftds),'var(--green)','') + _cxKPI('Commission','\u20AC'+_cxF(t.comm,2),'#a855f7','') +
-    _cxKPI('Click\u2192Reg',c2r+'%','var(--accent)','C2R') + _cxKPI('Reg\u2192FTD',r2f+'%','var(--green)','R2F') +
-  '</div>';
-
-  // ── Filters ──
-  h += '<div style="padding:0 24px 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+  // ── Filters row ──
+  h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px">' +
     '<input type="date" value="'+(_cxFilterDateFrom||'').replace(/\//g,'-')+'" onchange="_cxFilterDateFrom=this.value;_cxRefresh()" style="'+ds+'">' +
     '<span style="color:var(--muted);font-size:11px">to</span>' +
     '<input type="date" value="'+(_cxFilterDateTo||'').replace(/\//g,'-')+'" onchange="_cxFilterDateTo=this.value;_cxRefresh()" style="'+ds+'">' +
-    '<span style="width:1px;height:18px;background:var(--border);margin:0 2px"></span>' +
+    '<span style="width:1px;height:18px;background:var(--border);margin:0 4px"></span>' +
     '<select onchange="_cxFilterBrand=this.value;_cxRefresh()" style="'+ss+'">'+so(brands,_cxFilterBrand,'All Brands')+'</select>' +
     '<select onchange="_cxFilterCountry=this.value;_cxRefresh()" style="'+ss+'">'+so(countries,_cxFilterCountry,'All Countries')+'</select>' +
     '<select onchange="_cxFilterTracking=this.value;_cxRefresh()" style="'+ss+'">'+so(trackings,_cxFilterTracking,'All Tracking')+'</select>' +
     ((_cxFilterBrand||_cxFilterCountry||_cxFilterTracking)?'<button onclick="_cxFilterBrand=\'\';_cxFilterCountry=\'\';_cxFilterTracking=\'\';_cxRefresh()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);font-size:11px;cursor:pointer">Clear</button>':'') +
-    '<span style="margin-left:auto;font-size:11px;color:var(--muted)">'+rows.length+' rows</span></div>';
+    '<span style="margin-left:auto;font-size:10px;color:rgba(255,255,255,0.2);font-family:var(--font-mono)">'+rows.length+' rows</span></div>';
 
-  if (_cxView === 'overview') {
-    h += _cxOverview(rows, t);
-  } else {
-    h += _cxTableView(rows, t);
-  }
-  body.innerHTML = h;
-}
+  // ── KPI Cards ──
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">';
+  h += _cxKPI('Clicks',_cxF(t.clicks),'var(--text)',c2r+'% C2R');
+  h += _cxKPI('Registrations',_cxF(t.regs),'#63b3ed','');
+  h += _cxKPI('FTDs',_cxF(t.ftds),'var(--green)',r2f+'% R2F');
+  h += _cxKPI('Commission','\u20AC'+_cxF(t.comm,2),'var(--yellow)','');
+  h += '</div>';
 
-// ══════════════════════════════════════════════════════════════════════════════
-// OVERVIEW VIEW
-// ══════════════════════════════════════════════════════════════════════════════
-
-function _cxOverview(rows, t) {
-  var h = '';
-
-  // ── Conversion Funnel ──
-  h += '<div style="padding:0 24px 16px"><div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 24px">' +
-    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:16px">Conversion Funnel</div>' +
-    _cxFunnel(t.clicks, t.regs, t.ftds) +
-  '</div></div>';
-
-  // ── Charts row: Daily Trend + Brand Breakdown ──
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 16px">';
+  // ── Daily Trend Chart ──
   h += _cxDailyChart(rows);
-  h += _cxBrandDonut(rows, t);
-  h += '</div>';
 
-  // ── Second row: Top Countries + Top Tracking Codes ──
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 16px">';
-  h += _cxTopBarChart(rows, 'Country', 'Top Countries', 8);
-  h += _cxTopBarChart(rows, 'Tracking', 'Top Tracking Codes', 8);
-  h += '</div>';
-
-  // ── Performance Insights ──
-  h += _cxInsights(rows);
-
-  // ── Brand Performance Table ──
+  // ── Brand Performance ──
   h += _cxBrandTable(rows, t);
 
-  return h;
-}
+  // ── Data Table Toggle ──
+  h += '<div style="margin-top:16px">' +
+    '<div onclick="_cxShowTable=!_cxShowTable;_cxRefresh()" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 0;border-top:1px solid var(--border)">' +
+      '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Full Data Table</span>' +
+      '<span style="font-size:10px;color:var(--muted);transition:transform 0.2s;transform:rotate('+(_cxShowTable?'180':'0')+'deg)">\u25BC</span>' +
+      '<span style="flex:1"></span>' +
+      (_cxShowTable?'<div style="display:flex;gap:4px" onclick="event.stopPropagation()">'+_cxGBtns()+'</div>':'') +
+    '</div>';
+  if (_cxShowTable) {
+    if (_cxGroupBy) { h += _cxGroupedTbl(rows); } else { h += _cxDetailTbl(rows, t); }
+  }
+  h += '</div>';
 
-// ── Conversion Funnel ──
-function _cxFunnel(clicks, regs, ftds) {
-  var c2r = clicks > 0 ? (regs/clicks*100).toFixed(1) : '0';
-  var r2f = regs > 0 ? (ftds/regs*100).toFixed(1) : '0';
-  var c2f = clicks > 0 ? (ftds/clicks*100).toFixed(2) : '0';
-  var maxW = 100;
-  var rW = clicks > 0 ? Math.max(8, regs/clicks*100) : 8;
-  var fW = clicks > 0 ? Math.max(4, ftds/clicks*100) : 4;
-  return '<div style="display:flex;align-items:center;gap:0">' +
-    // Clicks bar
-    '<div style="flex:1;text-align:center">' +
-      '<div style="background:var(--accent);border-radius:8px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 2px">' +
-        '<span style="color:#fff;font-weight:800;font-size:18px">'+_cxF(clicks)+'</span></div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:600">CLICKS</div></div>' +
-    // Arrow + C2R
-    '<div style="padding:0 8px;text-align:center;flex:0 0 60px">' +
-      '<div style="font-size:14px;font-weight:800;color:var(--accent)">'+c2r+'%</div>' +
-      '<div style="color:var(--muted);font-size:16px">\u2192</div></div>' +
-    // Regs bar
-    '<div style="flex:0 0 '+rW+'%;min-width:60px;text-align:center">' +
-      '<div style="background:var(--yellow);border-radius:8px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 2px">' +
-        '<span style="color:#000;font-weight:800;font-size:18px">'+_cxF(regs)+'</span></div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:600">REGS</div></div>' +
-    // Arrow + R2F
-    '<div style="padding:0 8px;text-align:center;flex:0 0 60px">' +
-      '<div style="font-size:14px;font-weight:800;color:var(--green)">'+r2f+'%</div>' +
-      '<div style="color:var(--muted);font-size:16px">\u2192</div></div>' +
-    // FTDs bar
-    '<div style="flex:0 0 '+fW+'%;min-width:50px;text-align:center">' +
-      '<div style="background:var(--green);border-radius:8px;height:48px;display:flex;align-items:center;justify-content:center;margin:0 2px">' +
-        '<span style="color:#fff;font-weight:800;font-size:18px">'+_cxF(ftds)+'</span></div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:600">FTDs</div></div>' +
-    // Overall C2F
-    '<div style="padding:0 0 0 16px;text-align:center;flex:0 0 70px;border-left:1px solid var(--border);margin-left:12px">' +
-      '<div style="font-size:20px;font-weight:800;color:#a855f7">'+c2f+'%</div>' +
-      '<div style="font-size:9px;color:var(--muted);font-weight:600">CLICK\u2192FTD</div></div>' +
-  '</div>';
+  h += '</div>'; // close main wrapper
+  body.innerHTML = h;
 }
 
 // ── Daily Trend Chart ──
@@ -5141,233 +5087,130 @@ function _cxDailyChart(rows) {
   var dm = {};
   rows.forEach(function(r) { var d=r.Day.replace(/\//g,'-'); if(!dm[d])dm[d]={c:0,r:0,f:0}; dm[d].c+=r.Visitors; dm[d].r+=r.Regs; dm[d].f+=r.FTDs; });
   var dk = Object.keys(dm).sort();
-  if (dk.length < 2) return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;color:var(--muted);font-size:12px">Not enough daily data for chart</div>';
+  if (dk.length < 2) return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;text-align:center;color:var(--muted);font-size:12px;margin-bottom:16px">Not enough daily data for chart</div>';
 
   var maxC = Math.max.apply(null,dk.map(function(k){return dm[k].c;}))||1;
-  var W=700,H=180,PX=8,PY=12,PB=22;
+  var W=800,H=160,PX=8,PY=10,PB=20;
   var uW=W-PX*2, uH=H-PY-PB, step=uW/Math.max(1,dk.length-1);
 
   var cPts=dk.map(function(k,i){return (PX+i*step).toFixed(1)+','+(PY+uH-Math.round(dm[k].c/maxC*uH)).toFixed(1);}).join(' ');
-  var rPts=dk.map(function(k,i){return (PX+i*step).toFixed(1)+','+(PY+uH-Math.round(dm[k].r/maxC*uH)).toFixed(1);}).join(' ');
 
-  var barW=Math.max(3,Math.min(16,step*0.4));
-  var fBars=dk.map(function(k,i){var f=dm[k].f;if(!f)return '';var bh=Math.max(3,Math.round(f/maxC*uH));return '<rect x="'+(PX+i*step-barW/2).toFixed(1)+'" y="'+(PY+uH-bh)+'" width="'+barW+'" height="'+bh+'" fill="var(--green)" opacity="0.5" rx="2"/>';}).join('');
+  var barW=Math.max(3,Math.min(14,step*0.35));
+  var fBars=dk.map(function(k,i){var f=dm[k].f;if(!f)return '';var bh=Math.max(3,Math.round(f/maxC*uH));return '<rect x="'+(PX+i*step-barW/2).toFixed(1)+'" y="'+(PY+uH-bh)+'" width="'+barW+'" height="'+bh+'" fill="var(--green)" opacity="0.6" rx="2"/>';}).join('');
 
   var fp=PX+','+(PY+uH); var lp=(PX+(dk.length-1)*step)+','+(PY+uH);
   var area='M '+fp+' L '+cPts.split(' ').join(' L ')+' L '+lp+' Z';
-  var ls=Math.max(1,Math.ceil(dk.length/7));
-  var labs=dk.map(function(k,i){if(i%ls!==0&&i!==dk.length-1)return '';return '<text x="'+(PX+i*step).toFixed(1)+'" y="'+(H-4)+'" text-anchor="middle" fill="var(--muted)" font-size="8.5">'+k.slice(5)+'</text>';}).join('');
+  var ls=Math.max(1,Math.ceil(dk.length/8));
+  var labs=dk.map(function(k,i){if(i%ls!==0&&i!==dk.length-1)return '';return '<text x="'+(PX+i*step).toFixed(1)+'" y="'+(H-3)+'" text-anchor="middle" fill="rgba(255,255,255,0.25)" font-size="8" font-family="var(--font-mono)">'+k.slice(5)+'</text>';}).join('');
 
-  // Tooltips — hover dots
-  var dots = dk.map(function(k,i){var x=PX+i*step,y=PY+uH-Math.round(dm[k].c/maxC*uH);return '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3" fill="var(--accent)" opacity="0"><title>'+k+' | '+dm[k].c+' clicks, '+dm[k].r+' regs, '+dm[k].f+' FTDs</title></circle>';}).join('');
+  var dots = dk.map(function(k,i){var x=PX+i*step,y=PY+uH-Math.round(dm[k].c/maxC*uH);return '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3" fill="rgba(255,255,255,0.5)" opacity="0"><title>'+k+' \u2502 '+dm[k].c+' clicks, '+dm[k].r+' regs, '+dm[k].f+' FTDs</title></circle>';}).join('');
 
-  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-      '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">Daily Trend</span>' +
-      '<div style="display:flex;gap:12px;font-size:9px;color:var(--muted)">' +
-        '<span style="display:flex;align-items:center;gap:3px"><span style="width:10px;height:2px;background:var(--accent);border-radius:1px"></span>Clicks</span>' +
-        '<span style="display:flex;align-items:center;gap:3px"><span style="width:10px;height:2px;background:var(--yellow);border-radius:1px"></span>Regs</span>' +
-        '<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;background:var(--green);opacity:0.5;border-radius:2px"></span>FTDs</span></div></div>' +
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+      '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Daily Activity</div>' +
+      '<div style="display:flex;gap:14px;font-size:10px;color:var(--muted)">' +
+        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(112,112,120,0.5);vertical-align:middle;margin-right:3px"></span>Clicks</span>' +
+        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--green);vertical-align:middle;margin-right:3px;opacity:0.8"></span>FTDs</span></div></div>' +
     '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto">' +
-      '<defs><linearGradient id="cxA2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.12"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
-      '<path d="'+area+'" fill="url(#cxA2)"/>' +
-      '<polyline points="'+cPts+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
-      '<polyline points="'+rPts+'" fill="none" stroke="var(--yellow)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="4,3"/>' +
+      '<defs><linearGradient id="cxFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(255,255,255,0.06)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient></defs>' +
+      '<path d="'+area+'" fill="url(#cxFill)"/>' +
+      '<polyline points="'+cPts+'" fill="none" stroke="rgba(112,112,120,0.5)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
       fBars + labs + dots +
     '</svg></div>';
-}
-
-// ── Brand Donut Chart ──
-function _cxBrandDonut(rows, tot) {
-  var bg = _cxGT(rows,'Brand');
-  if (bg.length === 0) return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;color:var(--muted);font-size:12px">No brand data</div>';
-
-  var cx=80,cy=80,R=65,r=42;
-  var total = bg.reduce(function(s,b){return s+b.clicks;},0)||1;
-  var angle = -Math.PI/2;
-  var arcs = '';
-  var legend = '';
-  bg.forEach(function(b,i) {
-    var pct = b.clicks/total;
-    var a1 = angle, a2 = angle + pct*2*Math.PI;
-    var large = pct > 0.5 ? 1 : 0;
-    var x1o=cx+R*Math.cos(a1),y1o=cy+R*Math.sin(a1),x2o=cx+R*Math.cos(a2),y2o=cy+R*Math.sin(a2);
-    var x1i=cx+r*Math.cos(a2),y1i=cy+r*Math.sin(a2),x2i=cx+r*Math.cos(a1),y2i=cy+r*Math.sin(a1);
-    var col = _CX_COLORS[i%_CX_COLORS.length];
-    if (pct > 0.001) arcs += '<path d="M'+x1o.toFixed(1)+','+y1o.toFixed(1)+' A'+R+','+R+' 0 '+large+' 1 '+x2o.toFixed(1)+','+y2o.toFixed(1)+' L'+x1i.toFixed(1)+','+y1i.toFixed(1)+' A'+r+','+r+' 0 '+large+' 0 '+x2i.toFixed(1)+','+y2i.toFixed(1)+'Z" fill="'+col+'"><title>'+b.key+': '+b.clicks+' clicks ('+(pct*100).toFixed(1)+'%)</title></path>';
-    var bc2r = b.clicks>0?(b.regs/b.clicks*100).toFixed(1):'0';
-    legend += '<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0">' +
-      '<span style="width:8px;height:8px;border-radius:2px;background:'+col+';flex-shrink:0"></span>' +
-      '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(b.key)+'</span>' +
-      '<span style="color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap">'+_cxF(b.clicks)+' <span style="color:var(--green);font-weight:600">'+b.ftds+'</span> <span style="font-size:10px">'+bc2r+'%</span></span></div>';
-    angle = a2;
-  });
-
-  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px">' +
-    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:10px">Brand Breakdown</div>' +
-    '<div style="display:flex;align-items:center;gap:16px">' +
-      '<svg viewBox="0 0 160 160" style="width:130px;height:130px;flex-shrink:0">'+arcs+
-        '<text x="80" y="76" text-anchor="middle" fill="var(--text)" font-size="16" font-weight="800">'+_cxF(tot.ftds)+'</text>' +
-        '<text x="80" y="92" text-anchor="middle" fill="var(--muted)" font-size="9">FTDs</text></svg>' +
-      '<div style="flex:1;overflow:hidden">'+legend+'</div></div></div>';
-}
-
-// ── Top Bar Chart (Countries / Tracking Codes) ──
-function _cxTopBarChart(rows, key, title, max) {
-  var groups = _cxGT(rows, key).slice(0, max);
-  if (!groups.length) return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;color:var(--muted);font-size:12px">No '+key.toLowerCase()+' data</div>';
-  var maxClicks = groups[0].clicks || 1;
-
-  var bars = groups.map(function(g, i) {
-    var pct = Math.round(g.clicks/maxClicks*100);
-    var c2r = g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'0';
-    var col = _CX_COLORS[i%_CX_COLORS.length];
-    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-      '<div style="width:70px;font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);flex-shrink:0" title="'+escHtml(g.key)+'">'+escHtml(g.key)+'</div>' +
-      '<div style="flex:1;background:var(--card2);border-radius:3px;height:18px;overflow:hidden;position:relative">' +
-        '<div style="height:100%;border-radius:3px;background:'+col+';opacity:0.7;width:'+pct+'%;transition:width 0.3s"></div>' +
-        '<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--muted);font-variant-numeric:tabular-nums">'+_cxF(g.clicks)+' clicks &middot; '+g.ftds+' FTDs &middot; '+c2r+'%</span>' +
-      '</div></div>';
-  }).join('');
-
-  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px">' +
-    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:10px">'+title+'</div>' +
-    bars + '</div>';
-}
-
-// ── Performance Insights ──
-function _cxInsights(rows) {
-  if (rows.length < 3) return '';
-  var byCountry = _cxGT(rows,'Country').filter(function(g){return g.clicks>=5;});
-  var byTracking = _cxGT(rows,'Tracking').filter(function(g){return g.clicks>=5;});
-  var byBrand = _cxGT(rows,'Brand').filter(function(g){return g.clicks>=3;});
-
-  var insights = [];
-  // Best C2R country
-  var bc = byCountry.slice().sort(function(a,b){return (b.clicks>0?b.regs/b.clicks:0)-(a.clicks>0?a.regs/a.clicks:0);});
-  if (bc.length) { var b=bc[0]; var pct=(b.regs/b.clicks*100).toFixed(1); insights.push({icon:'\uD83C\uDDFA\uD83C\uDDF3',title:b.key+' leads C2R',desc:pct+'% conversion from '+_cxF(b.clicks)+' clicks',color:'var(--accent)'}); }
-  // Best FTD brand
-  var bf = byBrand.slice().sort(function(a,b){return b.ftds-a.ftds;});
-  if (bf.length) { var b2=bf[0]; insights.push({icon:'\uD83C\uDFC6',title:b2.key+' top FTDs',desc:b2.ftds+' FTDs from '+_cxF(b2.clicks)+' clicks',color:'var(--green)'}); }
-  // Best tracking code
-  var bt = byTracking.slice().sort(function(a,b){return b.ftds-a.ftds;});
-  if (bt.length) { var b3=bt[0]; insights.push({icon:'\uD83C\uDFAF',title:b3.key+' best tracker',desc:b3.ftds+' FTDs, '+_cxF(b3.clicks)+' clicks',color:'#a855f7'}); }
-  // Highest R2F country
-  var rc = byCountry.filter(function(g){return g.regs>=2;}).sort(function(a,b){return (b.regs>0?b.ftds/b.regs:0)-(a.regs>0?a.ftds/a.regs:0);});
-  if (rc.length && rc[0].ftds > 0) { var b4=rc[0]; insights.push({icon:'\uD83D\uDCA1',title:b4.key+' best R2F',desc:(b4.ftds/b4.regs*100).toFixed(1)+'% from '+b4.regs+' regs',color:'var(--yellow)'}); }
-
-  if (!insights.length) return '';
-  return '<div style="display:grid;grid-template-columns:repeat('+Math.min(insights.length,4)+',1fr);gap:10px;padding:0 24px 16px">' +
-    insights.map(function(ins) {
-      return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
-        '<div style="font-size:18px;margin-bottom:6px">'+ins.icon+'</div>' +
-        '<div style="font-size:13px;font-weight:700;color:'+ins.color+';margin-bottom:2px">'+escHtml(ins.title)+'</div>' +
-        '<div style="font-size:11px;color:var(--muted)">'+escHtml(ins.desc)+'</div></div>';
-    }).join('') + '</div>';
 }
 
 // ── Brand Performance Table ──
 function _cxBrandTable(rows, tot) {
   var bg = _cxGT(rows,'Brand');
-  if (bg.length < 2) return '';
-  var rh = bg.map(function(g,i) {
-    var c2r=g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'-';
-    var r2f=g.regs>0?(g.ftds/g.regs*100).toFixed(1):'-';
-    var share=tot.clicks>0?(g.clicks/tot.clicks*100).toFixed(0):0;
-    var col=_CX_COLORS[i%_CX_COLORS.length];
-    return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
-      '<td style="padding:10px 14px;font-size:13px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+col+';margin-right:8px;vertical-align:middle"></span>'+escHtml(g.key)+'</td>' +
-      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.clicks)+'</td>' +
-      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.regs)+'</td>' +
-      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:'+(g.ftds>0?'700':'400')+';color:'+(g.ftds>0?'var(--green)':'var(--text)')+';font-variant-numeric:tabular-nums">'+_cxF(g.ftds)+'</td>' +
-      '<td style="padding:10px 14px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">\u20AC'+_cxF(g.comm,2)+'</td>' +
-      '<td style="padding:10px 14px;text-align:right;font-size:12px;color:var(--muted)">'+c2r+'%</td>' +
-      '<td style="padding:10px 14px;text-align:right;font-size:12px;color:var(--muted)">'+r2f+'%</td>' +
-      '<td style="padding:10px 14px;width:80px"><div style="background:var(--card2);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;background:'+col+';width:'+share+'%"></div></div></td></tr>';
+  if (!bg.length) return '';
+  var ths='padding:10px 14px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);border-bottom:1px solid var(--border)';
+  var rh = bg.map(function(g) {
+    var c2r=g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'\u2014';
+    var r2f=g.regs>0?(g.ftds/g.regs*100).toFixed(1):'\u2014';
+    var share=tot.clicks>0?Math.round(g.clicks/tot.clicks*100):0;
+    return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
+      '<td style="padding:10px 14px;font-size:12px;font-weight:600">'+escHtml(g.key)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:12px;font-family:var(--font-mono)">'+_cxF(g.clicks)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:12px;font-family:var(--font-mono)">'+_cxF(g.regs)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:12px;font-family:var(--font-mono);font-weight:'+(g.ftds>0?'700':'400')+';color:'+(g.ftds>0?'var(--green)':'var(--text)')+'">'+_cxF(g.ftds)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:12px;font-family:var(--font-mono)">\u20AC'+_cxF(g.comm,2)+'</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:11px;color:var(--muted)">'+c2r+'%</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-size:11px;color:var(--muted)">'+r2f+'%</td>' +
+      '<td style="padding:10px 14px;width:80px"><div style="background:var(--card2);border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;border-radius:2px;background:rgba(255,255,255,0.25);width:'+share+'%"></div></div></td></tr>';
   }).join('');
 
-  var ths='padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border)';
-  return '<div style="padding:0 24px 16px"><div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">' +
-    '<div style="padding:14px 18px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">Brand Performance</div>' +
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
+    '<div style="padding:14px 18px 0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Brand Performance</div>' +
     '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
       '<thead><tr><th style="'+ths+';text-align:left">Brand</th><th style="'+ths+';text-align:right">Clicks</th><th style="'+ths+';text-align:right">Regs</th><th style="'+ths+';text-align:right">FTDs</th><th style="'+ths+';text-align:right">Commission</th><th style="'+ths+';text-align:right">C2R</th><th style="'+ths+';text-align:right">R2F</th><th style="'+ths+'">Share</th></tr></thead>' +
-      '<tbody>'+rh+'</tbody></table></div></div></div>';
+      '<tbody>'+rh+'</tbody></table></div></div>';
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TABLE VIEW
-// ══════════════════════════════════════════════════════════════════════════════
-
-function _cxTableView(rows, t) {
-  var h = '';
-  var bs='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text);font-size:12px;cursor:pointer';
-  function gb(v,l){var a=_cxGroupBy===v;return '<button onclick="_cxGroupBy=\''+v+'\';_cxRefresh()" style="'+bs+';'+(a?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">'+l+'</button>';}
-
-  h += '<div style="padding:0 24px 10px;display:flex;gap:6px;align-items:center">' +
-    '<span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Group:</span>' +
-    gb('','None')+gb('Day','Day')+gb('Brand','Brand')+gb('Country','Country')+gb('Tracking','Tracking')+'</div>';
-
-  if (_cxGroupBy) { h += _cxGroupedTbl(rows); } else { h += _cxDetailTbl(rows, t); }
-  return h;
+// ── Group-by Buttons ──
+function _cxGBtns() {
+  var bs='background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text);font-size:11px;cursor:pointer';
+  function gb(v,l){var a=_cxGroupBy===v;return '<button onclick="_cxGroupBy=\''+v+'\';_cxRefresh()" style="'+bs+';'+(a?'background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15)':'')+'">'+l+'</button>';}
+  return gb('','None')+gb('Day','Day')+gb('Brand','Brand')+gb('Country','Country')+gb('Tracking','Tracking');
 }
 
-function _cxTh(col,label,align){var a=_cxSortCol===col,ar=a?(_cxSortDir===-1?' \u2193':' \u2191'):'',al=align||(col==='Day'||col==='Tracking'||col==='Country'||col==='Brand'?'left':'right');return '<th onclick="_cxSortCol=\''+col+'\';_cxSortDir*=-1;_cxRefresh()" style="padding:9px 12px;text-align:'+al+';font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:'+(a?'var(--text)':'var(--muted)')+';cursor:pointer;white-space:nowrap;user-select:none;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card)">'+label+escHtml(ar)+'</th>';}
+// ── Sortable Header ──
+function _cxTh(col,label,align){var a=_cxSortCol===col,ar=a?(_cxSortDir===-1?' \u2193':' \u2191'):'',al=align||(col==='Day'||col==='Tracking'||col==='Country'||col==='Brand'?'left':'right');return '<th onclick="_cxSortCol=\''+col+'\';_cxSortDir*=-1;_cxRefresh()" style="padding:9px 12px;text-align:'+al+';font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:'+(a?'var(--text)':'var(--muted)')+';cursor:pointer;white-space:nowrap;user-select:none;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card)">'+label+escHtml(ar)+'</th>';}
 
+// ── Detail Table ──
 function _cxDetailTbl(rows, t) {
-  var rh = !rows.length ? '<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--muted);font-size:13px">No data</td></tr>'
-    : rows.map(function(r){var c2r=r.Visitors>0?(r.Regs/r.Visitors*100).toFixed(1):'-',r2f=r.Regs>0?(r.FTDs/r.Regs*100).toFixed(1):'-';
-        return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
-          '<td style="padding:8px 12px;font-size:12px;color:var(--muted);white-space:nowrap">'+escHtml(r.Day.replace(/\//g,'-'))+'</td>' +
-          '<td style="padding:8px 12px;font-size:12px">'+escHtml(r.Tracking||'\u2014')+'</td>' +
-          '<td style="padding:8px 12px;font-size:12px">'+escHtml(r.Country||'\u2014')+'</td>' +
-          '<td style="padding:8px 12px;font-size:12px">'+escHtml(r.Brand||'\u2014')+'</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">'+r.Visitors+'</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">'+r.Regs+'</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-weight:'+(r.FTDs>0?'700':'400')+';color:'+(r.FTDs>0?'var(--green)':'var(--text)')+';font-variant-numeric:tabular-nums">'+r.FTDs+'</td>' +
-          '<td style="padding:8px 12px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">\u20AC'+r.Commission.toFixed(2)+'</td>' +
-          '<td style="padding:8px 12px;font-size:11px;text-align:right;color:var(--muted)">'+c2r+'%</td>' +
-          '<td style="padding:8px 12px;font-size:11px;text-align:right;color:var(--muted)">'+r2f+'%</td></tr>';}).join('');
+  var rh = !rows.length ? '<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No data</td></tr>'
+    : rows.map(function(r){var c2r=r.Visitors>0?(r.Regs/r.Visitors*100).toFixed(1):'\u2014',r2f=r.Regs>0?(r.FTDs/r.Regs*100).toFixed(1):'\u2014';
+        return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
+          '<td style="padding:8px 12px;font-size:11px;color:var(--muted);white-space:nowrap;font-family:var(--font-mono)">'+escHtml(r.Day.replace(/\//g,'-'))+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px">'+escHtml(r.Tracking||'\u2014')+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px">'+escHtml(r.Country||'\u2014')+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px">'+escHtml(r.Brand||'\u2014')+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px;text-align:right;font-family:var(--font-mono)">'+r.Visitors+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px;text-align:right;font-family:var(--font-mono)">'+r.Regs+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px;text-align:right;font-family:var(--font-mono);font-weight:'+(r.FTDs>0?'700':'400')+';color:'+(r.FTDs>0?'var(--green)':'var(--text)')+'">'+r.FTDs+'</td>' +
+          '<td style="padding:8px 12px;font-size:11px;text-align:right;font-family:var(--font-mono)">\u20AC'+r.Commission.toFixed(2)+'</td>' +
+          '<td style="padding:8px 12px;font-size:10px;text-align:right;color:var(--muted)">'+c2r+'%</td>' +
+          '<td style="padding:8px 12px;font-size:10px;text-align:right;color:var(--muted)">'+r2f+'%</td></tr>';}).join('');
 
-  return '<div style="padding:0 24px 40px;overflow-x:auto;max-height:600px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
-    _cxTh('Day','Day')+_cxTh('Tracking','Tracking')+_cxTh('Country','Country')+_cxTh('Brand','Brand')+_cxTh('Visitors','Clicks')+_cxTh('Regs','Regs')+_cxTh('FTDs','FTDs')+_cxTh('Commission','Comm.')+_cxTh('_c2r','C2R%')+_cxTh('_r2f','R2F%')+'</tr></thead><tbody>'+rh+'</tbody>' +
-    (rows.length?'<tfoot><tr style="border-top:2px solid var(--border);font-weight:700"><td colspan="4" style="padding:10px 12px;font-size:12px">Total ('+rows.length+')</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+_cxF(t.clicks)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+_cxF(t.regs)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right;color:var(--green)">'+_cxF(t.ftds)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right">\u20AC'+_cxF(t.comm,2)+'</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+(t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0')+'%</td><td style="padding:10px 12px;font-size:12px;text-align:right">'+(t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0')+'%</td></tr></tfoot>':'') +
+  return '<div style="overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--card)"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
+    _cxTh('Day','Day')+_cxTh('Tracking','Tracking')+_cxTh('Country','Country')+_cxTh('Brand','Brand')+_cxTh('Visitors','Clicks')+_cxTh('Regs','Regs')+_cxTh('FTDs','FTDs')+_cxTh('Commission','Comm.')+_cxTh('_c2r','C2R')+_cxTh('_r2f','R2F')+'</tr></thead><tbody>'+rh+'</tbody>' +
+    (rows.length?'<tfoot><tr style="border-top:2px solid var(--border);font-weight:700"><td colspan="4" style="padding:10px 12px;font-size:11px;color:var(--muted)">Total ('+rows.length+')</td><td style="padding:10px 12px;font-size:11px;text-align:right;font-family:var(--font-mono)">'+_cxF(t.clicks)+'</td><td style="padding:10px 12px;font-size:11px;text-align:right;font-family:var(--font-mono)">'+_cxF(t.regs)+'</td><td style="padding:10px 12px;font-size:11px;text-align:right;font-family:var(--font-mono);color:var(--green)">'+_cxF(t.ftds)+'</td><td style="padding:10px 12px;font-size:11px;text-align:right;font-family:var(--font-mono)">\u20AC'+_cxF(t.comm,2)+'</td><td style="padding:10px 12px;font-size:10px;text-align:right">'+(t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0')+'%</td><td style="padding:10px 12px;font-size:10px;text-align:right">'+(t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0')+'%</td></tr></tfoot>':'') +
     '</table></div>';
 }
 
+// ── Grouped Table ──
 function _cxGroupedTbl(rows) {
   var groups = _cxGT(rows,_cxGroupBy);
   groups.sort(function(a,b){var k=_cxSortCol===_cxGroupBy?'key':(_cxSortCol==='Visitors'?'clicks':_cxSortCol==='Regs'?'regs':_cxSortCol==='FTDs'?'ftds':_cxSortCol==='Commission'?'comm':'key');var av=a[k],bv=b[k];if(typeof av==='string'){av=av.toLowerCase();bv=(bv||'').toLowerCase();}return av<bv?_cxSortDir:av>bv?-_cxSortDir:0;});
   var t=_cxT(rows);
-  var rh=groups.map(function(g){var c2r=g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'-',r2f=g.regs>0?(g.ftds/g.regs*100).toFixed(1):'-',pct=t.clicks>0?(g.clicks/t.clicks*100).toFixed(0):0;
-    return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'transparent\'">' +
-      '<td style="padding:10px 12px;font-size:13px;font-weight:600">'+escHtml(g.key)+'</td>' +
-      '<td style="padding:10px 12px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.clicks)+'</td>' +
-      '<td style="padding:10px 12px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums">'+_cxF(g.regs)+'</td>' +
-      '<td style="padding:10px 12px;text-align:right;font-weight:'+(g.ftds>0?'700':'400')+';color:'+(g.ftds>0?'var(--green)':'var(--text)')+';font-variant-numeric:tabular-nums">'+_cxF(g.ftds)+'</td>' +
-      '<td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums">\u20AC'+_cxF(g.comm,2)+'</td>' +
-      '<td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--muted)">'+c2r+'%</td>' +
-      '<td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--muted)">'+r2f+'%</td>' +
-      '<td style="padding:10px 12px;width:100px"><div style="background:var(--card2);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;background:var(--accent);width:'+pct+'%"></div></div></td></tr>';}).join('');
-  var ths='padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--muted);border-bottom:1px solid var(--border)';
-  return '<div style="padding:0 24px 40px;overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'+
+  var rh=groups.map(function(g){var c2r=g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'\u2014',r2f=g.regs>0?(g.ftds/g.regs*100).toFixed(1):'\u2014',pct=t.clicks>0?Math.round(g.clicks/t.clicks*100):0;
+    return '<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'rgba(255,255,255,0.02)\'" onmouseout="this.style.background=\'transparent\'">' +
+      '<td style="padding:10px 12px;font-size:12px;font-weight:600">'+escHtml(g.key)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:12px;font-family:var(--font-mono)">'+_cxF(g.clicks)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:12px;font-family:var(--font-mono)">'+_cxF(g.regs)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-family:var(--font-mono);font-weight:'+(g.ftds>0?'700':'400')+';color:'+(g.ftds>0?'var(--green)':'var(--text)')+'">'+_cxF(g.ftds)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-family:var(--font-mono)">\u20AC'+_cxF(g.comm,2)+'</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:11px;color:var(--muted)">'+c2r+'%</td>' +
+      '<td style="padding:10px 12px;text-align:right;font-size:11px;color:var(--muted)">'+r2f+'%</td>' +
+      '<td style="padding:10px 12px;width:80px"><div style="background:var(--card2);border-radius:2px;height:4px;overflow:hidden"><div style="height:100%;border-radius:2px;background:rgba(255,255,255,0.25);width:'+pct+'%"></div></div></td></tr>';}).join('');
+  return '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card)"><table style="width:100%;border-collapse:collapse"><thead><tr>'+
     _cxTh(_cxGroupBy,_cxGroupBy,'left')+_cxTh('Visitors','Clicks')+_cxTh('Regs','Regs')+_cxTh('FTDs','FTDs')+_cxTh('Commission','Comm.')+
-    '<th style="'+ths+';text-align:right">C2R</th><th style="'+ths+';text-align:right">R2F</th><th style="'+ths+'">Share</th></tr></thead><tbody>'+rh+'</tbody>' +
-    '<tfoot><tr style="border-top:2px solid var(--border);font-weight:700"><td style="padding:10px 12px;font-size:12px">Total ('+groups.length+')</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+_cxF(t.clicks)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+_cxF(t.regs)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--green)">'+_cxF(t.ftds)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px">\u20AC'+_cxF(t.comm,2)+'</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+(t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0')+'%</td><td style="padding:10px 12px;text-align:right;font-size:12px">'+(t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0')+'%</td><td></td></tr></tfoot></table></div>';
+    '<th style="padding:10px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-bottom:1px solid var(--border);text-align:right">C2R</th><th style="padding:10px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-bottom:1px solid var(--border);text-align:right">R2F</th><th style="padding:10px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-bottom:1px solid var(--border)">Share</th></tr></thead><tbody>'+rh+'</tbody>' +
+    '<tfoot><tr style="border-top:2px solid var(--border);font-weight:700"><td style="padding:10px 12px;font-size:11px;color:var(--muted)">Total ('+groups.length+')</td><td style="padding:10px 12px;text-align:right;font-size:11px;font-family:var(--font-mono)">'+_cxF(t.clicks)+'</td><td style="padding:10px 12px;text-align:right;font-size:11px;font-family:var(--font-mono)">'+_cxF(t.regs)+'</td><td style="padding:10px 12px;text-align:right;font-size:11px;font-family:var(--font-mono);color:var(--green)">'+_cxF(t.ftds)+'</td><td style="padding:10px 12px;text-align:right;font-size:11px;font-family:var(--font-mono)">\u20AC'+_cxF(t.comm,2)+'</td><td style="padding:10px 12px;text-align:right;font-size:10px">'+(t.clicks>0?(t.regs/t.clicks*100).toFixed(1):'0')+'%</td><td style="padding:10px 12px;text-align:right;font-size:10px">'+(t.regs>0?(t.ftds/t.regs*100).toFixed(1):'0')+'%</td><td></td></tr></tfoot></table></div>';
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// UTILITIES
-// ══════════════════════════════════════════════════════════════════════════════
-
+// ── Utilities ──
 function _cxU(a,k){return Array.from(new Set(a.map(function(r){return r[k];}))).filter(Boolean).sort();}
 function _cxT(rows){var c=0,r=0,f=0,cm=0,d=0;rows.forEach(function(x){c+=x.Visitors;r+=x.Regs;f+=x.FTDs;cm+=x.Commission;d+=x.Deposits;});return {clicks:c,regs:r,ftds:f,comm:cm,deps:d};}
 function _cxF(n,dec){if(dec!==undefined)return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g,',');return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 function _cxGT(rows,key){var m={};rows.forEach(function(r){var k=r[key]||'(empty)';if(!m[k])m[k]={key:k,clicks:0,regs:0,ftds:0,comm:0};m[k].clicks+=r.Visitors;m[k].regs+=r.Regs;m[k].ftds+=r.FTDs;m[k].comm+=r.Commission;});return Object.values(m).sort(function(a,b){return b.clicks-a.clicks;});}
 
-function _cxKPI(label,value,color) {
-  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px">' +
-    '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:3px">'+label+'</div>' +
-    '<div style="font-size:20px;font-weight:800;color:'+color+';font-variant-numeric:tabular-nums;line-height:1.1">'+value+'</div></div>';
+function _cxKPI(label,value,color,sub) {
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
+    '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:6px">'+label+'</div>' +
+    '<div style="font-size:22px;font-weight:800;color:'+color+';font-family:var(--font-mono);line-height:1;letter-spacing:-0.02em">'+value+'</div>' +
+    (sub?'<div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)">'+sub+'</div>':'') +
+  '</div>';
 }
 
 function _cxExportCSV() {
