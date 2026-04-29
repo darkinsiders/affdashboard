@@ -5100,19 +5100,30 @@ function _cxRender(body) {
     ((_cxFilterBrand||_cxFilterCountry||_cxFilterTracking)?'<button onclick="_cxFilterBrand=\'\';_cxFilterCountry=\'\';_cxFilterTracking=\'\';_cxRefresh()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);font-size:11px;cursor:pointer">Clear</button>':'') +
     '<span style="margin-left:auto;font-size:10px;color:rgba(255,255,255,0.2);font-family:var(--font-mono)">'+rows.length+' rows</span></div>';
 
-  // ── KPI Cards ──
+  // ── KPI Cards (8 cards, 4×2 grid) ──
+  var avgDep = t.ftds>0 ? (t.deps/t.ftds).toFixed(2) : '0.00';
+  var epc    = t.clicks>0 ? (t.comm/t.clicks).toFixed(2) : '0.00';
+  var rpfd   = t.ftds>0 ? (t.comm/t.ftds).toFixed(2) : '0.00';
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">';
   h += _cxKPI('Clicks',_cxF(t.clicks),'var(--text)',c2r+'% C2R');
   h += _cxKPI('Registrations',_cxF(t.regs),'#63b3ed','');
   h += _cxKPI('FTDs',_cxF(t.ftds),'var(--green)',r2f+'% R2F');
   h += _cxKPI('Commission','\u20AC'+_cxF(t.comm,2),'var(--yellow)','');
+  h += _cxKPI('Total Deposits','\u20AC'+_cxF(t.deps,2),'var(--text)','');
+  h += _cxKPI('Avg Deposit/FTD','\u20AC'+avgDep,'#a78bfa','');
+  h += _cxKPI('EPC','\u20AC'+epc,'#fb923c','\u20AC per click');
+  h += _cxKPI('Revenue / FTD','\u20AC'+rpfd,'var(--green)','');
   h += '</div>';
 
   // ── Daily Trend Chart ──
   h += _cxDailyChart(rows);
 
-  // ── Brand Performance ──
-  h += _cxBrandTable(rows, t);
+  // ── Brand / Country / Tracking Breakdowns ──
+  h += '<div style="display:flex;flex-direction:column;gap:12px">' +
+    _cxBreakdownTable(rows, t, 'Brand',    'Brand Performance') +
+    _cxBreakdownTable(rows, t, 'Country',  'Top Countries (10)',        10) +
+    _cxBreakdownTable(rows, t, 'Tracking', 'Top Tracking Sources (10)', 10) +
+    '</div>';
 
   // ── Data Table Toggle ──
   h += '<div style="margin-top:16px">' +
@@ -5168,10 +5179,11 @@ function _cxDailyChart(rows) {
     '</svg></div>';
 }
 
-// ── Brand Performance Table ──
-function _cxBrandTable(rows, tot) {
-  var bg = _cxGT(rows,'Brand');
+// ── Breakdown Table (used for Brand / Country / Tracking) ──
+function _cxBreakdownTable(rows, tot, key, label, limit) {
+  var bg = _cxGT(rows, key);
   if (!bg.length) return '';
+  if (limit) bg = bg.slice(0, limit);
   var ths='padding:10px 14px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);border-bottom:1px solid var(--border)';
   var rh = bg.map(function(g) {
     var c2r=g.clicks>0?(g.regs/g.clicks*100).toFixed(1):'\u2014';
@@ -5189,9 +5201,9 @@ function _cxBrandTable(rows, tot) {
   }).join('');
 
   return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">' +
-    '<div style="padding:14px 18px 0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Brand Performance</div>' +
+    '<div style="padding:14px 18px 0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">'+escHtml(label)+'</div>' +
     '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
-      '<thead><tr><th style="'+ths+';text-align:left">Brand</th><th style="'+ths+';text-align:right">Clicks</th><th style="'+ths+';text-align:right">Regs</th><th style="'+ths+';text-align:right">FTDs</th><th style="'+ths+';text-align:right">Commission</th><th style="'+ths+';text-align:right">C2R</th><th style="'+ths+';text-align:right">R2F</th><th style="'+ths+'">Share</th></tr></thead>' +
+      '<thead><tr><th style="'+ths+';text-align:left">'+escHtml(key)+'</th><th style="'+ths+';text-align:right">Clicks</th><th style="'+ths+';text-align:right">Regs</th><th style="'+ths+';text-align:right">FTDs</th><th style="'+ths+';text-align:right">Commission</th><th style="'+ths+';text-align:right">C2R</th><th style="'+ths+';text-align:right">R2F</th><th style="'+ths+'">Share</th></tr></thead>' +
       '<tbody>'+rh+'</tbody></table></div></div>';
 }
 
