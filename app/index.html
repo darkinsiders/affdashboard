@@ -5015,6 +5015,7 @@ var _cxMonthStart     = '';
 var _cxToday          = '';
 var _cxLoaded         = false;
 var _cxShowTable      = false;
+var _cxView           = 'overview';   // overview | brands | countries | tracking | data
 
 function renderCxStatsTab() {
   var body = document.getElementById('analyticsTabBody');
@@ -5100,43 +5101,15 @@ function _cxRender(body) {
     ((_cxFilterBrand||_cxFilterCountry||_cxFilterTracking)?'<button onclick="_cxFilterBrand=\'\';_cxFilterCountry=\'\';_cxFilterTracking=\'\';_cxRefresh()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);font-size:11px;cursor:pointer">Clear</button>':'') +
     '<span style="margin-left:auto;font-size:10px;color:rgba(255,255,255,0.2);font-family:var(--font-mono)">'+rows.length+' rows</span></div>';
 
-  // ── KPI Cards (8 cards, 4×2 grid) ──
-  var avgDep = t.ftds>0 ? (t.deps/t.ftds).toFixed(2) : '0.00';
-  var epc    = t.clicks>0 ? (t.comm/t.clicks).toFixed(2) : '0.00';
-  var rpfd   = t.ftds>0 ? (t.comm/t.ftds).toFixed(2) : '0.00';
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">';
-  h += _cxKPI('Clicks',_cxF(t.clicks),'var(--text)',c2r+'% C2R');
-  h += _cxKPI('Registrations',_cxF(t.regs),'#63b3ed','');
-  h += _cxKPI('FTDs',_cxF(t.ftds),'var(--green)',r2f+'% R2F');
-  h += _cxKPI('Commission','\u20AC'+_cxF(t.comm,2),'var(--yellow)','');
-  h += _cxKPI('Total Deposits','\u20AC'+_cxF(t.deps,2),'var(--text)','');
-  h += _cxKPI('Avg Deposit/FTD','\u20AC'+avgDep,'#a78bfa','');
-  h += _cxKPI('EPC','\u20AC'+epc,'#fb923c','\u20AC per click');
-  h += _cxKPI('Revenue / FTD','\u20AC'+rpfd,'var(--green)','');
-  h += '</div>';
+  // ── Sub-tab nav ──
+  h += _cxSubNav();
 
-  // ── Daily Trend Chart ──
-  h += _cxDailyChart(rows);
-
-  // ── Brand / Country / Tracking Breakdowns ──
-  h += '<div style="display:flex;flex-direction:column;gap:12px">' +
-    _cxBreakdownTable(rows, t, 'Brand',    'Brand Performance') +
-    _cxBreakdownTable(rows, t, 'Country',  'Top Countries (10)',        10) +
-    _cxBreakdownTable(rows, t, 'Tracking', 'Top Tracking Sources (10)', 10) +
-    '</div>';
-
-  // ── Data Table Toggle ──
-  h += '<div style="margin-top:16px">' +
-    '<div onclick="_cxShowTable=!_cxShowTable;_cxRefresh()" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 0;border-top:1px solid var(--border)">' +
-      '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Full Data Table</span>' +
-      '<span style="font-size:10px;color:var(--muted);transition:transform 0.2s;transform:rotate('+(_cxShowTable?'180':'0')+'deg)">\u25BC</span>' +
-      '<span style="flex:1"></span>' +
-      (_cxShowTable?'<div style="display:flex;gap:4px" onclick="event.stopPropagation()">'+_cxGBtns()+'</div>':'') +
-    '</div>';
-  if (_cxShowTable) {
-    if (_cxGroupBy) { h += _cxGroupedTbl(rows); } else { h += _cxDetailTbl(rows, t); }
-  }
-  h += '</div>';
+  // ── Active view ──
+  if      (_cxView === 'overview')  h += _cxViewOverview(rows, t, c2r, r2f);
+  else if (_cxView === 'brands')    h += _cxViewBrands(rows, t);
+  else if (_cxView === 'countries') h += _cxViewCountries(rows, t);
+  else if (_cxView === 'tracking')  h += _cxViewTracking(rows, t);
+  else if (_cxView === 'data')      h += _cxViewData(rows, t);
 
   h += '</div>'; // close main wrapper
   body.innerHTML = h;
@@ -5282,6 +5255,187 @@ function _cxExportCSV() {
 }
 
 
+
+// ── Sub-tab nav ──
+function _cxSubNav() {
+  function tab(v, l) {
+    var a = _cxView === v;
+    var s = 'background:' + (a ? 'rgba(255,255,255,0.06)' : 'transparent') + ';' +
+      'border:1px solid ' + (a ? 'rgba(255,255,255,0.18)' : 'var(--border)') + ';' +
+      'color:' + (a ? 'var(--text)' : 'var(--muted)') + ';' +
+      'padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;border-radius:6px;letter-spacing:0.04em';
+    return '<button onclick="_cxView=\'' + v + '\';_cxRefresh()" style="' + s + '">' + l + '</button>';
+  }
+  return '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap">' +
+    tab('overview',  'Overview')  +
+    tab('brands',    'Brands')    +
+    tab('countries', 'Countries') +
+    tab('tracking',  'Tracking')  +
+    tab('data',      'Data')      +
+  '</div>';
+}
+
+// ── View: Overview (KPIs + daily chart + funnel) ──
+function _cxViewOverview(rows, t, c2r, r2f) {
+  var avgDep = t.ftds>0 ? (t.deps/t.ftds).toFixed(2) : '0.00';
+  var epc    = t.clicks>0 ? (t.comm/t.clicks).toFixed(2) : '0.00';
+  var rpfd   = t.ftds>0 ? (t.comm/t.ftds).toFixed(2) : '0.00';
+  var h = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">' +
+    _cxKPI('Clicks',_cxF(t.clicks),'var(--text)',c2r+'% C2R') +
+    _cxKPI('Registrations',_cxF(t.regs),'#63b3ed','') +
+    _cxKPI('FTDs',_cxF(t.ftds),'var(--green)',r2f+'% R2F') +
+    _cxKPI('Commission','\u20AC'+_cxF(t.comm,2),'var(--yellow)','') +
+    _cxKPI('Total Deposits','\u20AC'+_cxF(t.deps,2),'var(--text)','') +
+    _cxKPI('Avg Deposit/FTD','\u20AC'+avgDep,'#a78bfa','') +
+    _cxKPI('EPC','\u20AC'+epc,'#fb923c','\u20AC per click') +
+    _cxKPI('Revenue / FTD','\u20AC'+rpfd,'var(--green)','') +
+  '</div>';
+  h += _cxDailyChart(rows);
+  h += _cxFunnel(t, c2r, r2f);
+  return h;
+}
+
+// ── View: Brands (donut + bar + full table) ──
+function _cxViewBrands(rows, t) {
+  var groups = _cxGT(rows, 'Brand');
+  if (!groups.length) return _cxEmpty('No brand data yet');
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    _cxDonut(groups, 'comm', 'Commission share by brand', '\u20AC') +
+    _cxHBar(groups, 'clicks', 'Clicks per brand', 12) +
+  '</div>' +
+  _cxBreakdownTable(rows, t, 'Brand', 'Brand Performance');
+}
+
+// ── View: Countries (donut + bar + full table) ──
+function _cxViewCountries(rows, t) {
+  var groups = _cxGT(rows, 'Country');
+  if (!groups.length) return _cxEmpty('No country data yet');
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    _cxDonut(groups, 'ftds', 'FTD share by country', '') +
+    _cxHBar(groups, 'clicks', 'Top countries by clicks', 12) +
+  '</div>' +
+  _cxBreakdownTable(rows, t, 'Country', 'All Countries');
+}
+
+// ── View: Tracking (donut + bar + full table) ──
+function _cxViewTracking(rows, t) {
+  var groups = _cxGT(rows, 'Tracking');
+  if (!groups.length) return _cxEmpty('No tracking data yet');
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    _cxDonut(groups, 'clicks', 'Click share by source', '') +
+    _cxHBar(groups, 'ftds', 'Top sources by FTDs', 12) +
+  '</div>' +
+  _cxBreakdownTable(rows, t, 'Tracking', 'All Tracking Sources');
+}
+
+// ── View: Data (full data table, group-by buttons inline) ──
+function _cxViewData(rows, t) {
+  var head = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">' +
+    '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">Group by</span>' +
+    '<div style="display:flex;gap:4px">'+_cxGBtns()+'</div>' +
+  '</div>';
+  var body = _cxGroupBy ? _cxGroupedTbl(rows) : _cxDetailTbl(rows, t);
+  return head + body;
+}
+
+// ── Empty state ──
+function _cxEmpty(msg) {
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:48px;text-align:center;color:var(--muted);font-size:13px">' + escHtml(msg) + '</div>';
+}
+
+// ── Donut chart (top 6 slices + Other) ──
+var _CX_PIE_COLORS = ['#63b3ed', '#10b981', '#f59e0b', '#a78bfa', '#fb923c', '#ef4444', '#6b7280'];
+function _cxDonut(groups, metric, title, prefix) {
+  var arr = groups.slice().sort(function(a,b){return b[metric]-a[metric];});
+  var total = arr.reduce(function(s,g){return s+(g[metric]||0);}, 0);
+  if (total <= 0) return _cxChartCard(title, '<div style="padding:48px;text-align:center;color:var(--muted);font-size:12px">No data</div>');
+  var top = arr.slice(0, 6);
+  var rest = arr.slice(6);
+  if (rest.length) {
+    var restSum = rest.reduce(function(s,g){return s+(g[metric]||0);}, 0);
+    if (restSum > 0) top.push({ key: 'Other ('+rest.length+')', _val: restSum });
+  }
+  // Build SVG arcs
+  var cx = 90, cy = 90, rOuter = 78, rInner = 50;
+  var startAng = -Math.PI/2;
+  var slices = '';
+  var legend = '';
+  top.forEach(function(g, i) {
+    var v = g._val !== undefined ? g._val : g[metric];
+    var pct = v / total;
+    var endAng = startAng + pct * Math.PI * 2;
+    var color = _CX_PIE_COLORS[i % _CX_PIE_COLORS.length];
+    var x1 = cx + rOuter*Math.cos(startAng), y1 = cy + rOuter*Math.sin(startAng);
+    var x2 = cx + rOuter*Math.cos(endAng),   y2 = cy + rOuter*Math.sin(endAng);
+    var x3 = cx + rInner*Math.cos(endAng),   y3 = cy + rInner*Math.sin(endAng);
+    var x4 = cx + rInner*Math.cos(startAng), y4 = cy + rInner*Math.sin(startAng);
+    var large = pct > 0.5 ? 1 : 0;
+    var d = 'M '+x1.toFixed(2)+','+y1.toFixed(2)+
+            ' A '+rOuter+','+rOuter+' 0 '+large+' 1 '+x2.toFixed(2)+','+y2.toFixed(2)+
+            ' L '+x3.toFixed(2)+','+y3.toFixed(2)+
+            ' A '+rInner+','+rInner+' 0 '+large+' 0 '+x4.toFixed(2)+','+y4.toFixed(2)+' Z';
+    slices += '<path d="'+d+'" fill="'+color+'" opacity="0.85"><title>'+escHtml(g.key)+': '+(prefix||'')+_cxF(v, prefix? 2 : 0)+' ('+(pct*100).toFixed(1)+'%)</title></path>';
+    legend += '<div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0"><span style="width:10px;height:10px;border-radius:2px;background:'+color+';opacity:0.85;flex-shrink:0"></span><span style="flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(g.key)+'</span><span style="font-family:var(--font-mono);color:var(--muted)">'+(pct*100).toFixed(1)+'%</span></div>';
+    startAng = endAng;
+  });
+  var center = '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="var(--muted)">Total</text>' +
+    '<text x="'+cx+'" y="'+(cy+12)+'" text-anchor="middle" font-size="15" font-weight="700" font-family="var(--font-mono)" fill="var(--text)">'+(prefix||'')+_cxF(total, prefix? 0 : 0)+'</text>';
+  var inner = '<div style="display:flex;gap:14px;align-items:center;padding:12px 16px">' +
+    '<svg viewBox="0 0 180 180" style="width:180px;height:180px;flex-shrink:0">'+slices+center+'</svg>' +
+    '<div style="flex:1;min-width:0">'+legend+'</div>' +
+  '</div>';
+  return _cxChartCard(title, inner);
+}
+
+// ── Horizontal bar chart (top N by metric) ──
+function _cxHBar(groups, metric, title, limit) {
+  var arr = groups.slice().sort(function(a,b){return b[metric]-a[metric];}).slice(0, limit||10);
+  var max = Math.max.apply(null, arr.map(function(g){return g[metric]||0;})) || 1;
+  if (!arr.length || max <= 0) return _cxChartCard(title, '<div style="padding:48px;text-align:center;color:var(--muted);font-size:12px">No data</div>');
+  var rows = arr.map(function(g){
+    var v = g[metric]||0;
+    var pct = (v/max)*100;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:11px">' +
+      '<div style="width:90px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escHtml(g.key)+'">'+escHtml(g.key)+'</div>' +
+      '<div style="flex:1;background:rgba(255,255,255,0.04);border-radius:3px;height:10px;overflow:hidden">' +
+        '<div style="height:100%;background:linear-gradient(90deg,#63b3ed,#a78bfa);border-radius:3px;width:'+pct.toFixed(1)+'%"></div>' +
+      '</div>' +
+      '<div style="width:60px;text-align:right;font-family:var(--font-mono);color:var(--muted)">'+_cxF(v)+'</div>' +
+    '</div>';
+  }).join('');
+  return _cxChartCard(title, '<div style="padding:12px 16px">'+rows+'</div>');
+}
+
+// ── Conversion funnel (Clicks → Regs → FTDs) ──
+function _cxFunnel(t, c2r, r2f) {
+  if (!t.clicks) return _cxChartCard('Conversion Funnel', '<div style="padding:48px;text-align:center;color:var(--muted);font-size:12px">No clicks in period</div>');
+  var max = t.clicks;
+  var stages = [
+    { label: 'Clicks',        value: t.clicks, color: 'var(--text)',  pct: 100 },
+    { label: 'Registrations', value: t.regs,   color: '#63b3ed',     pct: t.clicks>0 ? (t.regs/t.clicks*100) : 0 },
+    { label: 'FTDs',          value: t.ftds,   color: 'var(--green)', pct: t.clicks>0 ? (t.ftds/t.clicks*100) : 0 }
+  ];
+  var bars = stages.map(function(s, i) {
+    var w = Math.max(2, (s.value/max)*100);
+    var conv = i===0 ? '' : (i===1 ? c2r+'% C2R' : (t.regs>0 ? (t.ftds/t.regs*100).toFixed(1)+'% R2F' : ''));
+    return '<div style="display:flex;align-items:center;gap:14px;padding:10px 0">' +
+      '<div style="width:120px;font-size:11px;font-weight:600;color:var(--text)">'+s.label+'</div>' +
+      '<div style="flex:1;position:relative;height:32px;background:rgba(255,255,255,0.03);border-radius:6px;overflow:hidden">' +
+        '<div style="position:absolute;left:50%;transform:translateX(-50%);width:'+w.toFixed(1)+'%;height:100%;background:'+s.color+';opacity:0.85;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:var(--font-mono);color:#000">'+_cxF(s.value)+'</div>' +
+      '</div>' +
+      '<div style="width:90px;text-align:right;font-size:11px;color:var(--muted);font-family:var(--font-mono)">'+conv+'</div>' +
+    '</div>';
+  }).join('');
+  return _cxChartCard('Conversion Funnel', '<div style="padding:14px 18px">'+bars+'</div>');
+}
+
+// ── Chart card wrapper (matches breakdown table styling) ──
+function _cxChartCard(title, inner) {
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px">' +
+    '<div style="padding:14px 18px 0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted)">'+escHtml(title)+'</div>' +
+    inner +
+  '</div>';
+}
 // ── Analytics: Overview Tab ──────────────────────────────────────────────────
 var FUNNEL_COLORS = { Dark: 'var(--accent)', Slotio: 'var(--green)', Scanio: '#f97316', SpinGPT: 'var(--red)', Shadow: 'var(--purple)' };
 
