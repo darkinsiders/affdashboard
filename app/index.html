@@ -2354,6 +2354,16 @@
 
       <div class="form-section-label">Access &amp; Contact</div>
       <div class="form-group">
+        <label class="form-label">Platform</label>
+        <select class="form-input" id="f-platform">
+          <option value="">CellXpert (default)</option>
+          <option value="affilika">Affilika</option>
+          <option value="casinobet">Casinobet (custom Laravel)</option>
+          <option value="custom">Custom / Other</option>
+        </select>
+        <div class="form-hint">Determines how PebbleHost auto-fetches stats. Pick Affilika for iWildpartners and similar Rails partner panels.</div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Dashboard Login URL</label>
         <input class="form-input" id="f-dashboardurl" type="url" placeholder="https://track.padrinopartners.com" autocomplete="off">
         <div class="form-hint">Base URL of the affiliate dashboard (used for auto stats sync)</div>
@@ -2915,8 +2925,8 @@ function renderManagePage() {
         ? '<div style="display:flex;flex-wrap:wrap;gap:4px"><span style="font-size:10px;color:var(--muted);margin-right:2px;align-self:center">Funnels:</span>' + funnelBadges + '</div>'
         : '<div style="font-size:11px;color:var(--muted)">Not assigned to any funnel</div>') +
       '<div style="display:flex;gap:7px;padding-top:4px;border-top:1px solid var(--border)">' +
-        '<button onclick="openEditModal(' + deal.id + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--accent)\';this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Edit</button>' +
-        '<button onclick="startDeleteManage(' + deal.id + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--red)\';this.style.borderColor=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Delete</button>' +
+        '<button onclick="openEditModal(' + _did(deal.id) + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--accent)\';this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Edit</button>' +
+        '<button onclick="startDeleteManage(' + _did(deal.id) + ')" style="flex:1;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:color 0.15s,border-color 0.15s" onmouseover="this.style.color=\'var(--red)\';this.style.borderColor=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border)\'">Delete</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -3279,6 +3289,13 @@ function renderConflictBadges() {
 }
 
 
+// Inline-handler arg formatter that preserves type so === lookups still match.
+// Numbers pass through bare (5 → "5"); strings get quoted ("casinobet" → "'casinobet'").
+// Without this, deal.id="casinobet" rendered as openEditModal(casinobet) — undefined var.
+function _did(id) {
+  return typeof id === 'number' ? String(id) : "'" + String(id).replace(/'/g, "\\'") + "'";
+}
+
 // ── Persistence ────────────────────────────────────────────────────────────
 function saveDeals() {
   saveToFirebase();
@@ -3464,12 +3481,12 @@ function renderTable() {
 
     var actionsHtml = isConfirming
       ? '<div class="confirm-wrap"><span>Delete?</span>' +
-          '<button class="btn-confirm-yes" onclick="confirmDelete(' + deal.id + ')">Yes</button>' +
+          '<button class="btn-confirm-yes" onclick="confirmDelete(' + _did(deal.id) + ')">Yes</button>' +
           '<button class="btn-confirm-no" onclick="cancelDelete()">No</button></div>'
       : '<div class="actions">' +
-          '<button class="btn-icon" onclick="openPostbackModal(' + deal.id + ')" title="Postback URLs" style="color:var(--accent)">' + ICON_POSTBACK + '</button>' +
-          '<button class="btn-icon btn-edit" onclick="openEditModal(' + deal.id + ')" title="Edit">' + ICON_EDIT + '</button>' +
-          '<button class="btn-icon btn-delete" onclick="startDelete(' + deal.id + ')" title="Delete">' + ICON_TRASH + '</button>' +
+          '<button class="btn-icon" onclick="openPostbackModal(' + _did(deal.id) + ')" title="Postback URLs" style="color:var(--accent)">' + ICON_POSTBACK + '</button>' +
+          '<button class="btn-icon btn-edit" onclick="openEditModal(' + _did(deal.id) + ')" title="Edit">' + ICON_EDIT + '</button>' +
+          '<button class="btn-icon btn-delete" onclick="startDelete(' + _did(deal.id) + ')" title="Delete">' + ICON_TRASH + '</button>' +
         '</div>';
 
     var bgamingHtml = deal.bgaming
@@ -3479,9 +3496,9 @@ function renderTable() {
     var loginHtml = '<div class="login-cell">' +
       '<span class="login-user" title="' + escHtml(deal.username || '') + '">' + escHtml(deal.username || '&mdash;') + '</span>' +
       (deal.password
-        ? '<button class="btn-pass" onclick="copyPass(this,' + deal.id + ')" title="Copy password">' + ICON_LOCK + 'pw</button>' +
-          '<button class="btn-pass" onclick="toggleShowPass(this,' + deal.id + ')" title="Show/hide password">' + ICON_EYE + '</button>' +
-          '<span id="pw-' + deal.id + '" style="display:none;font-size:11px;font-family:monospace;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(deal.password || '') + '"></span>'
+        ? '<button class="btn-pass" onclick="copyPass(this,' + _did(deal.id) + ')" title="Copy password">' + ICON_LOCK + 'pw</button>' +
+          '<button class="btn-pass" onclick="toggleShowPass(this,' + _did(deal.id) + ')" title="Show/hide password">' + ICON_EYE + '</button>' +
+          '<span id="pw-' + _did(deal.id) + '" style="display:none;font-size:11px;font-family:monospace;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(deal.password || '') + '"></span>'
         : '') +
     '</div>';
 
@@ -3496,7 +3513,7 @@ function renderTable() {
         var fUrl = getFunnelUrl(deal.url, currentFunnel);
         return '<td><div class="link-cell">' +
           '<span class="link-text" title="' + escHtml(fUrl) + '">' + escHtml(fUrl) + '</span>' +
-          '<button class="btn-copy" onclick="copyUrl(this,' + deal.id + ')" title="Copy URL">' + ICON_COPY + '</button>' +
+          '<button class="btn-copy" onclick="copyUrl(this,' + _did(deal.id) + ')" title="Copy URL">' + ICON_COPY + '</button>' +
         '</div></td>';
       })() +
       '<td>' + renderGeoBadges(geos, deal.id) + '</td>' +
@@ -3725,6 +3742,7 @@ function openEditModal(id) {
   document.getElementById('f-bgaming').checked = !!deal.bgaming;
   document.getElementById('f-deposit').value  = deal.deposit;
   document.getElementById('f-revshare').value = deal.revshare;
+  document.getElementById('f-platform').value = deal.platform || '';
   document.getElementById('f-dashboardurl').value = deal.dashboardUrl || '';
   document.getElementById('f-username').value = deal.username || '';
   document.getElementById('f-password').value = deal.password || '';
@@ -3746,6 +3764,7 @@ function saveDeal(e) {
   var bgaming  = document.getElementById('f-bgaming').checked;
   var deposit  = parseInt(document.getElementById('f-deposit').value, 10);
   var revshare = parseInt(document.getElementById('f-revshare').value, 10);
+  var platform = document.getElementById('f-platform').value;
   var dashboardUrl = document.getElementById('f-dashboardurl').value.trim();
   var username = document.getElementById('f-username').value.trim();
   var password = document.getElementById('f-password').value.trim();
@@ -3755,12 +3774,12 @@ function saveDeal(e) {
     var idx = deals.findIndex(function(d) { return d.id === editingId; });
     if (idx !== -1) {
       var existing = deals[idx];
-      deals[idx] = { id: existing.id, name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, dashboardUrl: dashboardUrl, username: username, password: password, contact: contact,
+      deals[idx] = { id: existing.id, name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, platform: platform, dashboardUrl: dashboardUrl, username: username, password: password, contact: contact,
         status: existing.status || 'active', dealType: existing.dealType || 'RS', network: getNetworkId(url), cpaAmount: existing.cpaAmount || 0 };
     }
     saveDeals(); closeModal(); render();
   } else {
-    var newDeal = { id: nextId(), name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, dashboardUrl: dashboardUrl, username: username, password: password, contact: contact,
+    var newDeal = { id: nextId(), name: name, url: url, geos: geos, bgaming: bgaming, deposit: deposit, revshare: revshare, platform: platform, dashboardUrl: dashboardUrl, username: username, password: password, contact: contact,
       status: 'active', dealType: 'RS', network: getNetworkId(url), cpaAmount: 0 };
     deals.push(newDeal);
     saveDeals();
@@ -4325,7 +4344,7 @@ function renderSmartlinks() {
       '<div class="deal-card-name" title="' + escHtml(deal.name) + '">' + escHtml(deal.name) + '</div>' +
       '<input type="number" min="0" max="100" value="' + w + '" ' +
         'style="width:46px;background:var(--card);border:1px solid var(--border);border-radius:5px;padding:3px 5px;color:var(--text);font-size:12px;font-weight:600;text-align:center;outline:none" ' +
-        'onchange="setDealWeight(\'' + f + '\',' + deal.id + ',this.value)" ' +
+        'onchange="setDealWeight(\'' + f + '\',' + _did(deal.id) + ',this.value)" ' +
         'onclick="this.select()">' +
       '<span style="font-size:11px;color:var(--muted)">%</span>' +
       '<div class="deal-card-controls">' +
@@ -6646,7 +6665,7 @@ function renderDealsTable() {
       var assigned = assignedFunnels.indexOf(f) !== -1;
       var color = FUNNEL_COLORS[f] || 'var(--muted)';
       var fkey = f.toLowerCase();
-      return '<button onclick="toggleFunnelAssignment(\'' + f + '\',' + deal.id + ')" title="' + (assigned ? 'Remove from ' : 'Add to ') + f + '" style="padding:2px 8px;border-radius:3px;border:1px solid ' + (assigned ? color : 'var(--border)') + ';background:' + (assigned ? 'rgba(0,0,0,0.2)' : 'transparent') + ';color:' + (assigned ? color : 'var(--muted)') + ';font-size:10px;font-weight:700;cursor:pointer;transition:all 0.15s">' + f.substring(0,3) + '</button>';
+      return '<button onclick="toggleFunnelAssignment(\'' + f + '\',' + _did(deal.id) + ')" title="' + (assigned ? 'Remove from ' : 'Add to ') + f + '" style="padding:2px 8px;border-radius:3px;border:1px solid ' + (assigned ? color : 'var(--border)') + ';background:' + (assigned ? 'rgba(0,0,0,0.2)' : 'transparent') + ';color:' + (assigned ? color : 'var(--muted)') + ';font-size:10px;font-weight:700;cursor:pointer;transition:all 0.15s">' + f.substring(0,3) + '</button>';
     }).join('');
 
     var isArchived = currentStatus === 'archived';
@@ -6663,10 +6682,10 @@ function renderDealsTable() {
       '<td style="padding:10px 12px"><div style="display:flex;gap:4px;flex-wrap:wrap">' + funnelChips + '</div></td>' +
       '<td style="padding:10px 12px">' +
         '<div style="display:flex;gap:6px;align-items:center">' +
-          (!isArchived ? '<button onclick="toggleDealStatus(' + deal.id + ')" style="padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:11px;cursor:pointer">' + toggleLabel + '</button>' : '') +
-          '<button onclick="archiveDeal(' + deal.id + ')" style="padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:11px;cursor:pointer">' + archiveLabel + '</button>' +
-          '<button class="btn-icon btn-edit" onclick="openEditModal(' + deal.id + ')" title="Edit" style="color:var(--accent)">' + ICON_EDIT + '</button>' +
-          '<button class="btn-icon" onclick="openPostbackModal(' + deal.id + ')" title="Postback" style="color:var(--muted)">' + ICON_POSTBACK + '</button>' +
+          (!isArchived ? '<button onclick="toggleDealStatus(' + _did(deal.id) + ')" style="padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:11px;cursor:pointer">' + toggleLabel + '</button>' : '') +
+          '<button onclick="archiveDeal(' + _did(deal.id) + ')" style="padding:3px 10px;border-radius:4px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:11px;cursor:pointer">' + archiveLabel + '</button>' +
+          '<button class="btn-icon btn-edit" onclick="openEditModal(' + _did(deal.id) + ')" title="Edit" style="color:var(--accent)">' + ICON_EDIT + '</button>' +
+          '<button class="btn-icon" onclick="openPostbackModal(' + _did(deal.id) + ')" title="Postback" style="color:var(--muted)">' + ICON_POSTBACK + '</button>' +
         '</div>' +
       '</td>' +
     '</tr>';
