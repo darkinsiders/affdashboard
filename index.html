@@ -14614,12 +14614,17 @@ function _renderLeadApprovalsList(leads) {
     var rs     = (l.revshare_pct   != null) ? l.revshare_pct + '%' : '—';
     var when   = l.created_at ? new Date(l.created_at * 1000).toLocaleString() : '';
     var leadId = l.id || l._docId;
+    var managerLabel = (l.manager_name || '').trim();
+    if (managerLabel && l.manager_telegram) managerLabel += ' (' + l.manager_telegram + ')';
+    else if (l.manager_telegram)            managerLabel = l.manager_telegram;
+    else if (!managerLabel)                 managerLabel = '(unknown manager)';
     return (
       '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px">' +
         '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">' +
           '<div>' +
             '<div style="font-size:16px;font-weight:600;color:var(--text)">' + brands + '</div>' +
-            '<div style="font-size:12px;color:var(--muted);margin-top:2px">' + (l.manager_telegram || '') + (when ? ' · ' + when : '') + '</div>' +
+            '<div style="font-size:13px;color:var(--text);margin-top:4px">' + managerLabel + '</div>' +
+            (when ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + when + '</div>' : '') +
           '</div>' +
           '<div style="display:flex;gap:8px">' +
             '<button onclick="leadDecide(\'' + leadId.replace(/\\/g,'\\\\').replace(/\x27/g,"\\'") + '\', \'reject\', this)" style="background:transparent;border:1px solid #ff7b7b;color:#ff7b7b;padding:6px 14px;border-radius:6px;font-weight:600;cursor:pointer">❌ Reject</button>' +
