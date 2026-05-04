@@ -1997,6 +1997,10 @@
         <span class="ni-dot" style="background:var(--accent)"></span>
         <span class="ni-label">Employees</span>
       </div>
+      <div class="nav-item" id="tab-leadApprovals" onclick="navGo(function(){setPage('leadApprovals')})">
+        <span class="ni-dot" style="background:#ff9f43"></span>
+        <span class="ni-label">Lead Approvals <span id="leadApprovalsBadge" style="display:none;background:#ff9f43;color:#000;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px"></span></span>
+      </div>
     </div>
   </div>
 
@@ -2101,6 +2105,9 @@
   </div>
   <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('employees')})">
     <span class="mob-nav-dot" style="background:var(--accent)"></span> Employees
+  </div>
+  <div class="mob-nav-item" onclick="mobileNavGo(function(){setPage('leadApprovals')})">
+    <span class="mob-nav-dot" style="background:#ff9f43"></span> Lead Approvals
   </div>
 
   <div class="mob-nav-divider"></div>
@@ -2226,6 +2233,7 @@
 <div id="reportPage" style="display:none"></div>
 <div id="projectPage" style="display:none"></div>
 <div id="employeesPage" style="display:none"></div>
+<div id="leadApprovalsPage" style="display:none"></div>
 <div id="analyticsPage" style="display:none"></div>
 <div id="managePage" style="display:none"></div>
 <div id="dealsPage" style="display:none"></div>
@@ -2830,6 +2838,12 @@ function setPage(page) {
     setNavActive('employees', 'business');
     updateBreadcrumb('Team', 'Employees');
     if (typeof renderEmployeesPage === 'function') renderEmployeesPage();
+  } else if (page === 'leadApprovals') {
+    var el = document.getElementById('leadApprovalsPage');
+    if (el) el.style.display = '';
+    setNavActive('leadApprovals', 'business');
+    updateBreadcrumb('Team', 'Lead Approvals');
+    if (typeof renderLeadApprovalsPage === 'function') renderLeadApprovalsPage();
   } else if (page === 'manage') {
     var el = document.getElementById('funnelsPage');
     if (el) el.style.display = '';
@@ -6760,7 +6774,10 @@ function toggleFunnelAssignment(funnel, dealId) {
   renderDealsPage();
 }
 
-var dealsSubTab = 'deals'; // 'deals' | 'lps'
+var dealsSubTab = 'deals'; // 'deals' | 'lps' | 'leads'
+var leadsCache = [];        // cached from Firestore "leads" collection
+var leadsLoadedAt = 0;
+var leadsFilterStatus = 'all';
 
 function renderDealsPage() {
   var container = document.getElementById('dealsPage');
@@ -6776,12 +6793,187 @@ function renderDealsPage() {
       '<div style="display:flex;gap:0">' +
         subTabBtn('deals', 'Casino Deals (' + deals.length + ')') +
         subTabBtn('lps', 'Landing Pages (' + landingPages.length + ')') +
+        subTabBtn('leads', 'Leads (' + leadsCache.length + ')') +
       '</div>' +
     '</div>' +
     '<div id="dealsSubBody" style="padding:24px 32px 32px"></div>';
 
   if (dealsSubTab === 'deals') renderDealsTable();
-  else renderLandingPagesTab();
+  else if (dealsSubTab === 'lps') renderLandingPagesTab();
+  else if (dealsSubTab === 'leads') renderLeadsTab();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Leads tab — reads from Firestore "leads" collection (populated by affiliateLeadBot)
+// ════════════════════════════════════════════════════════════════════════════
+
+async function loadLeadsFromFirestore() {
+  if (typeof firebase === 'undefined' || !firebase.firestore) {
+    console.warn('Firestore not initialized — cannot load leads');
+    return;
+  }
+  try {
+    const snap = await firebase.firestore().collection('leads').get();
+    leadsCache = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    leadsCache.sort(function(a, b) {
+      return (b.created_at || 0) - (a.created_at || 0);
+    });
+    leadsLoadedAt = Date.now();
+  } catch (e) {
+    console.error('Failed to load leads:', e);
+  }
+}
+
+function renderLeadsTab() {
+  var body = document.getElementById('dealsSubBody');
+  if (!body) return;
+  // First paint: trigger async load if stale (>30s) and re-render
+  if (Date.now() - leadsLoadedAt > 30000) {
+    body.innerHTML = '<div style="padding:32px;color:var(--muted);text-align:center">Loading leads from Firestore…</div>';
+    loadLeadsFromFirestore().then(function() {
+      if (dealsSubTab === 'leads') renderLeadsTab();
+    });
+    return;
+  }
+
+  var statusOpts = [
+    ['all', 'All'],
+    ['pending_approval', 'Pending'],
+    ['approved', 'Approved'],
+    ['approved_pending_sync', 'Approved (queued)'],
+    ['rejected', 'Rejected'],
+    ['converted', 'Converted'],
+  ];
+  var statusFilter = statusOpts.map(function(o) {
+    var active = leadsFilterStatus === o[0];
+    return '<button onclick="leadsFilterStatus=\'' + o[0] + '\';renderLeadsTab()" style="padding:5px 14px;border-radius:5px;border:1px solid ' + (active ? 'var(--accent)' : 'var(--border)') + ';background:' + (active ? 'var(--accent-dim)' : 'var(--card)') + ';color:' + (active ? 'var(--accent)' : 'var(--muted)') + ';font-size:12px;font-weight:' + (active ? '700' : '500') + ';cursor:pointer;transition:all 0.15s">' + o[1] + '</button>';
+  }).join('');
+
+  var filtered = leadsCache.filter(function(L) {
+    if (leadsFilterStatus === 'all') return true;
+    return (L.status || 'pending_approval') === leadsFilterStatus;
+  });
+
+  var refreshBtn = '<button onclick="leadsLoadedAt=0;renderLeadsTab()" style="padding:5px 14px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:12px;cursor:pointer">↻ Refresh</button>';
+
+  var rows = filtered.map(function(L) {
+    var status = L.status || 'pending_approval';
+    var statusColor = ({
+      pending_approval: '#f0b400',
+      approved: '#3fb950',
+      approved_pending_sync: '#cc8400',
+      rejected: '#999',
+      converted: '#2f80ed',
+    })[status] || 'var(--muted)';
+    var brand = L.brand_name || '—';
+    var tg = L.manager_telegram || '—';
+    var cpa = (L.cpa_amount_eur != null) ? ('€' + L.cpa_amount_eur) : '—';
+    var rs = (L.revshare_pct != null) ? (L.revshare_pct + '%') : '—';
+    var geos = Array.isArray(L.geos_open) ? L.geos_open.join(', ') : (L.geos_open || '—');
+    var created = L.created_at ? new Date(L.created_at * 1000).toLocaleDateString() : '—';
+    var convertBtn = (status === 'approved' || status === 'approved_pending_sync')
+      ? '<button onclick="convertLeadToDeal(\'' + L.id + '\')" style="padding:4px 10px;border-radius:4px;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Convert to Deal</button>'
+      : (status === 'converted' ? '<span style="color:#2f80ed;font-size:11px">→ Deal</span>' : '');
+
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:10px 12px"><span style="display:inline-block;padding:3px 9px;border-radius:100px;background:' + statusColor + '22;color:' + statusColor + ';font-size:10px;font-weight:700;text-transform:uppercase">' + status.replace(/_/g, ' ') + '</span></td>' +
+      '<td style="padding:10px 12px"><span style="font-weight:700;font-size:13px">' + escHtml(brand) + '</span></td>' +
+      '<td style="padding:10px 12px;font-size:12px">' + escHtml(tg) + '</td>' +
+      '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:12px">' + cpa + ' / ' + rs + '</td>' +
+      '<td style="padding:10px 12px;font-size:11px;color:var(--muted)">' + escHtml(geos.length > 60 ? geos.slice(0, 60) + '…' : geos) + '</td>' +
+      '<td style="padding:10px 12px;font-size:11px;color:var(--muted)">' + created + '</td>' +
+      '<td style="padding:10px 12px;text-align:right">' +
+        '<button onclick="viewLeadDetail(\'' + L.id + '\')" style="padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;cursor:pointer;margin-right:6px">Details</button>' +
+        convertBtn +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  body.innerHTML =
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:18px;flex-wrap:wrap">' +
+      statusFilter +
+      '<div style="flex:1"></div>' +
+      refreshBtn +
+    '</div>' +
+    (filtered.length === 0
+      ? '<div style="padding:48px;text-align:center;color:var(--muted)">No leads match the filter.</div>'
+      : '<table style="width:100%;border-collapse:collapse;font-family:var(--font-body)">' +
+          '<thead><tr style="border-bottom:1px solid var(--border);text-align:left">' +
+            '<th style="padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.06em">Status</th>' +
+            '<th style="padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.06em">Brand</th>' +
+            '<th style="padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.06em">Manager TG</th>' +
+            '<th style="padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.06em">CPA / RS</th>' +
+            '<th style="padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.06em">GEOs</th>' +
+            '<th style="padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.06em">Created</th>' +
+            '<th style="padding:10px 12px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:0.06em;text-align:right">Actions</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>'
+    );
+}
+
+function viewLeadDetail(leadId) {
+  var L = leadsCache.find(function(x) { return x.id === leadId; });
+  if (!L) return alert('Lead not found in cache. Try refreshing.');
+  var lines = [];
+  Object.keys(L).sort().forEach(function(k) {
+    if (k === 'id') return;
+    var v = L[k];
+    if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) return;
+    if (typeof v === 'object') v = JSON.stringify(v);
+    lines.push(k + ': ' + v);
+  });
+  alert('Lead ' + leadId + '\n\n' + lines.join('\n'));
+}
+
+async function convertLeadToDeal(leadId) {
+  var L = leadsCache.find(function(x) { return x.id === leadId; });
+  if (!L) return alert('Lead not found.');
+  if (!confirm('Create a Deal record from this lead?\n\n' + (L.brand_name || '?') + ' · €' + (L.cpa_amount_eur || '?') + ' + ' + (L.revshare_pct || '?') + '% RS')) return;
+
+  // Map lead fields → Deal schema
+  var newDeal = {
+    id: Date.now(),
+    name: L.brand_name || L.manager_telegram || 'Untitled',
+    url: L.tracking_url || L.affiliate_dashboard_url || '',
+    geos: Array.isArray(L.geos_open) ? L.geos_open.join(' ') : (L.geos_open || ''),
+    bgaming: false,
+    deposit: L.min_deposit_eur || 0,
+    revshare: Number(L.revshare_pct) || 0,
+    platform: L.affiliate_platform || '',
+    dashboardUrl: L.affiliate_dashboard_url || '',
+    username: '',
+    password: '',
+    contact: L.manager_telegram || '',
+    status: 'active',
+    dealType: (Number(L.cpa_amount_eur) > 0 && Number(L.revshare_pct) > 0) ? 'Hybrid' : (Number(L.cpa_amount_eur) > 0 ? 'CPA' : 'RS'),
+    cpaAmount: Number(L.cpa_amount_eur) || 0,
+  };
+
+  if (typeof saveDeal !== 'function') {
+    return alert('saveDeal() not available — please reload the dashboard.');
+  }
+  try {
+    await saveDeal(newDeal);
+  } catch (e) {
+    return alert('Failed to save deal: ' + e.message);
+  }
+
+  // Mark lead as converted in Firestore
+  try {
+    await firebase.firestore().collection('leads').doc(leadId).update({
+      status: 'converted',
+      converted_to_deal_id: newDeal.id,
+      converted_at: Math.floor(Date.now() / 1000),
+    });
+    L.status = 'converted';
+    L.converted_to_deal_id = newDeal.id;
+  } catch (e) {
+    console.error('Failed to mark lead converted:', e);
+  }
+
+  alert('Deal created. Switch to Casino Deals tab to see it.');
+  renderLeadsTab();
 }
 
 function renderDealsTable() {
@@ -14344,6 +14536,136 @@ function _renderAutopilotHistory(runs) {
 function _apGrade(n) {
   return n >= 90 ? 'A+' : n >= 80 ? 'A' : n >= 70 ? 'B' : n >= 60 ? 'C' : n >= 50 ? 'D' : 'F';
 }
+
+// ─── Lead Approvals page (affiliateLeadBot integration) ────────────────────
+// Writes go directly to Firestore via the authenticated JS SDK — no worker
+// token in client code. The bot polls Firestore (via its server-side worker
+// endpoint) to pick up status flips and DM the manager.
+
+var _leadApprovalsCache  = null;
+var _leadApprovalsLoading = false;
+
+function renderLeadApprovalsPage() {
+  var el = document.getElementById('leadApprovalsPage');
+  if (!el) return;
+  el.innerHTML =
+    '<div style="padding:24px;max-width:1200px;margin:0 auto">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">' +
+        '<div>' +
+          '<h2 style="margin:0;font-family:var(--font-head);font-size:22px;color:var(--text)">Lead Approvals</h2>' +
+          '<div style="color:var(--muted);font-size:12px;margin-top:4px">Pending leads from <code>affiliateLeadBot</code> — approve to push the deal live, reject to send the manager a polite close.</div>' +
+        '</div>' +
+        '<button onclick="loadLeadApprovals(true)" style="background:var(--accent);border:none;color:#000;padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer">Refresh</button>' +
+      '</div>' +
+      '<div id="leadApprovalsList"><div style="color:var(--muted);padding:32px;text-align:center">Loading…</div></div>' +
+    '</div>';
+  loadLeadApprovals(false);
+}
+
+function loadLeadApprovals(force) {
+  if (_leadApprovalsLoading) return;
+  _leadApprovalsLoading = true;
+  db.collection('leads')
+    .where('status', '==', 'pending_approval')
+    .orderBy('created_at', 'desc')
+    .limit(50)
+    .get()
+    .then(function(snap) {
+      var leads = [];
+      snap.forEach(function(d) {
+        var v = d.data();
+        v._docId = d.id;
+        leads.push(v);
+      });
+      _leadApprovalsCache = leads;
+      _renderLeadApprovalsList(leads);
+      _updateLeadApprovalsBadge(leads.length);
+    })
+    .catch(function(e) {
+      var box = document.getElementById('leadApprovalsList');
+      if (box) box.innerHTML = '<div style="color:#ff5e5e;padding:24px">Failed to load: ' + (e && e.message || e) + '</div>';
+    })
+    .then(function() { _leadApprovalsLoading = false; });
+}
+
+function _updateLeadApprovalsBadge(n) {
+  var b = document.getElementById('leadApprovalsBadge');
+  if (!b) return;
+  if (n > 0) { b.textContent = String(n); b.style.display = ''; }
+  else       { b.style.display = 'none'; }
+}
+
+function _renderLeadApprovalsList(leads) {
+  var box = document.getElementById('leadApprovalsList');
+  if (!box) return;
+  if (!leads.length) {
+    box.innerHTML = '<div style="color:var(--muted);padding:48px;text-align:center;font-size:14px">No pending leads — all clear.</div>';
+    return;
+  }
+  box.innerHTML = leads.map(function(l) {
+    var brands = [(l.brand_name || '?')].concat(Array.isArray(l.brand_other) ? l.brand_other : []).filter(Boolean).join(' · ');
+    var geos   = Array.isArray(l.geos_open) && l.geos_open.length ? l.geos_open.join(', ') : '—';
+    var bg     = l.bgaming_available === true ? '<span style="color:#4ade80">✅ yes</span>'
+               : l.bgaming_available === false ? '<span style="color:#ff7b7b">❌ no</span>'
+               : '<span style="color:var(--muted)">❓ unknown</span>';
+    var cpa    = (l.cpa_amount_eur != null) ? '€' + Math.round(l.cpa_amount_eur) : '—';
+    var rs     = (l.revshare_pct   != null) ? l.revshare_pct + '%' : '—';
+    var when   = l.created_at ? new Date(l.created_at * 1000).toLocaleString() : '';
+    var leadId = l.id || l._docId;
+    return (
+      '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">' +
+          '<div>' +
+            '<div style="font-size:16px;font-weight:600;color:var(--text)">' + brands + '</div>' +
+            '<div style="font-size:12px;color:var(--muted);margin-top:2px">' + (l.manager_telegram || '') + (when ? ' · ' + when : '') + '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px">' +
+            '<button onclick="leadDecide(\'' + leadId.replace(/\\/g,'\\\\').replace(/\x27/g,"\\'") + '\', \'reject\', this)" style="background:transparent;border:1px solid #ff7b7b;color:#ff7b7b;padding:6px 14px;border-radius:6px;font-weight:600;cursor:pointer">❌ Reject</button>' +
+            '<button onclick="leadDecide(\'' + leadId.replace(/\\/g,'\\\\').replace(/\x27/g,"\\'") + '\', \'approve\', this)" style="background:#4ade80;border:none;color:#000;padding:6px 14px;border-radius:6px;font-weight:600;cursor:pointer">✅ Approve & Push</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;font-size:12px;color:var(--text)">' +
+          '<div><span style="color:var(--muted)">CPA / RS:</span> ' + cpa + ' + ' + rs + '</div>' +
+          '<div><span style="color:var(--muted)">BGaming:</span> ' + bg + '</div>' +
+          '<div><span style="color:var(--muted)">GEOs:</span> ' + geos + '</div>' +
+          '<div><span style="color:var(--muted)">Dashboard:</span> ' + (l.affiliate_dashboard_url || '—') + '</div>' +
+          '<div style="grid-column:1/-1"><span style="color:var(--muted)">Postback:</span> <code style="font-size:11px">' + (l.postback_url_template || '—') + '</code></div>' +
+          '<div><span style="color:var(--muted)">Click-ID:</span> <code style="font-size:11px">' + (l.click_id_param || '—') + '</code></div>' +
+          '<div><span style="color:var(--muted)">Macro:</span> <code style="font-size:11px">' + (l.commission_macro || '—') + '</code></div>' +
+        '</div>' +
+        ((l.notes || '').trim() ? '<div style="margin-top:10px;font-size:12px;color:var(--text);background:rgba(255,255,255,0.03);padding:8px 10px;border-radius:6px"><span style="color:var(--muted)">Notes:</span> ' + l.notes + '</div>' : '') +
+        '<div style="margin-top:8px;font-size:10px;color:var(--muted)">lead_id=' + leadId + '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+function leadDecide(leadId, action, btn) {
+  if (!confirm('Confirm ' + action + ' for lead ' + leadId.slice(0, 8) + '…?')) return;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  var nowSec = Date.now() / 1000;
+  var update = {
+    status: action === 'approve' ? 'approved' : 'rejected',
+    actioned_via: 'dashboard',
+    dashboard_actioned_at: nowSec,
+  };
+  if (action === 'approve') update.approved_at = nowSec;
+  else                      update.rejected_at = nowSec;
+  db.collection('leads').doc(leadId).update(update)
+    .then(function() { loadLeadApprovals(true); })
+    .catch(function(e) {
+      alert('Failed: ' + (e && e.message || e));
+      if (btn) { btn.disabled = false; btn.textContent = action === 'approve' ? '✅ Approve & Push' : '❌ Reject'; }
+    });
+}
+
+// Lightweight badge-poll (every 2 min) so the menu shows the pending count
+// without forcing the user onto the page.
+setInterval(function() {
+  db.collection('leads').where('status', '==', 'pending_approval').get()
+    .then(function(s) { _updateLeadApprovalsBadge(s.size); })
+    .catch(function() { /* ignore */ });
+}, 120000);
 
 </script>
 </body>

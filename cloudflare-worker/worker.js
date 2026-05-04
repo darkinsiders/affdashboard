@@ -49,6 +49,188 @@ export default {
       );
     }
 
+    // ── Lead intake (called by affiliateLeadBot when Krypto approves a lead) ──
+    if (url.pathname === "/lead-intake" && request.method === "POST") {
+      const token = url.searchParams.get("token");
+      if (token !== env.POSTBACK_TOKEN) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+      }
+      let payload;
+      try {
+        payload = await request.json();
+      } catch (e) {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const leadId = payload.id;
+      if (!leadId || typeof leadId !== "string") {
+        return new Response(JSON.stringify({ error: "Missing payload.id" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      let accessToken;
+      try {
+        accessToken = await getGoogleAccessToken(env.SA_EMAIL, env.SA_PRIVATE_KEY);
+      } catch (e) {
+        return new Response(`Auth error: ${e.message}`, { status: 500 });
+      }
+      try {
+        await firestoreSetDeep(PROJECT_ID, `leads/${leadId}`, payload, accessToken);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      // Optional Telegram notify (reuses existing TG_BOT_TOKEN)
+      if (env.TG_BOT_TOKEN && env.TG_CHAT_ID) {
+        const handle = payload.manager_telegram || "?";
+        const brand  = payload.brand_name || "?";
+        const cpa    = payload.cpa_amount_eur ?? "?";
+        const rs     = payload.revshare_pct ?? "?";
+        const msg    = `🎯 *Lead pushed to dashboard*\n${brand} · ${handle}\n€${cpa} CPA + ${rs}% RS`;
+        ctx.waitUntil(fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: env.TG_CHAT_ID, text: msg, parse_mode: "Markdown" }),
+        }));
+      }
+      return new Response(JSON.stringify({ status: "ok", lead_id: leadId }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    // ── Lead approve/reject from dashboard (called by app/index.html) ──────
+    // POST /leads/{id}/decide?token=X  body: {"action":"approve"|"reject"}
+    // Flips the lead's status and stamps dashboard_actioned_at + actioned_via.
+    // The bot polls /leads/dashboard-actions to pick this up and DM the manager.
+    {
+      const m = url.pathname.match(/^\/leads\/([^/]+)\/decide$/);
+      if (m && request.method === "POST") {
+        const token = url.searchParams.get("token");
+        if (token !== env.POSTBACK_TOKEN) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+          });
+        }
+        const leadId = m[1];
+        let body;
+        try { body = await request.json(); }
+        catch (_) {
+          return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+            status: 400, headers: { "Content-Type": "application/json" },
+          });
+        }
+        const action = (body.action || "").toLowerCase();
+        if (action !== "approve" && action !== "reject") {
+          return new Response(JSON.stringify({ error: "action must be 'approve' or 'reject'" }), {
+            status: 400, headers: { "Content-Type": "application/json" },
+          });
+        }
+        let accessToken;
+        try { accessToken = await getGoogleAccessToken(env.SA_EMAIL, env.SA_PRIVATE_KEY); }
+        catch (e) { return new Response(`Auth error: ${e.message}`, { status: 500 }); }
+
+        // Read existing doc, mutate, write back.
+        let existing;
+        try { existing = await firestoreGet(PROJECT_ID, `leads/${leadId}`, accessToken); }
+        catch (e) {
+          return new Response(JSON.stringify({ error: "lead not found: " + e.message }), {
+            status: 404, headers: { "Content-Type": "application/json" },
+          });
+        }
+        const nowMs = Date.now();
+        existing.status = action === "approve" ? "approved" : "rejected";
+        existing.actioned_via = "dashboard";
+        existing.dashboard_actioned_at = nowMs / 1000;
+        if (action === "approve") existing.approved_at = nowMs / 1000;
+        else                      existing.rejected_at = nowMs / 1000;
+        try { await firestoreSetDeep(PROJECT_ID, `leads/${leadId}`, existing, accessToken); }
+        catch (e) {
+          return new Response(JSON.stringify({ error: e.message }), {
+            status: 500, headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ status: "ok", lead_id: leadId, action }), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+      }
+    }
+
+    // ── Polling endpoint for the bot — list leads actioned via dashboard ──
+    // GET /leads/dashboard-actions?token=X&since=<unix_seconds>
+    if (url.pathname === "/leads/dashboard-actions" && request.method === "GET") {
+      const token = url.searchParams.get("token");
+      if (token !== env.POSTBACK_TOKEN) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { "Content-Type": "application/json" },
+        });
+      }
+      const since = parseFloat(url.searchParams.get("since") || "0") || 0;
+      let accessToken;
+      try { accessToken = await getGoogleAccessToken(env.SA_EMAIL, env.SA_PRIVATE_KEY); }
+      catch (e) { return new Response(`Auth error: ${e.message}`, { status: 500 }); }
+
+      // runQuery over the leads collection
+      const queryBody = {
+        structuredQuery: {
+          from: [{ collectionId: "leads" }],
+          where: {
+            compositeFilter: {
+              op: "AND",
+              filters: [
+                { fieldFilter: {
+                    field: { fieldPath: "actioned_via" },
+                    op: "EQUAL",
+                    value: { stringValue: "dashboard" },
+                }},
+                { fieldFilter: {
+                    field: { fieldPath: "dashboard_actioned_at" },
+                    op: "GREATER_THAN_OR_EQUAL",
+                    value: { doubleValue: since },
+                }},
+              ],
+            },
+          },
+          orderBy: [{ field: { fieldPath: "dashboard_actioned_at" }, direction: "ASCENDING" }],
+          limit: 100,
+        },
+      };
+      let res;
+      try {
+        res = await fetch(
+          `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(queryBody),
+          },
+        );
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+      }
+      const json = await res.json();
+      if (!Array.isArray(json)) {
+        return new Response(JSON.stringify({ error: "unexpected runQuery response", body: json }),
+          { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+      const leads = [];
+      for (const row of json) {
+        if (!row.document) continue;
+        leads.push(firestoreParseDoc(row.document));
+      }
+      return new Response(JSON.stringify({ leads }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
     // ── Postback handler (existing) ───────────────────────────────────────
     let p = Object.fromEntries(url.searchParams);
 
@@ -442,6 +624,46 @@ Return ONLY valid JSON, no markdown:
 }
 
 // ── Set (create or overwrite) a Firestore document ──────────────────────────
+
+// Recursive Firestore Value serializer — handles strings, numbers, booleans,
+// nulls, arrays, and nested objects. Used by /lead-intake which receives
+// rich JSON payloads (geos_open arrays, payment_methods, etc.).
+function fsValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === "string")         return { stringValue: v };
+  if (typeof v === "boolean")        return { booleanValue: v };
+  if (typeof v === "number") {
+    if (Number.isInteger(v)) return { integerValue: String(v) };
+    return { doubleValue: v };
+  }
+  if (Array.isArray(v)) {
+    return { arrayValue: { values: v.map(fsValue) } };
+  }
+  if (typeof v === "object") {
+    const fields = {};
+    for (const [k, val] of Object.entries(v)) fields[k] = fsValue(val);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(v) };  // fallback
+}
+
+async function firestoreSetDeep(projectId, docPath, data, token) {
+  const fields = {};
+  for (const [k, v] of Object.entries(data)) fields[k] = fsValue(v);
+  const res = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${docPath}`,
+    {
+      method:  "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ fields }),
+    }
+  );
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Firestore PATCH ${docPath} failed: ${res.status} ${txt}`);
+  }
+  return res;
+}
 
 async function firestoreSet(projectId, docPath, data, token) {
   const fields = {};
