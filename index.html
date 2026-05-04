@@ -14565,10 +14565,10 @@ function renderLeadApprovalsPage() {
 function loadLeadApprovals(force) {
   if (_leadApprovalsLoading) return;
   _leadApprovalsLoading = true;
+  // Single-field where (no composite index needed). Sort + cap client-side.
   db.collection('leads')
     .where('status', '==', 'pending_approval')
-    .orderBy('created_at', 'desc')
-    .limit(50)
+    .limit(100)
     .get()
     .then(function(snap) {
       var leads = [];
@@ -14577,6 +14577,8 @@ function loadLeadApprovals(force) {
         v._docId = d.id;
         leads.push(v);
       });
+      leads.sort(function(a, b) { return (b.created_at || 0) - (a.created_at || 0); });
+      if (leads.length > 50) leads = leads.slice(0, 50);
       _leadApprovalsCache = leads;
       _renderLeadApprovalsList(leads);
       _updateLeadApprovalsBadge(leads.length);
