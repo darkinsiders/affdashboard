@@ -1,0 +1,8 @@
+# Wrangler local caches
+**/.wrangler/
+
+# Local dashboard backups
+app/index.backup-*.html
+
+# Stray non-project files
+smartlinks/*.pdf

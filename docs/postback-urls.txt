@@ -1,0 +1,78 @@
+POSTBACK URL TEMPLATES
+======================
+Worker: https://affdashboard-postback.darkinsidersbusiness.workers.dev
+Token:  pbkDark2026xZ
+
+Use these templates when adding a new casino.
+Just pick the template for the affiliate network and paste into their postback settings.
+Funnel is auto-detected via [trackingcode]. Offer identifies the network.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CELLXPERT  (Rolletto, Cosmobet, Velobet, Ivybet, + any new CellXpert casino)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTE: Ivybet uses [afp1] instead of [afp]
+
+Registration:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=Registration&type=Registration&sum=0&funnel=[trackingcode]&offer=cellxpert
+
+FTD:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=FTD&type=FTD&sum=0&funnel=[trackingcode]&offer=cellxpert
+
+Qualified CPA:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=QFTD&type=QFTD&sum=[commissionamount]&funnel=[trackingcode]&offer=cellxpert
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FTDGALLERY  (Spinania + any new FTDGallery casino)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTE: Check available macros in their postback settings — may differ from CellXpert
+
+Registration:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=Registration&type=Registration&sum=0&funnel=[trackingcode]&offer=ftdgallery
+
+FTD:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=FTD&type=FTD&sum=0&funnel=[trackingcode]&offer=ftdgallery
+
+Qualified CPA:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=QFTD&type=QFTD&sum=[commissionamount]&funnel=[trackingcode]&offer=ftdgallery
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PADRINO  (NeedForSlots + any new Padrino casino)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTE: Check available macros in their postback settings — may differ from CellXpert
+
+Registration:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=Registration&type=Registration&sum=0&funnel=[trackingcode]&offer=padrino
+
+FTD:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=FTD&type=FTD&sum=0&funnel=[trackingcode]&offer=padrino
+
+Qualified CPA:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=QFTD&type=QFTD&sum=[commissionamount]&funnel=[trackingcode]&offer=padrino
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AFFILIKA  (Trueluck, Holyluck, Spinorhino + other Affilika deals)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTE: Funnel uses {campaign_id}. Revenue macros are based on the Affilika postback variable list.
+
+Registration:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid={visit_id}&status=Registration&type=Registration&sum=0&funnel={campaign_id}&offer=affilika
+
+FTD:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid={visit_id}&status=FTD&type=FTD&sum={first_deposit}&funnel={campaign_id}&offer=affilika
+
+Qualified CPA:
+https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid={visit_id}&status=QFTD&type=QFTD&sum={payout}&funnel={campaign_id}&offer=affilika
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEW / UNKNOWN PLATFORM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Check their available postback macros
+2. Replace [afp] with their click ID macro
+3. Replace [trackingcode] with their campaign/tracking macro
+4. Replace [commissionamount] with their revenue macro
+5. Set offer=networkname

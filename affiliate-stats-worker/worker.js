@@ -5,7 +5,7 @@
 const PROJECT_ID = "affdashboard-3f1a3";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
@@ -26,13 +26,19 @@ export default {
           headers: { "Content-Type": "application/json" },
         });
       }
-      // Fire and return immediately — don't block response
-      const promise = runStatsFetch(env);
-      promise.catch(e => console.error("runStatsFetch error:", e.message));
-      return new Response(
-        JSON.stringify({ status: "started", message: "Stats fetch initiated" }),
-        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
-      );
+      // Run synchronously so errors are visible in response
+      try {
+        const result = await runStatsFetch(env);
+        return new Response(
+          JSON.stringify({ status: "ok", result }),
+          { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+        );
+      } catch(e) {
+        return new Response(
+          JSON.stringify({ status: "error", error: e.message }),
+          { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+        );
+      }
     }
 
     return new Response("Not found", { status: 404 });
@@ -85,10 +91,8 @@ async function runStatsFetch(env) {
   for (const deal of deals) {
     if (!deal || (deal.status || "active") === "archived") continue;
 
-    // Only process CellXpert deals with a dashboard login URL set
-    const network = deal.network || getNetworkFromUrl(deal.url || "");
-    if (network !== "cellxpert") continue;
-    if (!deal.username || !deal.password || !deal.dashboardUrl) continue;
+    // Process any deal that has a dashboardUrl + credentials set
+    if (!deal.dashboardUrl || !deal.username || !deal.password) continue;
 
     const domain = extractDomain(deal.dashboardUrl);
     if (!domain) continue;
@@ -202,6 +206,7 @@ async function runStatsFetch(env) {
   }
 
   console.log(`Stats fetch done. success=${successCount}, failed=${failCount}`);
+  return { successCount, failCount, brands: results.map(r => ({ name: r.dealName, domain: r.domain, rows: r.rows?.length || 0, error: r.error || null })) };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

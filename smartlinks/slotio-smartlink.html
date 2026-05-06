@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Redirecting…</title>
+  <meta charset="UTF-8">
+  <style>
+    body { margin: 0; display: flex; align-items: center; justify-content: center;
+           min-height: 100vh; background: #0d0f14; color: #7d8590;
+           font-family: sans-serif; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div>Redirecting…</div>
+  <script>
+    var FUNNEL = "Slotio";
+    var FIRESTORE_URL = "https://firestore.googleapis.com/v1/projects/affdashboard-3f1a3/databases/(default)/documents/routes/slotio";
+    var CLICKS_URL = "https://firestore.googleapis.com/v1/projects/affdashboard-3f1a3/databases/(default)/documents/clicks?key=AIzaSyCVegt6HxRbJAe1Es_SHEMPH1P3e9YvOvU";
+    var HARDCODED_FALLBACK = "https://casinobet.com/?a=5d9946";
+    var URL_TO_CASINO = {"https://track.padrinopartners.com/visit/?bta=35062&brand=needforslots&afp=Slotio&utm_campaign=Slotio":"NEEDFORSLOTS","https://track.cosmobetpartners.com/visit/?bta=38241&brand=cosmobet&utm_campaign=Slotio":"COSMOBET","https://clickholyluck.com/tk4rxt4ru":"HOLYLUCK"};
+    var src      = new URLSearchParams(window.location.search).get('src') || '';
+    var campaign = new URLSearchParams(window.location.search).get('c') || '';
+    var sub1     = new URLSearchParams(window.location.search).get('sub1') || '';
+
+    function hashIP(ip) {
+      var h = 0;
+      for (var i = 0; i < ip.length; i++) {
+        h = (Math.imul(31, h) + ip.charCodeAt(i)) | 0;
+      }
+      return Math.abs(h);
+    }
+
+    function logClick(geo, casino) {
+      try {
+        fetch(CLICKS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: {
+            ts:       { stringValue: new Date().toISOString() },
+            funnel:   { stringValue: FUNNEL },
+            geo:      { stringValue: geo || '' },
+            casino:   { stringValue: casino || 'unknown' },
+            src:      { stringValue: src },
+            campaign: { stringValue: campaign },
+            sub1:     { stringValue: sub1 }
+          }})
+        });
+      } catch(e) {}
+    }
+
+    function injectTracking(url) {
+      if (!url || !src) return url;
+      var isCellXpert = /7ladies|cosmobetpartners|rollettoaffiliate|velobetpartners|cellxpert|ftdgallery|padrino|needforslots/.test(url);
+      var p1 = isCellXpert ? 'afp2' : 'sub1';
+      var p2 = isCellXpert ? 'afp3' : 'sub2';
+      var u = url;
+      var re1 = new RegExp('([?&])' + p1 + '=[^&#]*');
+      if (re1.test(u)) {
+        u = u.replace(re1, '$1' + p1 + '=' + encodeURIComponent(src));
+      } else {
+        u += (u.indexOf('?') !== -1 ? '&' : '?') + p1 + '=' + encodeURIComponent(src);
+      }
+      if (campaign) {
+        var re2 = new RegExp('([?&])' + p2 + '=[^&#]*');
+        if (re2.test(u)) {
+          u = u.replace(re2, '$1' + p2 + '=' + encodeURIComponent(campaign));
+        } else {
+          u += '&' + p2 + '=' + encodeURIComponent(campaign);
+        }
+      }
+      return u;
+    }
+
+    function redirect(routes, fallback, code, ip, utc) {
+      var url, casino;
+      var options = routes[code];
+      if (!options || !options.length) {
+        url = fallback; casino = 'fallback';
+      } else {
+        var total = options.reduce(function(s, o) { return s + o[1]; }, 0);
+        if (total <= 0) {
+          url = fallback; casino = 'fallback';
+        } else {
+          var h = ip ? hashIP(ip) % total : 0;
+          var cum = 0;
+          for (var i = 0; i < options.length; i++) {
+            cum += options[i][1];
+            if (h < cum) { url = options[i][0]; break; }
+          }
+          if (!url) url = options[options.length - 1][0];
+          casino = (utc || URL_TO_CASINO)[url] || 'unknown';
+        }
+      }
+      logClick(code, casino);
+      window.location.replace(injectTracking(url));
+    }
+
+    function doRedirect(routes, fallback, utc) {
+      fetch('https://ipapi.co/json/')
+        .then(function(r){ return r.json(); })
+        .then(function(d){ redirect(routes, fallback, d.country_code || d.country, d.ip || '', utc); })
+        .catch(function(){
+          fetch('https://freeipapi.com/api/json')
+            .then(function(r){ return r.json(); })
+            .then(function(d){ redirect(routes, fallback, d.countryCode, d.ipAddress || '', utc); })
+            .catch(function(){
+              logClick('unknown', 'fallback');
+              window.location.replace(injectTracking(fallback));
+            });
+        });
+    }
+
+    fetch(FIRESTORE_URL)
+      .then(function(r){ return r.json(); })
+      .then(function(doc) {
+        var routes = JSON.parse(doc.fields.routes.stringValue);
+        var fallback = doc.fields.fallback.stringValue || HARDCODED_FALLBACK;
+        var utc = doc.fields.urlToCasino ? JSON.parse(doc.fields.urlToCasino.stringValue) : URL_TO_CASINO;
+        doRedirect(routes, fallback, utc);
+      })
+      .catch(function() {
+        logClick('unknown', 'fallback');
+        window.location.replace(injectTracking(HARDCODED_FALLBACK));
+      });
+  </script>
+</body>
+</html>

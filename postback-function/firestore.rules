@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /dashboard/{doc} { allow read, write: if true; }
+    match /routes/{funnel} { allow read, write: if true; }
+    match /clicks/{clickId} { allow read, write: if true; }
+    match /conversions/{doc} { allow read: if true; allow write: if false; }
+    match /postbacks/{doc} { allow read: if true; allow write: if false; }
+  }
+}

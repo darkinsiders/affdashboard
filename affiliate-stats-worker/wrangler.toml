@@ -5,5 +5,5 @@ workers_dev = true
 
 # Cron disabled — PebbleHost Python script handles all brands now
 # The /run-stats endpoint still works for manual testing
-# [triggers]
-# crons = ["0 * * * *"]
+[triggers]
+crons = []
