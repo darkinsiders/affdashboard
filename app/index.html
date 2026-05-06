@@ -2001,6 +2001,10 @@
         <span class="ni-dot" style="background:#ff9f43"></span>
         <span class="ni-label">Lead Approvals <span id="leadApprovalsBadge" style="display:none;background:#ff9f43;color:#000;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px"></span></span>
       </div>
+      <div class="nav-item" id="tab-botOutreach" onclick="navGo(function(){setPage('botOutreach')})">
+        <span class="ni-dot" style="background:#22c55e"></span>
+        <span class="ni-label">Bot Outreach <span id="botOutreachStatusDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#888;margin-left:4px;vertical-align:middle"></span></span>
+      </div>
     </div>
   </div>
 
@@ -2234,6 +2238,7 @@
 <div id="projectPage" style="display:none"></div>
 <div id="employeesPage" style="display:none"></div>
 <div id="leadApprovalsPage" style="display:none"></div>
+<div id="botOutreachPage" style="display:none"></div>
 <div id="analyticsPage" style="display:none"></div>
 <div id="managePage" style="display:none"></div>
 <div id="dealsPage" style="display:none"></div>
@@ -2844,6 +2849,12 @@ function setPage(page) {
     setNavActive('leadApprovals', 'business');
     updateBreadcrumb('Team', 'Lead Approvals');
     if (typeof renderLeadApprovalsPage === 'function') renderLeadApprovalsPage();
+  } else if (page === 'botOutreach') {
+    var el = document.getElementById('botOutreachPage');
+    if (el) el.style.display = '';
+    setNavActive('botOutreach', 'business');
+    updateBreadcrumb('Team', 'Bot Outreach');
+    if (typeof renderBotOutreachPage === 'function') renderBotOutreachPage();
   } else if (page === 'manage') {
     var el = document.getElementById('funnelsPage');
     if (el) el.style.display = '';
@@ -14536,6 +14547,209 @@ function _renderAutopilotHistory(runs) {
 function _apGrade(n) {
   return n >= 90 ? 'A+' : n >= 80 ? 'A' : n >= 70 ? 'B' : n >= 60 ? 'C' : n >= 50 ? 'D' : 'F';
 }
+
+// ─── Bot Outreach page (affiliateLeadBot live status) ─────────────────────
+// Reads bot_status/affiliateLeadBot doc which the bot heartbeats every 60s.
+
+var _botStatusUnsub = null;
+var _botStatusData  = null;
+var _botStatusRefreshTimer = null;
+
+function _fmtTimeAgo(unixSec) {
+  if (!unixSec) return '—';
+  var s = Math.max(0, (Date.now()/1000) - unixSec);
+  if (s < 60)    return Math.floor(s) + 's ago';
+  if (s < 3600)  return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
+function _fmtDateTime(unixSec) {
+  if (!unixSec) return '—';
+  return new Date(unixSec * 1000).toLocaleString();
+}
+function _isBotOnline(d) {
+  if (!d || !d.last_heartbeat_ts) return false;
+  return (Date.now()/1000 - d.last_heartbeat_ts) < 180;  // online if heartbeat <3min ago
+}
+
+function renderBotOutreachPage() {
+  var el = document.getElementById('botOutreachPage');
+  if (!el) return;
+  if (!el.innerHTML) {
+    el.innerHTML = '<div id="botOutreachContent" style="padding:24px;max-width:1280px;margin:0 auto">' +
+      '<div style="color:var(--muted);padding:40px;text-align:center">Loading bot status...</div></div>';
+  }
+
+  if (_botStatusUnsub) { try { _botStatusUnsub(); } catch (_) {} _botStatusUnsub = null; }
+  _botStatusUnsub = firebase.firestore().collection('bot_status').doc('affiliateLeadBot')
+    .onSnapshot(function(snap) {
+      _botStatusData = snap.exists ? snap.data() : null;
+      _renderBotOutreachContent();
+    }, function(err) {
+      console.error('bot_status snapshot error:', err);
+    });
+
+  if (_botStatusRefreshTimer) clearInterval(_botStatusRefreshTimer);
+  _botStatusRefreshTimer = setInterval(_renderBotOutreachContent, 15000);  // re-render to update "Xs ago" labels
+}
+
+function _renderBotOutreachContent() {
+  var c = document.getElementById('botOutreachContent');
+  if (!c) return;
+  var d = _botStatusData;
+  if (!d) {
+    c.innerHTML = '<div style="color:var(--muted);padding:40px;text-align:center">No status data yet — waiting for first bot heartbeat. If the bot is running it should appear within ~60 seconds.</div>';
+    _setBotStatusDot(false);
+    return;
+  }
+  var online = _isBotOnline(d);
+  _setBotStatusDot(online);
+  var stages = d.stages || {};
+  var stageOrder = ['queued','contacted','engaged','awaiting_approval','closed_won','closed_lost','send_failed'];
+  var stageColors = {queued:'#6b7280', contacted:'#3b82f6', engaged:'#8b5cf6', awaiting_approval:'#f59e0b', closed_won:'#10b981', closed_lost:'#ef4444', send_failed:'#dc2626'};
+  var stageLabels = {queued:'Queued', contacted:'Contacted', engaged:'Engaged', awaiting_approval:'Awaiting Approval', closed_won:'Closed Won', closed_lost:'Closed Lost', send_failed:'Send Failed'};
+
+  var pipelineHtml = stageOrder.map(function(s) {
+    var n = stages[s] || 0;
+    if (n === 0 && s !== 'queued' && s !== 'contacted') return '';
+    return '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:14px 16px;min-width:130px">' +
+      '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">' + stageLabels[s] + '</div>' +
+      '<div style="font-size:24px;font-weight:700;color:' + stageColors[s] + '">' + n + '</div>' +
+      '</div>';
+  }).join('');
+
+  var sentToday = d.sent_today || 0;
+  var cap = d.daily_cap || 5;
+  var capPct = Math.min(100, (sentToday / cap) * 100);
+  var minGap = Math.round((d.min_gap_seconds || 1800) / 60);
+  var maxGap = Math.round((d.max_gap_seconds || 3600) / 60);
+  var nextSendEta = '—';
+  if (d.last_send_ts && sentToday < cap) {
+    var nextEarly = d.last_send_ts + (d.min_gap_seconds || 1800);
+    var secsUntil = Math.max(0, nextEarly - Date.now()/1000);
+    nextSendEta = secsUntil < 60 ? '<1min' : Math.round(secsUntil/60) + ' min';
+  } else if (sentToday >= cap) {
+    nextSendEta = 'cap reached';
+  }
+
+  // Outreach table
+  var rows = (d.outreach || []).slice(0, 30);
+  var tableRows = rows.map(function(r) {
+    var hot = r.last_inbound_at && (Date.now()/1000 - r.last_inbound_at < 3600);
+    var stageColor = stageColors[r.stage] || '#888';
+    return '<tr' + (hot ? ' style="background:rgba(245,158,11,0.05)"' : '') + '>' +
+      '<td style="padding:8px 12px"><a href="https://t.me/' + (r.tg_handle || '') + '" target="_blank" style="color:var(--accent);text-decoration:none">@' + (r.tg_handle || '?') + '</a></td>' +
+      '<td style="padding:8px 12px;color:var(--muted)">' + (r.tg_first_name || '') + '</td>' +
+      '<td style="padding:8px 12px"><span style="background:' + stageColor + '22;color:' + stageColor + ';padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">' + (r.stage || '?') + '</span></td>' +
+      '<td style="padding:8px 12px;color:var(--muted);font-size:12px">' + (r.msg_count_in || 0) + ' in / ' + (r.msg_count_out || 0) + ' out</td>' +
+      '<td style="padding:8px 12px;color:var(--muted);font-size:12px">' + _fmtTimeAgo(r.last_outbound_at) + '</td>' +
+      '<td style="padding:8px 12px;color:var(--muted);font-size:12px">' + (r.last_inbound_at ? _fmtTimeAgo(r.last_inbound_at) : '—') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  // Recent messages
+  var recentMsgs = (d.recent_messages || []).slice(0, 20);
+  var msgRows = recentMsgs.map(function(m) {
+    var dirColor = m.direction === 'in' ? '#3b82f6' : '#10b981';
+    var preview = (m.body || '').replace(/[<>&]/g, function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}).slice(0, 140);
+    return '<tr>' +
+      '<td style="padding:6px 10px;font-size:11px;color:var(--muted);white-space:nowrap">' + _fmtTimeAgo(m.ts) + '</td>' +
+      '<td style="padding:6px 10px"><span style="background:' + dirColor + '22;color:' + dirColor + ';padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase">' + m.direction + '</span></td>' +
+      '<td style="padding:6px 10px;color:var(--muted);font-size:12px">' + (m.user_id || '?') + '</td>' +
+      '<td style="padding:6px 10px;font-size:12px;color:var(--text)">' + preview + (m.body && m.body.length > 140 ? '…' : '') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  c.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+      '<div>' +
+        '<h1 style="margin:0;font-size:24px;font-weight:700">Bot Outreach</h1>' +
+        '<div style="color:var(--muted);font-size:13px;margin-top:4px">affiliateLeadBot — Thomas @ Scanio AI</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;background:' + (online ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.1)') + ';padding:8px 14px;border-radius:8px;border:1px solid ' + (online ? '#10b981' : '#6b7280') + '33">' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + (online ? '#10b981' : '#6b7280') + ';' + (online ? 'box-shadow:0 0 8px #10b981' : '') + '"></span>' +
+        '<span style="font-weight:600">' + (online ? 'Online' : 'Offline') + '</span>' +
+        '<span style="color:var(--muted);font-size:12px">last beat ' + _fmtTimeAgo(d.last_heartbeat_ts) + '</span>' +
+      '</div>' +
+    '</div>' +
+
+    // KPI cards
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px">' +
+      '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px">' +
+        '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Sent today</div>' +
+        '<div style="font-size:28px;font-weight:700">' + sentToday + ' <span style="font-size:14px;color:var(--muted);font-weight:400">/ ' + cap + '</span></div>' +
+        '<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;width:' + capPct + '%;background:#10b981"></div></div>' +
+      '</div>' +
+      '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px">' +
+        '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Targets in file</div>' +
+        '<div style="font-size:28px;font-weight:700">' + (d.targets_in_file || 0) + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);margin-top:4px">' + minGap + '–' + maxGap + ' min gap</div>' +
+      '</div>' +
+      '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px">' +
+        '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Next send eta</div>' +
+        '<div style="font-size:28px;font-weight:700">' + nextSendEta + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);margin-top:4px">last send ' + _fmtTimeAgo(d.last_send_ts) + '</div>' +
+      '</div>' +
+      '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px">' +
+        '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Deal floor</div>' +
+        '<div style="font-size:18px;font-weight:700">€' + (d.deal_floor && d.deal_floor.cpa_eur || 160) + ' / ' + (d.deal_floor && d.deal_floor.rs_pct || 40) + '% RS</div>' +
+        '<div style="font-size:11px;color:var(--muted);margin-top:4px">min ' + (d.deal_floor && d.deal_floor.min_geos || 10) + ' GEOs</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Pipeline
+    '<div style="margin-bottom:24px">' +
+      '<h2 style="font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 12px">Pipeline</h2>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">' + pipelineHtml + '</div>' +
+    '</div>' +
+
+    // Outreach table
+    '<div style="margin-bottom:24px">' +
+      '<h2 style="font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 12px">Conversations <span style="color:var(--muted);font-weight:400;text-transform:none">(top ' + rows.length + ' by activity)</span></h2>' +
+      '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+          '<thead><tr style="background:rgba(255,255,255,0.04);text-align:left">' +
+            '<th style="padding:10px 12px;font-weight:600;color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Handle</th>' +
+            '<th style="padding:10px 12px;font-weight:600;color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Name</th>' +
+            '<th style="padding:10px 12px;font-weight:600;color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Stage</th>' +
+            '<th style="padding:10px 12px;font-weight:600;color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Messages</th>' +
+            '<th style="padding:10px 12px;font-weight:600;color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Last Out</th>' +
+            '<th style="padding:10px 12px;font-weight:600;color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:0.5px">Last In</th>' +
+          '</tr></thead>' +
+          '<tbody>' + (tableRows || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">No outreach data</td></tr>') + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>' +
+
+    // Recent messages
+    '<div style="margin-bottom:24px">' +
+      '<h2 style="font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 12px">Recent Messages</h2>' +
+      '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden;max-height:400px;overflow-y:auto">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+          '<tbody>' + (msgRows || '<tr><td style="padding:20px;text-align:center;color:var(--muted)">No messages yet</td></tr>') + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
+}
+
+function _setBotStatusDot(online) {
+  var dot = document.getElementById('botOutreachStatusDot');
+  if (dot) dot.style.background = online ? '#10b981' : '#888';
+}
+
+// Subscribe globally so the nav indicator dot is correct on any page
+(function _initBotOutreachIndicator() {
+  if (typeof firebase === 'undefined' || !firebase.firestore) return;
+  setTimeout(function() {
+    try {
+      firebase.firestore().collection('bot_status').doc('affiliateLeadBot')
+        .onSnapshot(function(snap) {
+          if (!snap.exists) { _setBotStatusDot(false); return; }
+          _setBotStatusDot(_isBotOnline(snap.data()));
+        });
+    } catch (e) { console.warn('bot status indicator init failed:', e); }
+  }, 2000);
+})();
 
 // ─── Lead Approvals page (affiliateLeadBot integration) ────────────────────
 // Writes go directly to Firestore via the authenticated JS SDK — no worker
