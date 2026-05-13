@@ -4994,6 +4994,7 @@ function renderAnalyticsPage() {
 // ── SEO Site tab: aigamblingdaily.com analytics ──────────────────────────────
 var _seoSupabaseUrl = 'https://qetfydwmjlycfftldbrf.supabase.co';
 var _seoAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFldGZ5ZHdtamx5Y2ZmdGxkYnJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDM2NDMsImV4cCI6MjA5NDA3OTY0M30.zm4ubdIUqlL6-Ht5EvVwawuTqaCijIKeEhEbRhWbFTc';
+var _seoCfProxyUrl = 'https://aigd-analytics-proxy.darkinsidersbusiness.workers.dev';
 
 function _seoFetch(path) {
   return fetch(_seoSupabaseUrl + '/rest/v1/' + path, {
@@ -5034,10 +5035,15 @@ function renderSeoSiteTab() {
     _seoFetch('blog_articles?select=slug,title,category,word_count,published_at&status=eq.live&order=published_at.desc&limit=10'),
     _seoFetch('blog_clicks?select=funnel,article_slug,created_at&created_at=gte.' + encodeURIComponent(since30d) + '&order=created_at.desc&limit=500'),
     _seoFetch('blog_sources?select=name,rss_url,active,last_fetched_at,consecutive_failures&order=name.asc'),
-    _seoFetch('blog_articles?select=category&status=eq.live&limit=1000')
+    _seoFetch('blog_articles?select=category&status=eq.live&limit=1000'),
+    fetch(_seoCfProxyUrl).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
   ]).then(function(results) {
     var liveArticles = results[0], totalSlots = results[1], totalCasinos = results[2], queueDepth = results[3];
     var recent = results[4] || [], clicks30d = results[5] || [], sources = results[6] || [], byCategory = results[7] || [];
+    var cfStats = results[8];
+    var visitsToday = cfStats && cfStats.today ? cfStats.today.pageviews : null;
+    var visits7d = cfStats && cfStats.last7d ? cfStats.last7d.pageviews : null;
+    var visits30d = cfStats && cfStats.last30d ? cfStats.last30d.pageviews : null;
 
     var clicksByArticle = {}, clicksByFunnel = {};
     clicks30d.forEach(function(c) {
@@ -5074,11 +5080,23 @@ function renderSeoSiteTab() {
         (sub ? '<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:4px;font-family:var(--font-mono)">' + sub + '</div>' : '') +
       '</div>';
     }
+    // Traffic row (Cloudflare Web Analytics + funnel clicks)
+    var vTodayLbl = visitsToday === null ? '—' : visitsToday.toLocaleString();
+    var v7dLbl    = visits7d    === null ? '—' : visits7d.toLocaleString();
+    var v30dLbl   = visits30d   === null ? '—' : visits30d.toLocaleString();
+    var cvr = (visits30d && clicks30d.length) ? ((clicks30d.length / visits30d) * 100).toFixed(2) + '%' : '—';
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
+      kpi('Visits Today', vTodayLbl, 'aigamblingdaily.com') +
+      kpi('Visits 7d', v7dLbl, '') +
+      kpi('Visits 30d', v30dLbl, '') +
+      kpi('Funnel Clicks (30d)', clicks30d.length.toLocaleString(), 'CVR ' + cvr) +
+    '</div>';
+
+    // Content row
     h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">' +
       kpi('Live Articles', liveArticles, 'news + listicles') +
       kpi('Slot Reviews', totalSlots, 'Pragmatic + BGaming') +
       kpi('Casino Reviews', totalCasinos, '') +
-      kpi('Funnel Clicks (30d)', clicks30d.length, 'attributed to SEO') +
       kpi('Queue Depth', queueDepth, 'awaiting rewrite') +
     '</div>';
 
