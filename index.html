@@ -2775,7 +2775,7 @@ function setPage(page) {
   } else if (page === 'analytics') {
     var el = document.getElementById('analyticsPage');
     if (el) el.style.display = '';
-    var subLabel = {cxstats:'CX Stats',legacy:'Legacy Analytics',clicks:'Clicks',performance:'Performance',deals:'Deals',sources:'Sources',roi:'ROI & Spend',overview:'Overview',report:'Reports'}[analyticsTab] || 'Analytics';
+    var subLabel = {cxstats:'CX Stats',seo:'SEO Site',legacy:'Legacy Analytics',clicks:'Clicks',performance:'Performance',deals:'Deals',sources:'Sources',roi:'ROI & Spend',overview:'Overview',report:'Reports'}[analyticsTab] || 'Analytics';
     setNavActive(analyticsTab, 'analytics');
     updateBreadcrumb('Analytics', subLabel);
     renderAnalyticsPage();
@@ -4980,12 +4980,186 @@ function renderAnalyticsPage() {
       '<div style="display:flex;gap:0;overflow-x:auto;scrollbar-width:none;align-items:center">' +
         tabBtn('cxstats', 'CX Stats') +
         '<span style="width:1px;height:18px;background:var(--border);margin:0 6px;flex-shrink:0"></span>' +
+        tabBtn('seo', 'SEO Site') +
+        '<span style="width:1px;height:18px;background:var(--border);margin:0 6px;flex-shrink:0"></span>' +
         tabBtn('legacy', 'Legacy Analytics', true) +
       '</div>' +
     '</div>' +
     '<div id="analyticsTabBody"></div>';
   if (analyticsTab === 'cxstats') renderCxStatsTab();
+  else if (analyticsTab === 'seo') renderSeoSiteTab();
   else if (analyticsTab === 'legacy') renderLegacyAnalytics();
+}
+
+// ── SEO Site tab: aigamblingdaily.com analytics ──────────────────────────────
+var _seoSupabaseUrl = 'https://qetfydwmjlycfftldbrf.supabase.co';
+var _seoAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFldGZ5ZHdtamx5Y2ZmdGxkYnJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDM2NDMsImV4cCI6MjA5NDA3OTY0M30.zm4ubdIUqlL6-Ht5EvVwawuTqaCijIKeEhEbRhWbFTc';
+
+function _seoFetch(path) {
+  return fetch(_seoSupabaseUrl + '/rest/v1/' + path, {
+    headers: { apikey: _seoAnonKey, Authorization: 'Bearer ' + _seoAnonKey }
+  }).then(function(r) { return r.ok ? r.json() : []; });
+}
+function _seoCount(table, filter) {
+  return fetch(_seoSupabaseUrl + '/rest/v1/' + table + '?' + (filter ? filter + '&' : '') + 'select=id', {
+    headers: { apikey: _seoAnonKey, Authorization: 'Bearer ' + _seoAnonKey, Prefer: 'count=exact', Range: '0-0' }
+  }).then(function(r) {
+    var cr = r.headers.get('content-range') || '0';
+    return parseInt(cr.split('/')[1] || 0, 10);
+  });
+}
+function _seoRelTime(iso) {
+  if (!iso) return 'never';
+  var diffMs = Date.now() - new Date(iso).getTime();
+  var diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return diffMin + 'm ago';
+  var diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return diffH + 'h ago';
+  var diffD = Math.floor(diffH / 24);
+  if (diffD < 14) return diffD + 'd ago';
+  return String(iso).slice(0, 10);
+}
+
+function renderSeoSiteTab() {
+  var body = document.getElementById('analyticsTabBody');
+  if (!body) return;
+  body.innerHTML = '<div style="padding:40px 32px;color:var(--muted);font-size:13px">Loading SEO site data…</div>';
+  var since30d = new Date(Date.now() - 30*86400*1000).toISOString();
+  Promise.all([
+    _seoCount('blog_articles', 'status=eq.live'),
+    _seoCount('blog_slots'),
+    _seoCount('blog_casinos'),
+    _seoCount('blog_scraped_items', 'status=eq.new'),
+    _seoFetch('blog_articles?select=slug,title,category,word_count,published_at&status=eq.live&order=published_at.desc&limit=10'),
+    _seoFetch('blog_clicks?select=funnel,article_slug,created_at&created_at=gte.' + encodeURIComponent(since30d) + '&order=created_at.desc&limit=500'),
+    _seoFetch('blog_sources?select=name,rss_url,active,last_fetched_at,consecutive_failures&order=name.asc'),
+    _seoFetch('blog_articles?select=category&status=eq.live&limit=1000')
+  ]).then(function(results) {
+    var liveArticles = results[0], totalSlots = results[1], totalCasinos = results[2], queueDepth = results[3];
+    var recent = results[4] || [], clicks30d = results[5] || [], sources = results[6] || [], byCategory = results[7] || [];
+
+    var clicksByArticle = {}, clicksByFunnel = {};
+    clicks30d.forEach(function(c) {
+      clicksByArticle[c.article_slug] = (clicksByArticle[c.article_slug] || 0) + 1;
+      clicksByFunnel[c.funnel] = (clicksByFunnel[c.funnel] || 0) + 1;
+    });
+    var topArticles = Object.keys(clicksByArticle).map(function(s) { return { slug: s, count: clicksByArticle[s] }; }).sort(function(a,b){return b.count-a.count;}).slice(0, 10);
+    var catCounts = {};
+    byCategory.forEach(function(r) { catCounts[r.category] = (catCounts[r.category]||0) + 1; });
+    var lastPubRel = recent[0] ? _seoRelTime(recent[0].published_at) : 'never';
+
+    var ss = 'background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer';
+    var hdrLbl = 'font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted)';
+    var cardSt = 'background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:14px 16px';
+    var sectSt = 'background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:16px';
+    var tdSt = 'padding:6px 0;border-bottom:1px solid var(--border)';
+
+    var h = '<div style="padding:24px 32px 40px;max-width:1800px;margin:0 auto">';
+
+    // Header
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">' +
+      '<div>' +
+        '<div style="' + hdrLbl + '">SEO Site &middot; aigamblingdaily.com</div>' +
+        '<div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:2px;font-family:var(--font-mono)">Last publish: ' + escHtml(lastPubRel) + '</div>' +
+      '</div>' +
+      '<button onclick="renderSeoSiteTab()" style="' + ss + '">&#8635; Refresh</button>' +
+    '</div>';
+
+    // KPI cards
+    function kpi(label, val, sub) {
+      return '<div style="' + cardSt + ';flex:1;min-width:140px">' +
+        '<div style="' + hdrLbl + ';margin-bottom:6px">' + label + '</div>' +
+        '<div style="font-size:24px;font-family:var(--font-mono);font-weight:700">' + val + '</div>' +
+        (sub ? '<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:4px;font-family:var(--font-mono)">' + sub + '</div>' : '') +
+      '</div>';
+    }
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">' +
+      kpi('Live Articles', liveArticles, 'news + listicles') +
+      kpi('Slot Reviews', totalSlots, 'Pragmatic + BGaming') +
+      kpi('Casino Reviews', totalCasinos, '') +
+      kpi('Funnel Clicks (30d)', clicks30d.length, 'attributed to SEO') +
+      kpi('Queue Depth', queueDepth, 'awaiting rewrite') +
+    '</div>';
+
+    // External link buttons
+    function lnk(label, url) {
+      return '<a href="' + url + '" target="_blank" rel="noopener" style="' + cardSt + ';font-size:12px;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:8px;flex:1;min-width:200px;transition:border-color 0.15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+        '<span style="font-weight:600">' + label + '</span><span style="margin-left:auto;color:var(--muted);font-size:14px">&#8599;</span>' +
+      '</a>';
+    }
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px">' +
+      lnk('Open site', 'https://aigamblingdaily.com') +
+      lnk('Cloudflare Web Analytics', 'https://dash.cloudflare.com/?to=/:account/web-analytics') +
+      lnk('Google Search Console', 'https://search.google.com/search-console') +
+      lnk('Vercel Deploys', 'https://vercel.com/desc-s-projects/aigamblingdaily') +
+    '</div>';
+
+    // 3-column row: top articles | clicks by funnel | by category
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px">';
+
+    h += '<div style="' + sectSt + '">' +
+      '<div style="' + hdrLbl + ';margin-bottom:10px">Top SEO Articles &middot; 30d clicks</div>';
+    if (!topArticles.length) h += '<div style="font-size:12px;color:var(--muted)">No funnel clicks yet.</div>';
+    else {
+      h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+      topArticles.forEach(function(a) {
+        h += '<tr><td style="' + tdSt + ';font-family:var(--font-mono);font-size:11px;color:var(--muted);padding-right:8px">' + escHtml(a.slug.slice(0, 50)) + '</td><td style="' + tdSt + ';text-align:right;font-family:var(--font-mono);font-weight:600">' + a.count + '</td></tr>';
+      });
+      h += '</table>';
+    }
+    h += '</div>';
+
+    h += '<div style="' + sectSt + '">' +
+      '<div style="' + hdrLbl + ';margin-bottom:10px">Clicks by Funnel &middot; 30d</div>';
+    var funnelKeys = Object.keys(clicksByFunnel).sort(function(a,b){return clicksByFunnel[b]-clicksByFunnel[a];});
+    if (!funnelKeys.length) h += '<div style="font-size:12px;color:var(--muted)">No funnel clicks yet.</div>';
+    else {
+      h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+      funnelKeys.forEach(function(f) {
+        h += '<tr><td style="' + tdSt + ';font-weight:600;text-transform:capitalize">' + escHtml(f) + '</td><td style="' + tdSt + ';text-align:right;font-family:var(--font-mono);font-weight:600">' + clicksByFunnel[f] + '</td></tr>';
+      });
+      h += '</table>';
+    }
+    h += '</div>';
+
+    h += '<div style="' + sectSt + '">' +
+      '<div style="' + hdrLbl + ';margin-bottom:10px">Articles by Category</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    Object.keys(catCounts).sort(function(a,b){return catCounts[b]-catCounts[a];}).forEach(function(c) {
+      h += '<tr><td style="' + tdSt + ';text-transform:capitalize">' + escHtml(c) + '</td><td style="' + tdSt + ';text-align:right;font-family:var(--font-mono);font-weight:600">' + catCounts[c] + '</td></tr>';
+    });
+    h += '</table></div>';
+    h += '</div>';
+
+    // RSS source health
+    h += '<div style="' + sectSt + ';margin-bottom:14px">' +
+      '<div style="' + hdrLbl + ';margin-bottom:10px">RSS Source Health</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<tr style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.05em"><th style="text-align:left;padding:6px 0;font-weight:600">Source</th><th style="text-align:left;padding:6px 0;font-weight:600">Last Fetch</th><th style="text-align:right;padding:6px 0;font-weight:600">Errors</th><th style="text-align:right;padding:6px 0;font-weight:600">Status</th></tr>';
+    sources.forEach(function(s) {
+      var lf = s.last_fetched_at ? _seoRelTime(s.last_fetched_at) : '<span style="color:var(--red)">never</span>';
+      var status = !s.active ? '<span style="color:rgba(255,255,255,0.3)">inactive</span>' : (s.consecutive_failures > 0 ? '<span style="color:var(--red)">errors</span>' : '<span style="color:var(--green)">ok</span>');
+      var nmCol = s.active ? 'var(--text)' : 'rgba(255,255,255,0.4)';
+      h += '<tr><td style="' + tdSt + ';font-weight:600;color:' + nmCol + '">' + escHtml(s.name) + '</td><td style="' + tdSt + ';font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + lf + '</td><td style="' + tdSt + ';text-align:right;font-family:var(--font-mono)">' + (s.consecutive_failures || 0) + '</td><td style="' + tdSt + ';text-align:right">' + status + '</td></tr>';
+    });
+    h += '</table></div>';
+
+    // Recent publishes
+    h += '<div style="' + sectSt + '">' +
+      '<div style="' + hdrLbl + ';margin-bottom:10px">Recent Publishes</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    recent.forEach(function(a) {
+      var url = 'https://aigamblingdaily.com/' + a.category + '/' + a.slug;
+      h += '<tr><td style="' + tdSt + ';font-family:var(--font-mono);font-size:11px;color:var(--muted);width:130px">' + escHtml(String(a.published_at||'').slice(0,16).replace('T',' ')) + '</td><td style="' + tdSt + '"><a href="' + url + '" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">' + escHtml(a.title || a.slug) + '</a></td><td style="' + tdSt + ';font-size:10px;color:var(--muted);text-transform:capitalize;text-align:right;width:90px">' + escHtml(a.category) + '</td><td style="' + tdSt + ';font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:right;width:60px">' + (a.word_count || 0) + 'w</td></tr>';
+    });
+    h += '</table></div>';
+
+    h += '</div>';
+    body.innerHTML = h;
+  }).catch(function(e) {
+    body.innerHTML = '<div style="padding:40px 32px;color:var(--red);font-size:13px">Failed to load SEO data: ' + escHtml(e.message || String(e)) + '</div>';
+  });
 }
 
 function renderLegacyAnalytics() {
