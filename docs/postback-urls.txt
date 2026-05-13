@@ -9,9 +9,9 @@ Funnel is auto-detected via [trackingcode]. Offer identifies the network.
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CELLXPERT  (Rolletto, Cosmobet, Velobet, Ivybet, + any new CellXpert casino)
+CELLXPERT  (Rolletto, Cosmobet, Velobet, NeedForSlots, Spinania, + any new CellXpert casino)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NOTE: Ivybet uses [afp1] instead of [afp]
+NOTE: Legacy 7ladies-based casinos use [afp1] instead of [afp]
 
 Registration:
 https://affdashboard-postback.darkinsidersbusiness.workers.dev?token=pbkDark2026xZ&clickid=[afp]&status=Registration&type=Registration&sum=0&funnel=[trackingcode]&offer=cellxpert

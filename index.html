@@ -1772,7 +1772,7 @@
         <div style="display:flex;flex-direction:column;gap:8px">
           <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">1</span><span style="font-size:13px;color:var(--text);line-height:1.6">Visitor opens the smartlink URL hosted on GitHub Pages</span></div>
           <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">2</span><span style="font-size:13px;color:var(--text);line-height:1.6">The page calls <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">ipapi.co</code> to detect their country code (e.g. <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">DE</code>, <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">SI</code>)</span></div>
-          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">3</span><span style="font-size:13px;color:var(--text);line-height:1.6">Their IP is hashed to a number — this maps them to a casino based on your traffic weights (e.g. 70% IVYBET / 30% ROLLETTO). The same IP always gets the same casino.</span></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">3</span><span style="font-size:13px;color:var(--text);line-height:1.6">Their IP is hashed to a number — this maps them to a casino based on your traffic weights (e.g. 70% NEEDFORSLOTS / 30% ROLLETTO). The same IP always gets the same casino.</span></div>
           <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">4</span><span style="font-size:13px;color:var(--text);line-height:1.6">If their country is not covered, they go to the Fallback URL you set</span></div>
           <div style="display:flex;gap:12px;align-items:flex-start"><span style="background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700;color:var(--purple);white-space:nowrap">5</span><span style="font-size:13px;color:var(--text);line-height:1.6">If ipapi.co fails, it automatically retries with <code style="background:var(--card2);padding:1px 6px;border-radius:4px;font-size:12px">freeipapi.com</code> as backup</span></div>
         </div>
@@ -1794,7 +1794,7 @@
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px">④ Pushing One Casino More Than Another (Traffic Weights)</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <div style="font-size:13px;color:var(--text);line-height:1.6">Each assigned casino has a <strong>% weight</strong> input. Total must equal 100%.</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6">Example: IVYBET 70% + ROLLETTO 30% = visitors in shared GEOs get IVYBET 70% of the time, ROLLETTO 30% of the time — and it stays consistent per IP.</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">Example: NEEDFORSLOTS 70% + ROLLETTO 30% = visitors in shared GEOs get NEEDFORSLOTS 70% of the time, ROLLETTO 30% of the time — and it stays consistent per IP.</div>
           <div style="font-size:13px;color:var(--text);line-height:1.6">Click <strong>Auto-balance</strong> to split evenly. Weight changes push to Firebase automatically — live smartlinks update instantly.</div>
         </div>
       </div>
@@ -2333,7 +2333,7 @@
       <div class="form-section-label">Deal Info</div>
       <div class="form-group">
         <label class="form-label">Casino Name</label>
-        <input class="form-input" id="f-name" type="text" placeholder="e.g. IVYBET" required autocomplete="off">
+        <input class="form-input" id="f-name" type="text" placeholder="e.g. NEEDFORSLOTS" required autocomplete="off">
       </div>
       <div class="form-group">
         <label class="form-label">Affiliate URL</label>
@@ -2591,7 +2591,6 @@ function showSaveIndicator(state, msg) {
 }
 
 var SEED_DEALS = [
-  { id: 1, name: 'IVYBET',       url: 'https://track.7ladies.com/visit/?bta=35364&nci=5370&afp1&afp10=Facebook&utm_campaign=mindep10&afp2=Dark',   geos: 'AL AT AU BE CA CH DE DK ES FI GR HU IE IT LU ME MK NO NZ PL PT RO RS SI SK',    bgaming: true, deposit: 150, revshare: 40, username: 'darkadmin',                    password: 'Desc123$',     contact: '@SarahCass1' },
   { id: 2, name: 'ROLLETTO',     url: 'https://track.rollettoaffiliate.com/visit/?bta=38243&brand=rolletto&utm_campaign=Dark',                      geos: 'AU AT BE DE IE IT RO SK SI ES SE CH GB',                                          bgaming: true, deposit: 200, revshare: 40, username: 'darkadmin',                    password: 'Desc123$',     contact: '@Dakhets' },
   { id: 3, name: 'COSMOBET',     url: 'https://track.cosmobetpartners.com/visit/?bta=38241&brand=cosmobet&utm_campaign=Dark',                      geos: 'AU AT BE DE IE IT RO SK SI ES SE CH GB',                                          bgaming: true, deposit: 200, revshare: 40, username: 'darkadminR',                   password: 'Desc123$',     contact: '@Dakhets' },
   { id: 4, name: 'VELOBET',      url: 'https://track.velobetpartners.com/visit/?bta=38242&brand=velobet&utm_campaign=Dark',                         geos: 'AU AT BE DE IE IT RO SK SI ES SE CH GB',                                          bgaming: true, deposit: 200, revshare: 40, username: 'darkadminV',                   password: 'Desc123$',     contact: '@Dakhets' },
@@ -8167,7 +8166,7 @@ function renderBuilderPage() {
       (function(){
         var pbNetworks = [
           { id: 'cellxpert',      label: 'CellXpert',               obj: { name: 'cellxpert', clickMacro: '[afp]'      } },
-          { id: 'cellxpert_afp1', label: 'CellXpert (IVYBET / afp1)',obj: { name: 'cellxpert', clickMacro: '[afp1]'     } },
+          { id: 'cellxpert_afp1', label: 'CellXpert (legacy / afp1)',obj: { name: 'cellxpert', clickMacro: '[afp1]'     } },
           { id: 'affilika',       label: 'Affilika',                 obj: { name: 'affilika',  clickMacro: '{visit_id}' } },
         ];
         var pbNet    = (pbNetworks.find(function(n){ return n.id === pbPlatform; }) || pbNetworks[0]).obj;
